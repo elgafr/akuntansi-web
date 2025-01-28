@@ -44,9 +44,11 @@ export function LoginForm({
                   Forgot your password?
                 </a>
               </div>
+              <Link href="/dashboard">
               <Button type="submit" className="w-full">
                 Login
               </Button>
+              </Link>
             </div>
           </form>
           <Link href="/register">
