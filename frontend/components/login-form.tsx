@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 // import { Label } from "@/components/ui/label"
 import Link from "next/link";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function LoginForm({
   className,
@@ -27,7 +28,13 @@ export function LoginForm({
           <form>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Input id="nim" type="text" placeholder="NIM" required />
+                <Input
+                  id="nim"
+                  type="text"
+                  placeholder="NIM"
+                  required
+                  className="rounded-xl"
+                />
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center"></div>
@@ -36,23 +43,38 @@ export function LoginForm({
                   type="password"
                   placeholder="Password"
                   required
+                  className="rounded-xl"
                 />
-                <a
-                  href="#"
-                  className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                >
-                  Forgot your password?
-                </a>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="terms2" className="rounded-xl" />
+                    <label
+                      htmlFor="terms2"
+                      className="text-xs font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Remember me
+                    </label>
+                  </div>
+                  <a
+                    href="#"
+                    className="text-sm underline-offset-4 hover:underline text-destructive"
+                  >
+                    Forgot your password?
+                  </a>
+                </div>
               </div>
-              <Link href="/dashboard">
-              <Button type="submit" className="w-full">
-                Login
-              </Button>
+              <Link href="/perusahaan">
+                <Button
+                  type="submit"
+                  className="w-full bg-destructive rounded-xl"
+                >
+                  Login
+                </Button>
               </Link>
             </div>
           </form>
           <Link href="/register">
-            <Button variant="outline" className="w-full mt-4">
+            <Button variant="outline" className="w-full mt-4 rounded-xl border-destructive text-destructive">
               Sign Up
             </Button>
           </Link>

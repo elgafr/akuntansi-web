@@ -59,13 +59,13 @@ const data = {
   navMain: [
     {
       title: "Perusahaan",
-      url: "#",
+      url: "/perusahaan",
       icon: SquareTerminal,
       isActive: true,
     },
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: LayoutDashboard,
     },
     {
@@ -99,8 +99,7 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        {/* <TeamSwitcher teams={data.teams} /> */}
+      <SidebarHeader className="text-2xl font-bold text-center">
         LoremLpsum
       </SidebarHeader>
       <SidebarContent>

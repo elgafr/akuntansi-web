@@ -1,3 +1,5 @@
+'use client';
+
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,10 +21,10 @@ export function RegisterForm({
           <form>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Input id="email" type="text" placeholder="Name" required />
+                <Input id="name" type="text" placeholder="Name" required className="rounded-xl"/>
               </div>
               <div className="grid gap-2">
-                <Input id="email" type="email" placeholder="email" required />
+                <Input id="email" type="email" placeholder="email" required className="rounded-xl"/>
               </div>
               <div className="grid gap-2">
                 <Input
@@ -30,30 +32,29 @@ export function RegisterForm({
                   type="password"
                   placeholder="Password"
                   required
+                  className="rounded-xl"
                 />
               </div>
               <div className="grid gap-2">
-                <Input id="email" type="text" placeholder="NIM" required />
+                <Input id="nim" type="text" placeholder="NIM" required className="rounded-xl"/>
               </div>
               <div className="flex items-center space-x-2">
-                <Checkbox id="terms2" />
+                <Checkbox id="terms2" className="rounded-xl"/>
                 <label
                   htmlFor="terms2"
                   className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  By proceeding, you agree to the Terms and Conditions
+                  By proceeding, you agree to the <span className="text-destructive">Terms and Conditions</span> 
                 </label>
               </div>
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full bg-destructive rounded-xl">
                 Sign up
               </Button>
             </div>
             <Link href="/login">
             <div className="mt-4 text-center text-sm">
               Already have an account?{" "}
-              <a href="#" className="underline underline-offset-4">
-                Login
-              </a>
+              <span className="text-destructive">Login Now</span>
             </div>
             </Link>
           </form>

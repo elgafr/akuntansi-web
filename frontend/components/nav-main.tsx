@@ -1,49 +1,51 @@
-"use client"
+"use client";
 
-import {  type LucideIcon } from "lucide-react"
-
-
+import { type LucideIcon } from "lucide-react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   SidebarGroup,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  // SidebarMenuSub,
-  // SidebarMenuSubButton,
-  // SidebarMenuSubItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string
-    url: string
-    icon?: LucideIcon
-    isActive?: boolean
-    items?: {
-      title: string
-      url: string
-    }[]
-  }[]
+    title: string;
+    url: string;
+    icon?: LucideIcon;
+  }[];
 }) {
+  const pathname = usePathname();
+
   return (
     <SidebarGroup>
       <SidebarMenu className="space-y-4 mt-6">
-        {items.map((item) => (
-          <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton
-              tooltip={item.title}
-              className={`${
-                item.isActive ? "bg-blue-500 text-white" : "text-gray-700"
-              } rounded-xl p-3 hover:bg-blue-100 transition-colors duration-200`}
-            >
-              {item.icon && <item.icon className="w-5 h-5" />}
-              <span className="text-lg font-bold">{item.title}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
+        {items.map((item) => {
+          const isActive = pathname === item.url;
+
+          return (
+            <SidebarMenuItem key={item.title}>
+              <Link href={item.url} passHref>
+                <SidebarMenuButton
+                  tooltip={item.title}
+                  className={`${
+                    isActive
+                      ? "bg-destructive text-white"
+                      : "text-gray-700"
+                  } rounded-xl p-3 hover:bg-destructive transition-colors duration-200 flex items-center gap-2`}
+                >
+                  {item.icon && <item.icon className="w-5 h-5" />}
+                  <span className="text-lg font-bold">{item.title}</span>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          );
+        })}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }
