@@ -14,6 +14,7 @@ import {
   FormControl,
   FormField,
   FormItem,
+  // FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -23,11 +24,20 @@ import { z } from "zod";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  // SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  // CardDescription,
+  // CardHeader,
+  // CardTitle,
 } from "@/components/ui/card";
 
 // Schema for form validation
@@ -36,12 +46,6 @@ const FormSchema = z.object({
     message: "Company name must be at least 2 characters.",
   }),
 });
-
-const companies = [
-  { name: "PT. Jaya Abadi", category: "Jasa" },
-  { name: "PT. Sukses Makmur", category: "Manufaktur" },
-  { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
-];
 
 export default function Page() {
   const form = useForm<z.infer<typeof FormSchema>>({
@@ -65,9 +69,11 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-10">Perusahaan</h1>
-                  <h2 className="text-sm ml-10">
-                    Let&apos;s check your Company today
+                  <h1 className="text-2xl font-bold ml-6 text-black">
+                    Dashboard
+                  </h1>
+                  <h2 className="text-sm ml-6">
+                    Let&apos;s check your Dashboard today
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -100,7 +106,7 @@ export default function Page() {
                 control={form.control}
                 name="companyName"
                 render={({ field }) => (
-                  <FormItem className="w-full flex-1 ml-10">
+                  <FormItem className="w-full flex-1 ml-6">
                     <FormControl>
                       <div className="relative">
                         {/* Input dengan padding untuk ikon */}
@@ -128,37 +134,135 @@ export default function Page() {
                 <span className="flex items-center justify-center">
                   <PlusCircle className="w-6 h-6 text-white" />
                 </span>
-                Tambah Perusahaan
+                Pilih Perusahaan
               </Button>
             </form>
           </Form>
         </div>
-        {/* Container untuk Cards */}
-        <div className="flex gap-4 ml-24 mt-4">
-          {companies.map((company, index) => (
-            <Card key={index} className="w-[350px]">
-              <CardHeader>
-                <CardTitle className="text-2xl text-center text-destructive">
-                  {company.name}
-                </CardTitle>
-                <CardDescription className="text-center">
-                  Kategori - {company.category}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid w-full items-center gap-4">
-                  <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white">
-                      Hapus Perusahaan
-                    </Button>
-                  </div>
-                  <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl">Detail dan Akun</Button>
+
+        {/* Container utama */}
+        <div className="flex flex-col ml-10 mt-6 gap-4">
+          {/* Wrapper untuk memastikan header sejajar */}
+          <div className="flex items-start gap-20">
+            {/* Header Informasi Mahasiswa */}
+            <h2 className="text-lg font-semibold mb-2 w-[420px]">
+              Informasi Mahasiswa
+            </h2>
+
+            {/* Header Chart Pergerakan Akun */}
+            <h2 className="text-lg font-semibold mb-2 w-[450px]">
+              Chart Pergerakan Akun
+            </h2>
+          </div>
+
+          {/* Wrapper untuk Card & Select agar tetap sejajar */}
+          <div className="flex items-start gap-4">
+            {/* Card Informasi Mahasiswa */}
+            <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
+              <CardContent className="flex items-center justify-center gap-4 h-full w-full">
+                {/* Avatar (Selalu di Tengah) */}
+                <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
+                  <AvatarImage
+                    src="https://randomuser.me/api/portraits/women/79.jpg"
+                    alt="Mahasiswa"
+                  />
+                </Avatar>
+
+                {/* Informasi Mahasiswa */}
+                <div className="text-md w-full">
+                  <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
+                    {/* Nama Mahasiswa */}
+                    <p className="font-semibold whitespace-nowrap">
+                      Nama Mahasiswa
+                    </p>
+                    <p className="text-right w-[20px]">:</p>
+                    <p className="text-left break-words">Cody Alexander</p>
+
+                    {/* NIM */}
+                    <p className="font-semibold whitespace-nowrap">NIM</p>
+                    <p className="text-right w-[20px]">:</p>
+                    <p className="text-left break-words">123456789101112</p>
+
+                    {/* Program Studi */}
+                    <p className="font-semibold whitespace-nowrap">
+                      Program Studi
+                    </p>
+                    <p className="text-right w-[20px]">:</p>
+                    <p className="text-left break-words">Computer Science</p>
+
+                    {/* Semester */}
+                    <p className="font-semibold whitespace-nowrap">Semester</p>
+                    <p className="text-right w-[20px]">:</p>
+                    <p className="text-left">5</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
+
+            {/* Select di Samping Card */}
+            <div className="flex flex-col gap-3 text-gray-600 w-[450px]">
+              {/* Select 1 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-destructive">
+                  Pilih Akun Pertama
+                </label>
+                <Select>
+                  <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
+                    <SelectValue placeholder="Pilih Akun Pertama" />
+                  </SelectTrigger>
+                  <SelectContent className="text-gray-500">
+                    <SelectGroup>
+                      <SelectItem value="teknik">Teknik</SelectItem>
+                      <SelectItem value="ekonomi">Ekonomi</SelectItem>
+                      <SelectItem value="hukum">Hukum</SelectItem>
+                      <SelectItem value="kedokteran">Kedokteran</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Select 2 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-destructive">
+                  Pilih Akun Kedua
+                </label>
+                <Select>
+                  <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
+                    <SelectValue placeholder="Pilih Akun Kedua" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="informatika">Informatika</SelectItem>
+                      <SelectItem value="manajemen">Manajemen</SelectItem>
+                      <SelectItem value="akuntansi">Akuntansi</SelectItem>
+                      <SelectItem value="hukum">Ilmu Hukum</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Select 3 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-destructive">
+                  Pilih Akun Ketiga
+                </label>
+                <Select>
+                  <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
+                    <SelectValue placeholder="Pilih Akun Ketiga" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="1">Semester 1</SelectItem>
+                      <SelectItem value="2">Semester 2</SelectItem>
+                      <SelectItem value="3">Semester 3</SelectItem>
+                      <SelectItem value="4">Semester 4</SelectItem>
+                      <SelectItem value="5">Semester 5</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

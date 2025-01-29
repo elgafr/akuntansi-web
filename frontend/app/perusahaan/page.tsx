@@ -41,6 +41,7 @@ const companies = [
   { name: "PT. Jaya Abadi", category: "Jasa" },
   { name: "PT. Sukses Makmur", category: "Manufaktur" },
   { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
+  
 ];
 
 export default function Page() {
