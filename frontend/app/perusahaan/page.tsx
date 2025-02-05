@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useForm } from "react-hook-form";
 import {
@@ -22,6 +23,10 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { z } from "zod";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
+import Link from "next/link";
+import FormModal from "@/components/ui/custom/form-modal/add-company/add-company";
+import { companyFormConfig } from "@/components/ui/custom/form-modal/add-company/add-company.config"; // Correct import
+
 import {
   Card,
   CardContent,
@@ -41,7 +46,6 @@ const companies = [
   { name: "PT. Jaya Abadi", category: "Jasa" },
   { name: "PT. Sukses Makmur", category: "Manufaktur" },
   { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
-  
 ];
 
 export default function Page() {
@@ -55,6 +59,12 @@ export default function Page() {
   function onSubmit(data: z.infer<typeof FormSchema>) {
     alert(`Form submitted with Compoany Name: ${data.companyName}`);
   }
+
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+  };
 
   return (
     <SidebarProvider>
@@ -123,14 +133,27 @@ export default function Page() {
 
               {/* Tombol di samping input */}
               <Button
-                type="submit"
-                className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10" // Sama dengan tinggi input dan padding
+                type="button"
+                className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10"
+                onClick={() => handleOpenChange(true)} // Open the modal
               >
                 <span className="flex items-center justify-center">
                   <PlusCircle className="w-6 h-6 text-white" />
                 </span>
                 Tambah Perusahaan
               </Button>
+
+              {/* Modal */}
+              {isOpen && (
+                <FormModal
+                  triggerText="Tambah Perusahaan"
+                  title="Input Data Perusahaan"
+                  formFields={companyFormConfig.fields}
+                  buttons={companyFormConfig.buttons}
+                  defaultOpen={isOpen}
+                  onOpenChange={handleOpenChange}
+                />
+              )}
             </form>
           </Form>
         </div>
@@ -153,9 +176,11 @@ export default function Page() {
                       Hapus Perusahaan
                     </Button>
                   </div>
-                  <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl">Detail dan Akun</Button>
-                  </div>
+                  <Link href="/detail-akun">
+                    <div className="flex flex-col space-y-1.5">
+                      <Button className="rounded-xl">Detail dan Akun</Button>
+                    </div>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

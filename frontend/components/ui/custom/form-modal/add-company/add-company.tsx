@@ -19,7 +19,7 @@ import {
 import type { FormModalProps } from "./add-company.config";
 
 export const FormModal = ({
-  triggerText = "Open Form",
+  // triggerText = "Open Form",
   title = "Input Data Perusahaan",
   formFields = [],
   buttons = [],
@@ -36,12 +36,12 @@ export const FormModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline">{triggerText}</Button>
+        {/* <Button variant="outline">{triggerText}</Button> */}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-[600px] p-0 bg-background rounded-3xl overflow-hidden">
         <DialogHeader className="p-8 pb-0">
-          <DialogTitle className="text-[2rem] font-normal text-primary">
+          <DialogTitle className="text-[2rem] text-primary text-center">
             {title}
           </DialogTitle>
         </DialogHeader>
