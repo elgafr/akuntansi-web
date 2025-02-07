@@ -1,7 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useForm } from "react-hook-form";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,19 +9,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { z } from "zod";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
+import Link from "next/link";
+import FormModal from "@/components/ui/custom/form-modal/add-company/add-company";
 import {
   Card,
   CardContent,
@@ -30,30 +23,43 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Schema for form validation
-const FormSchema = z.object({
-  companyName: z.string().min(2, {
-    message: "Company name must be at least 2 characters.",
-  }),
-});
-
-const companies = [
-  { name: "PT. Jaya Abadi", category: "Jasa" },
-  { name: "PT. Sukses Makmur", category: "Manufaktur" },
-  { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
-  
-];
+interface Company {
+  name: string;
+  category: string;
+}
 
 export default function Page() {
-  const form = useForm<z.infer<typeof FormSchema>>({
-    resolver: zodResolver(FormSchema),
-    defaultValues: {
-      companyName: "",
-    },
-  });
+  const [companyList, setCompanyList] = useState<Company[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false); // State to manage modal visibility
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    alert(`Form submitted with Compoany Name: ${data.companyName}`);
+  // Load companies from localStorage on mount
+  useEffect(() => {
+    const savedCompanies = localStorage.getItem("companies");
+    if (savedCompanies) {
+      setCompanyList(JSON.parse(savedCompanies));
+    } else {
+      // Initialize with default companies if none exist
+      const defaultCompanies = [
+        { name: "PT. Jaya Abadi", category: "Jasa" },
+        { name: "PT. Sukses Makmur", category: "Manufaktur" },
+        { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
+      ];
+      setCompanyList(defaultCompanies);
+      localStorage.setItem("companies", JSON.stringify(defaultCompanies));
+    }
+  }, []);
+
+  // Handle adding new company from modal
+  const handleAddCompany = (newCompany: Company) => {
+    const updatedCompanies = [...companyList, newCompany];
+    setCompanyList(updatedCompanies);
+    localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+  };
+
+  const hendleDeleteCompany = (companyName: string) =>{
+    const updatedCompanies = companyList.filter((company) => company.name !== companyName);
+    setCompanyList(updatedCompanies);
+    localStorage.setItem("companies", JSON.stringify(updatedCompanies));
   }
 
   return (
@@ -90,53 +96,32 @@ export default function Page() {
           </div>
         </header>
 
-        {/* Form Section */}
+        {/* Search and Add Button Section */}
         <div className="flex flex-col gap-4 p-4">
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="flex items-center gap-4 w-full"
-            >
-              <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem className="w-full flex-1 ml-10">
-                    <FormControl>
-                      <div className="relative">
-                        {/* Input dengan padding untuk ikon */}
-                        <Input
-                          placeholder="Cari Perusahaan"
-                          {...field}
-                          className="w-full pl-10 h-10 rounded-xl"
-                        />
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                          <FaBuilding className="w-5 h-5 text-gray-700" />{" "}
-                          {/* Ikon perusahaan */}
-                        </div>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          <div className="flex items-center gap-4 w-full">
+            <div className="relative w-full flex-1 ml-10">
+              <Input
+                placeholder="Cari Perusahaan"
+                className="w-full pl-10 h-10 rounded-xl"
               />
-
-              {/* Tombol di samping input */}
-              <Button
-                type="submit"
-                className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10" // Sama dengan tinggi input dan padding
-              >
-                <span className="flex items-center justify-center">
-                  <PlusCircle className="w-6 h-6 text-white" />
-                </span>
-                Tambah Perusahaan
-              </Button>
-            </form>
-          </Form>
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                <FaBuilding className="w-5 h-5 text-gray-700" />
+              </div>
+            </div>
+            {/* Add Company Button is placed below the profile, triggering modal */}
+            <Button
+              className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10"
+              onClick={() => setIsModalOpen(true)} // Open the modal when this button is clicked
+            >
+              <PlusCircle className="w-6 h-6 text-white" />
+              Tambah Perusahaan
+            </Button>
+          </div>
         </div>
-        {/* Container untuk Cards */}
-        <div className="flex gap-4 ml-24 mt-4">
-          {companies.map((company, index) => (
+
+        {/* Company Cards Section */}
+        <div className="flex flex-wrap gap-4 ml-24 mt-4">
+          {companyList.map((company, index) => (
             <Card key={index} className="w-[350px]">
               <CardHeader>
                 <CardTitle className="text-2xl text-center text-destructive">
@@ -149,18 +134,28 @@ export default function Page() {
               <CardContent>
                 <div className="grid w-full items-center gap-4">
                   <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white">
+                    <Button className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white" onClick={() => hendleDeleteCompany(company.name)}>
                       Hapus Perusahaan
                     </Button>
                   </div>
-                  <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl">Detail dan Akun</Button>
-                  </div>
+                  <Link href="/detail-akun">
+                    <div className="flex flex-col space-y-1.5">
+                      <Button className="rounded-xl">Detail dan Akun</Button>
+                    </div>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
+
+        {/* Add Company Modal */}
+        <FormModal
+          title="Input Data Perusahaan"
+          isOpen={isModalOpen} // Control the modal open state from parent
+          onOpenChange={setIsModalOpen} // Close the modal when needed
+          onSave={handleAddCompany} // Handle saving data to parent
+        />
       </SidebarInset>
     </SidebarProvider>
   );

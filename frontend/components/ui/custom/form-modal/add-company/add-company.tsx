@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -16,32 +15,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { FormModalProps } from "./add-company.config";
+
+interface FormModalProps {
+  title?: string;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave?: (data: { name: string; category: string }) => void;
+}
 
 export const FormModal = ({
-  triggerText = "Open Form",
   title = "Input Data Perusahaan",
-  formFields = [],
-  buttons = [],
-  defaultOpen = false,
+  isOpen,
   onOpenChange,
+  onSave,
 }: FormModalProps) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [companyName, setCompanyName] = useState("");
+  const [category, setCategory] = useState("");
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    onOpenChange?.(open);
+  const handleSubmit = () => {
+    if (companyName && category && onSave) {
+      onSave({
+        name: companyName,
+        category: category,
+      });
+    }
+    setCompanyName(""); // Reset company name
+    setCategory(""); // Reset category
+    onOpenChange(false); // Close the modal after saving
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline">{triggerText}</Button>
-      </DialogTrigger>
-
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] p-0 bg-background rounded-3xl overflow-hidden">
         <DialogHeader className="p-8 pb-0">
-          <DialogTitle className="text-[2rem] font-normal text-primary">
+          <DialogTitle className="text-[2rem] text-primary text-center">
             {title}
           </DialogTitle>
         </DialogHeader>
@@ -52,19 +59,21 @@ export const FormModal = ({
             <Input
               placeholder="Input nama perusahaan"
               className="rounded-xl h-12 text-gray-500 text-base"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
             <label className="text-primary text-lg">Kategori Perusahaan</label>
-            <Select>
+            <Select onValueChange={(value) => setCategory(value)}>
               <SelectTrigger className="rounded-xl h-12 text-gray-500 text-base">
-                <SelectValue placeholder="Jasa" />
+                <SelectValue placeholder="Pilih Kategori" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="jasa">Jasa</SelectItem>
-                <SelectItem value="manufaktur">Manufaktur</SelectItem>
-                <SelectItem value="dagang">Dagang</SelectItem>
+                <SelectItem value="Jasa">Jasa</SelectItem>
+                <SelectItem value="Manufaktur">Manufaktur</SelectItem>
+                <SelectItem value="Dagang">Dagang</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -89,25 +98,17 @@ export const FormModal = ({
             <Button
               variant="secondary"
               className="h-12 rounded-xl bg-red-200 hover:bg-red-300 text-base font-normal"
-              onClick={() => handleOpenChange(false)}
+              onClick={() => onOpenChange(false)} // Close the modal on Cancel
             >
               Batal
             </Button>
             <Button
               className="h-12 rounded-xl bg-primary hover:bg-primary/90 text-base font-normal"
-              onClick={() => {
-                // Handle save
-                handleOpenChange(false);
-              }}
+              onClick={handleSubmit} // Save data and close modal
             >
               Simpan data
             </Button>
           </div>
-
-          <p className="text-center text-gray-500 text-sm">
-            Pastikan data yang Anda masukkan benar{" "}
-            <span className="text-primary">sebelum menyimpan</span>.
-          </p>
         </div>
       </DialogContent>
     </Dialog>

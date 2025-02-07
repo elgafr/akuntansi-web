@@ -47,9 +47,11 @@ export function RegisterForm({
                   By proceeding, you agree to the <span className="text-destructive">Terms and Conditions</span> 
                 </label>
               </div>
+              <Link href="/otp">
               <Button type="submit" className="w-full bg-destructive rounded-xl">
                 Sign up
               </Button>
+              </Link>
             </div>
             <Link href="/login">
             <div className="mt-4 text-center text-sm">
