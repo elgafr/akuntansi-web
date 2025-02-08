@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Save, Trash2, Plus, Pencil, X, Download, Upload, Moon } from "lucide-react";
+import { Save, Trash2, Plus, Pencil, X, Download, Upload, Moon, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAccounts } from "@/contexts/AccountContext";
 import {
   Select,
@@ -16,6 +16,7 @@ import { useTransactions } from "@/contexts/TransactionContext";
 import Papa from 'papaparse';
 import { AddTransactionForm } from "./AddTransactionForm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Card } from "@/components/ui/card";
 
 interface Transaction {
   date: string;
@@ -52,6 +53,7 @@ export function AddTransactionTable({
   transactions = [], 
   onTransactionsChange 
 }: AddTransactionTableProps) {
+  const { accounts: contextAccounts } = useAccounts();
   const { setTransactions } = useTransactions();
   const [search, setSearch] = useState("");
   const [newTransactions, setNewTransactions] = useState<Transaction[]>([]);
@@ -59,6 +61,10 @@ export function AddTransactionTable({
   const [pageSize, setPageSize] = useState(10);
   const [showAll, setShowAll] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [inlineEditIndex, setInlineEditIndex] = useState<number | null>(null);
+  const [inlineEditData, setInlineEditData] = useState<Transaction | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -99,35 +105,33 @@ export function AddTransactionTable({
     setNewTransactions(updatedTransactions);
   };
 
-  // Update fungsi getAllAccounts untuk menampilkan akun utama dan sub akun
+  // Update fungsi getAllAccounts untuk menggunakan contextAccounts
   const getAllAccounts = () => {
+    const accountsData = contextAccounts || accounts;
+    console.log("Using accounts data:", accountsData);
+    
+    if (!accountsData || accountsData.length === 0) {
+        console.warn("No accounts data available");
+        return [];
+    }
+
     const allAccounts: { kodeAkun: string; namaAkun: string }[] = [];
 
-    if (!accounts) return allAccounts;
-
-    accounts.forEach(account => {
-      // Tambahkan akun utama
-      allAccounts.push({
-        kodeAkun: account.kodeAkun,
-        namaAkun: `${account.namaAkun} (${account.kodeAkun})`
-      });
-
-      // Tambahkan sub akun jika ada
-      if (account.subAccounts && account.subAccounts.length > 0) {
-        account.subAccounts.forEach((sub: { 
-          namaSubAkun: string;
-          kodeAkunInduk: string;
-          kodeSubAkun: string;
-          debit: number;
-          kredit: number;
-        }) => {
-          const fullKodeAkun = `${sub.kodeAkunInduk},${sub.kodeSubAkun}`;
-          allAccounts.push({
-            kodeAkun: fullKodeAkun,
-            namaAkun: `${sub.namaSubAkun} (${fullKodeAkun})`
-          });
+    accountsData.forEach(account => {
+        allAccounts.push({
+            kodeAkun: account.kodeAkun,
+            namaAkun: account.namaAkun
         });
-      }
+
+        if (account.subAccounts?.length) {
+            account.subAccounts.forEach(subAccount => {
+                const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
+                allAccounts.push({
+                    kodeAkun: fullKodeAkun,
+                    namaAkun: subAccount.namaSubAkun
+                });
+            });
+        }
     });
 
     return allAccounts;
@@ -215,23 +219,25 @@ export function AddTransactionTable({
     t.namaAkun.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Handle CSV export
+  // Tambahkan fungsi handleExportCSV
   const handleExportCSV = () => {
-    const dataToExport = transactions.map(transaction => ({
-      Date: transaction.date,
-      'Account Code': transaction.kodeAkun,
-      'Account Name': transaction.namaAkun,
-      Description: transaction.description || '',
-      Debit: transaction.debit || 0,
-      Credit: transaction.kredit || 0
+    const csvData = transactions.map(t => ({
+      Tanggal: t.date,
+      Bukti: t.documentType,
+      Keterangan: t.description,
+      'Kode Akun': t.kodeAkun,
+      'Nama Akun': t.namaAkun,
+      Debit: t.debit,
+      Kredit: t.kredit
     }));
 
-    const csv = Papa.unparse(dataToExport);
+    const csv = Papa.unparse(csvData);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
+    
     link.setAttribute('href', url);
-    link.setAttribute('download', 'transactions.csv');
+    link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -276,21 +282,83 @@ export function AddTransactionTable({
     }
   };
 
+  // Tambahkan fungsi untuk menangani inline edit
+  const handleInlineEdit = (index: number) => {
+    const transaction = transactions[index];
+    setInlineEditIndex(index);
+    setInlineEditData(transaction);
+  };
+
+  const handleInlineSave = (index: number) => {
+    if (!inlineEditData) return;
+    
+    const updatedTransactions = [...transactions];
+    updatedTransactions[index] = inlineEditData;
+    setTransactions(updatedTransactions);
+    setInlineEditIndex(null);
+    setInlineEditData(null);
+  };
+
+  const getTotalDebit = () => {
+    return transactions.reduce((total, transaction) => total + transaction.debit, 0);
+  };
+
+  const getTotalKredit = () => {
+    return transactions.reduce((total, transaction) => total + transaction.kredit, 0);
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center gap-4 p-4">
+    <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
+      {/* Header Section with Totals */}
+      <div className="flex gap-4 mb-6">
+        {/* Debit & Kredit Container */}
+        <div className="flex flex-1 flex-grow">
+          {/* Debit Card */}
+          <Card className="bg-red-400 p-4 rounded-r-none rounded-l-xl flex-1 border-r-0">
+            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-l-xl rounded-r-none h-full">
+              <p className="text-sm text-white/90">Debit</p>
+              <p className="text-lg font-medium text-white">
+                Rp {getTotalDebit().toLocaleString()}
+              </p>
+            </div>
+          </Card>
+
+          {/* Kredit Card */}
+          <Card className="bg-red-400 p-4 rounded-l-none rounded-r-xl flex-1 border-l-0">
+            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-l-none rounded-r-xl h-full">
+              <p className="text-sm text-white/90">Kredit</p>
+              <p className="text-lg font-medium text-white">
+                Rp {getTotalKredit().toLocaleString()}
+              </p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Unbalanced Card */}
+        <Card className="bg-red-400 p-4 rounded-xl w-1/3">
+          <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl h-full">
+            <p className="text-sm text-white/90">Unbalanced</p>
+            <p className="text-lg font-medium text-white">
+              Difference: Rp {Math.abs(getTotalDebit() - getTotalKredit()).toLocaleString()}
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      {/* Controls Section */}
+      <div className="flex justify-between items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Input
             placeholder="Search transactions..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-[300px]"
+            className="w-[300px] rounded-lg border-gray-200"
           />
           <Select
             value={showAll ? 'all' : pageSize.toString()}
             onValueChange={handlePageSizeChange}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] rounded-lg border-gray-200">
               <SelectValue placeholder="Rows per page" />
             </SelectTrigger>
             <SelectContent>
@@ -313,7 +381,7 @@ export function AddTransactionTable({
             variant="outline"
             size="sm"
             onClick={() => document.getElementById('csvInput')?.click()}
-            className="flex items-center gap-2 !rounded-lg"
+            className="flex items-center gap-2 rounded-lg border-gray-200"
           >
             <Upload className="h-4 w-4" />
             Import CSV
@@ -322,7 +390,7 @@ export function AddTransactionTable({
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
-            className="flex items-center gap-2 !rounded-lg"
+            className="flex items-center gap-2 rounded-lg border-gray-200"
           >
             <Download className="h-4 w-4" />
             Export CSV
@@ -330,165 +398,352 @@ export function AddTransactionTable({
           <Button
             onClick={() => setIsFormModalOpen(true)}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2 !rounded-lg"
+            className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2 rounded-lg"
           >
             <Plus className="h-4 w-4" />
-            Add Transaction
+            Add Acc
           </Button>
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Tanggal</TableHead>
-            <TableHead>Bukti</TableHead>
-            <TableHead>Deskripsi</TableHead>
-            <TableHead>Nama Akun</TableHead>
-            <TableHead>Kode Akun</TableHead>
-            <TableHead>Debit</TableHead>
-            <TableHead>Kredit</TableHead>
-            <TableHead>Aksi</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {/* New Transactions */}
-          {newTransactions.map((transaction, index) => (
-            <TableRow key={`new-${index}`}>
-              <TableCell>
-                <Input
-                  type="date"
-                  value={transaction.date}
-                  onChange={(e) => handleNewTransactionChange(index, "date", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={transaction.documentType}
-                  onChange={(e) => handleNewTransactionChange(index, "documentType", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={transaction.description}
-                  onChange={(e) => handleNewTransactionChange(index, "description", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Select
-                  value={transaction.namaAkun || undefined}
-                  onValueChange={(value) => handleAccountSelect(index, 'namaAkun', value, true)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Pilih Akun" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAllAccounts().map((account) => (
-                      <SelectItem 
-                        key={account.kodeAkun} 
-                        value={account.namaAkun}
-                      >
-                        {account.namaAkun}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Select
-                  value={transaction.kodeAkun || undefined}
-                  onValueChange={(value) => handleAccountSelect(index, 'kodeAkun', value, true)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Pilih Kode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAllAccounts().map((account) => (
-                      <SelectItem 
-                        key={account.kodeAkun} 
-                        value={account.kodeAkun}
-                        className={!account.kodeAkun.includes(',') ? 'font-semibold' : 'pl-4'}
-                      >
-                        {account.kodeAkun}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={transaction.debit}
-                  onChange={(e) => handleNewTransactionChange(index, "debit", Number(e.target.value))}
-                  disabled={transaction.kredit > 0}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={transaction.kredit}
-                  onChange={(e) => handleNewTransactionChange(index, "kredit", Number(e.target.value))}
-                  disabled={transaction.debit > 0}
-                />
-              </TableCell>
-              <TableCell>
-                <div className="flex space-x-2">
-                  <Button variant="default" size="icon" onClick={() => handleSave(index)}>
-                    <Save className="h-4 w-4" />
-                  </Button>
-                  <Button variant="destructive" size="icon" onClick={() => handleDelete(index, true)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <Table>
+          <TableHeader className="bg-gray-50 border-b border-gray-200">
+            <TableRow>
+              <TableHead className="text-gray-600">Tanggal</TableHead>
+              <TableHead className="text-gray-600">Bukti</TableHead>
+              <TableHead className="text-gray-600">Keterangan</TableHead>
+              <TableHead className="text-gray-600">Kode akun</TableHead>
+              <TableHead className="text-gray-600">Nama Akun</TableHead>
+              <TableHead className="text-gray-600 text-right">Debit</TableHead>
+              <TableHead className="text-gray-600 text-right">Kredit</TableHead>
+              <TableHead className="text-gray-600 w-[100px]">Aksi</TableHead>
             </TableRow>
-          ))}
-
-          {/* Existing Transactions */}
-          {filteredTransactions.map((transaction, index) => (
-            <TableRow key={index}>
-              <TableCell>{transaction.date}</TableCell>
-              <TableCell>{transaction.documentType}</TableCell>
-              <TableCell>{transaction.description}</TableCell>
-              <TableCell>{transaction.namaAkun}</TableCell>
-              <TableCell>{transaction.kodeAkun}</TableCell>
-              <TableCell>{transaction.debit.toLocaleString()}</TableCell>
-              <TableCell>{transaction.kredit.toLocaleString()}</TableCell>
-              <TableCell>
-                <div className="flex space-x-2">
-                  {editingIndex === index ? (
-                    <Button 
-                      variant="default" 
-                      size="icon"
-                      className="bg-emerald-600 hover:bg-emerald-700 !rounded-lg shadow-sm transition-colors"
-                      onClick={() => handleUpdate(index)}
-                    >
+          </TableHeader>
+          <TableBody>
+            {/* New Transactions */}
+            {newTransactions.map((transaction, index) => (
+              <TableRow key={`new-${index}`}>
+                <TableCell>
+                  <Input
+                    type="date"
+                    value={transaction.date}
+                    onChange={(e) => handleNewTransactionChange(index, "date", e.target.value)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    value={transaction.documentType}
+                    onChange={(e) => handleNewTransactionChange(index, "documentType", e.target.value)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    value={transaction.description}
+                    onChange={(e) => handleNewTransactionChange(index, "description", e.target.value)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Select
+                    value={transaction.kodeAkun || undefined}
+                    onValueChange={(value) => handleAccountSelect(index, 'kodeAkun', value, true)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Pilih Kode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAllAccounts().map((account) => (
+                        <SelectItem 
+                          key={account.kodeAkun} 
+                          value={account.kodeAkun}
+                          className={!account.kodeAkun.includes(',') ? 'font-semibold' : 'pl-4'}
+                        >
+                          {account.kodeAkun}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Select
+                    value={transaction.namaAkun || undefined}
+                    onValueChange={(value) => handleAccountSelect(index, 'namaAkun', value, true)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Pilih Nama Akun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAllAccounts().map((account) => (
+                        <SelectItem 
+                          key={account.kodeAkun} 
+                          value={account.namaAkun}
+                          className="hover:bg-gray-100 cursor-pointer font-normal"
+                        >
+                          {account.namaAkun}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={transaction.debit}
+                    onChange={(e) => handleNewTransactionChange(index, "debit", Number(e.target.value))}
+                    disabled={transaction.kredit > 0}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={transaction.kredit}
+                    onChange={(e) => handleNewTransactionChange(index, "kredit", Number(e.target.value))}
+                    disabled={transaction.debit > 0}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button variant="default" size="icon" onClick={() => handleSave(index)}>
                       <Save className="h-4 w-4" />
                     </Button>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      className="hover:border-blue-500 hover:text-blue-500 !rounded-lg shadow-sm transition-colors"
-                      onClick={() => handleEdit(index)}
-                    >
-                      <Pencil className="h-4 w-4" />
+                    <Button variant="destructive" size="icon" onClick={() => handleDelete(index, true)}>
+                      <X className="h-4 w-4" />
                     </Button>
-                  )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+
+            {/* Existing Transactions */}
+            {filteredTransactions.map((transaction, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Input
+                      type="date"
+                      value={inlineEditData?.date}
+                      onChange={(e) => setInlineEditData({
+                        ...inlineEditData!,
+                        date: e.target.value
+                      })}
+                    />
+                  ) : transaction.date}
+                </TableCell>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Input
+                      value={inlineEditData?.documentType}
+                      onChange={(e) => setInlineEditData({
+                        ...inlineEditData!,
+                        documentType: e.target.value
+                      })}
+                    />
+                  ) : transaction.documentType}
+                </TableCell>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Input
+                      value={inlineEditData?.description}
+                      onChange={(e) => setInlineEditData({
+                        ...inlineEditData!,
+                        description: e.target.value
+                      })}
+                    />
+                  ) : transaction.description}
+                </TableCell>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Select
+                      value={inlineEditData?.kodeAkun || transaction.kodeAkun}
+                      onValueChange={(value) => {
+                          const account = getAllAccounts().find(acc => acc.kodeAkun === value);
+                          if (account) {
+                              setInlineEditData({
+                                  ...inlineEditData!,
+                                  kodeAkun: value,
+                                  namaAkun: account.namaAkun
+                              });
+                          }
+                      }}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Pilih Kode Akun">
+                                {inlineEditData?.kodeAkun || transaction.kodeAkun}
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {getAllAccounts().map((account) => (
+                                <SelectItem 
+                                    key={account.kodeAkun} 
+                                    value={account.kodeAkun}
+                                    className="hover:bg-gray-100 cursor-pointer font-normal"
+                                >
+                                    {account.kodeAkun}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                  ) : transaction.kodeAkun}
+                </TableCell>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Select
+                      value={inlineEditData?.namaAkun || transaction.namaAkun}
+                      onValueChange={(value) => {
+                          const account = getAllAccounts().find(acc => acc.namaAkun === value);
+                          if (account) {
+                              setInlineEditData({
+                                  ...inlineEditData!,
+                                  namaAkun: value,
+                                  kodeAkun: account.kodeAkun
+                              });
+                          }
+                      }}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Pilih Nama Akun">
+                                {inlineEditData?.namaAkun || transaction.namaAkun}
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {getAllAccounts().map((account) => (
+                                <SelectItem 
+                                    key={account.kodeAkun} 
+                                    value={account.namaAkun}
+                                    className="hover:bg-gray-100 cursor-pointer font-normal"
+                                >
+                                    {account.namaAkun}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                  ) : transaction.namaAkun}
+                </TableCell>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Input
+                      type="number"
+                      value={inlineEditData?.debit}
+                      onChange={(e) => setInlineEditData({
+                        ...inlineEditData!,
+                        debit: parseFloat(e.target.value) || 0
+                      })}
+                    />
+                  ) : transaction.debit.toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  {inlineEditIndex === index ? (
+                    <Input
+                      type="number"
+                      value={inlineEditData?.kredit}
+                      onChange={(e) => setInlineEditData({
+                        ...inlineEditData!,
+                        kredit: parseFloat(e.target.value) || 0
+                      })}
+                    />
+                  ) : transaction.kredit.toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    {inlineEditIndex === index ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleInlineSave(index)}
+                      >
+                        <Check className="h-4 w-4 text-primary" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleInlineEdit(index)}
+                      >
+                        <Pencil className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(index, false)}
+                    >
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between py-4">
+        <p className="text-sm text-gray-500">
+          Page {currentPage} of {totalPages}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="rounded-lg border-gray-200 px-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          {/* Page Numbers */}
+          <div className="flex gap-1">
+            {[...Array(totalPages)].map((_, index) => {
+              const pageNumber = index + 1;
+              // Show first page, current page, last page, and pages around current
+              if (
+                pageNumber === 1 ||
+                pageNumber === totalPages ||
+                (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+              ) {
+                return (
                   <Button
-                    variant="destructive"
-                    size="icon"
-                    className="hover:bg-red-600 !rounded-lg shadow-sm transition-colors"
-                    onClick={() => handleDelete(index, false)}
+                    key={pageNumber}
+                    variant={currentPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`rounded-lg min-w-[40px] ${
+                      currentPage === pageNumber 
+                        ? "bg-red-500 text-white hover:bg-red-600" 
+                        : "border-gray-200"
+                    }`}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {pageNumber}
                   </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                );
+              }
+              // Show ellipsis for gaps
+              if (
+                pageNumber === currentPage - 2 ||
+                pageNumber === currentPage + 2
+              ) {
+                return (
+                  <span key={pageNumber} className="px-2 py-2 text-gray-500">
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="rounded-lg border-gray-200 px-2"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       <Dialog open={isFormModalOpen} onOpenChange={setIsFormModalOpen}>
         <DialogContent className="sm:max-w-[1080px] p-6 !rounded-2xl overflow-hidden border">

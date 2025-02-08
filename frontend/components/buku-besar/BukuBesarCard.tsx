@@ -11,113 +11,55 @@ export function BukuBesarCard({ selectedMainAccount }: BukuBesarCardProps) {
   const { accounts } = useAccounts();
   const { transactions } = useTransactions();
 
-  // Calculate totals based on selected account
-  const calculateTotals = () => {
+  const calculateSelectedAccountTotals = () => {
     if (selectedMainAccount === "all") {
+      // Jika "all", tampilkan total semua transaksi
       return {
-        totalDebit: 0,
-        totalKredit: 0,
-        accountName: "All Accounts",
-        accountCode: "",
+        totalDebit: transactions.reduce((sum, t) => sum + (Number(t.debit) || 0), 0),
+        totalKredit: transactions.reduce((sum, t) => sum + (Number(t.kredit) || 0), 0),
       };
     }
 
-    const [mainCode, mainName] = selectedMainAccount.split(" ");
+    // Ambil kode akun utama dari selectedMainAccount
+    const mainCode = selectedMainAccount.split(" ")[0];
+    
     let totalDebit = 0;
     let totalKredit = 0;
 
-    // Add up opening balances from accounts
-    accounts.forEach(account => {
-      const accountMainCode = account.kodeAkun.split(",")[0];
-      if (accountMainCode === mainCode) {
-        totalDebit += account.debit || 0;
-        totalKredit += account.kredit || 0;
-      }
-      if (account.subKodeAkun) {
-        const subMainCode = account.subKodeAkun.split(",")[0];
-        if (subMainCode === mainCode) {
-          totalDebit += account.debit || 0;
-          totalKredit += account.kredit || 0;
-        }
-      }
-    });
-
-    // Add up transactions
+    // Hitung total dari akun utama dan sub akun
     transactions.forEach(transaction => {
-      const transactionMainCode = transaction.kodeAkun.split(",")[0];
-      if (transactionMainCode === mainCode) {
+      const [transMainCode] = transaction.kodeAkun.split(',');
+      if (transMainCode === mainCode) {
         totalDebit += Number(transaction.debit) || 0;
         totalKredit += Number(transaction.kredit) || 0;
       }
     });
 
-    return {
-      totalDebit,
-      totalKredit,
-      accountName: mainName,
-      accountCode: mainCode,
-    };
+    return { totalDebit, totalKredit };
   };
 
-  const { totalDebit, totalKredit, accountName, accountCode } = calculateTotals();
-  const balance = totalDebit - totalKredit;
+  const { totalDebit, totalKredit } = calculateSelectedAccountTotals();
+  const difference = Math.abs(totalDebit - totalKredit);
 
   return (
-    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Debit</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-emerald-600">
-            Rp {totalDebit.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {accountCode ? `${accountCode} - ${accountName}` : accountName}
-          </p>
-        </CardContent>
+    <div className="grid grid-cols-3 gap-4 mb-6">
+      <Card className="bg-red-500 text-white p-4 rounded-xl">
+        <p className="text-sm opacity-90">Debit</p>
+        <p className="text-lg font-medium">
+          Rp {totalDebit.toLocaleString()}
+        </p>
       </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Kredit</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-600">
-            Rp {totalKredit.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {accountCode ? `${accountCode} - ${accountName}` : accountName}
-          </p>
-        </CardContent>
+      <Card className="bg-red-500 text-white p-4 rounded-xl">
+        <p className="text-sm opacity-90">Kredit</p>
+        <p className="text-lg font-medium">
+          Rp {totalKredit.toLocaleString()}
+        </p>
       </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Saldo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            Rp {Math.abs(balance).toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {balance >= 0 ? 'Debit' : 'Kredit'}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Account Info</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-lg font-semibold">
-            {accountName}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {accountCode || 'Showing all accounts'}
-          </p>
-        </CardContent>
+      <Card className="bg-red-400 text-white p-4 rounded-xl">
+        <p className="text-sm opacity-90">Unbalanced</p>
+        <p className="text-lg font-medium">
+          Difference: Rp {difference.toLocaleString()}
+        </p>
       </Card>
     </div>
   );
