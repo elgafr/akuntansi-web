@@ -1,0 +1,19 @@
+{
+  "accounts": [
+    {
+      "id": "ab40",
+      "namaAkun": "tes",
+      "kodeAkun": "1",
+      "debit": "1",
+      "kredit": "0",
+      "subAccounts": [
+        {
+          "nama": "",
+          "kodeAkun": "100,0",
+          "debit": "1",
+          "kredit": "0"
+        }
+      ]
+    }
+  ]
+}
