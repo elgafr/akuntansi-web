@@ -29,6 +29,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AccountDetailModal } from "@/components/perusahaan/AccountDetailForm";
+import { useState } from "react";
 
 // Schema for form validation
 const FormSchema = z.object({
@@ -52,9 +54,25 @@ export default function Page() {
     },
   });
 
+  // Add state for modal
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+
   function onSubmit(data: z.infer<typeof FormSchema>) {
     alert(`Form submitted with Compoany Name: ${data.companyName}`);
   }
+
+  // Add handler for modal
+  const handleDetailClick = (companyName: string) => {
+    setSelectedCompany(companyName);
+    setIsAccountModalOpen(true);
+  };
+
+  // Add save handler
+  const handleSaveAccount = (data: any) => {
+    console.log('Account data saved:', data);
+    setIsAccountModalOpen(false);
+  };
 
   return (
     <SidebarProvider>
@@ -154,7 +172,12 @@ export default function Page() {
                     </Button>
                   </div>
                   <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl">Detail dan Akun</Button>
+                    <Button 
+                      className="rounded-xl"
+                      onClick={() => handleDetailClick(company.name)}
+                    >
+                      Detail dan Akun
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -162,6 +185,13 @@ export default function Page() {
           ))}
         </div>
       </SidebarInset>
+
+      {/* Add the AccountDetailModal */}
+      <AccountDetailModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onSave={handleSaveAccount}
+      />
     </SidebarProvider>
   );
 }

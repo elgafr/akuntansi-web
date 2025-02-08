@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type {
-  AccountFormData,
+  Transactions,
   SubAccountFormData,
 } from "@/components/ui/custom/form-modal/account.config";
 
@@ -20,10 +20,10 @@ export const AccountDetailModal = ({
   isOpen: boolean;
   onClose: () => void;
   onSave: (
-    data: AccountFormData & { subAccounts: SubAccountFormData[] },
+    data: Transactions & { subAccounts: SubAccountFormData[] },
   ) => void;
 }) => {
-  const [formData, setFormData] = useState<AccountFormData>({
+  const [formData, setFormData] = useState<Transactions>({
     namaAkun: "Kas Kecil",
     kodeAkun: "11111",
     debit: "",

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import FormModal from "@/components/ui/custom/form-modal/add-company/add-company";
 import type {
-  AccountFormData,
+  Transactions,
   SubAccountFormData,
 } from "@/components/ui/custom/form-modal/account.config";
 import { companyFormConfig } from "@/components/ui/custom/form-modal/add-company/add-company.config";
@@ -66,7 +66,7 @@ const ModalsPage = () => {
 
   const handleSubmit =
     (type: string) =>
-    (data: AccountFormData[] | AccountFormData | SubAccountFormData | Record<string, unknown>) => {
+    (data: Transactions[] | Transactions | SubAccountFormData | Record<string, unknown>) => {
       console.log(`${type} submitted:`, data);
       toggleModal(type as keyof typeof openStates, false);
     };
