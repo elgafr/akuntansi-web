@@ -14,6 +14,7 @@ import {
 import { useAccounts } from "@/contexts/AccountContext";
 import { useTransactions } from "@/contexts/TransactionContext";
 import { BukuBesarCard } from "./BukuBesarCard";
+import { Card } from "@/components/ui/card";
 
 interface Transaction {
   date: string;
@@ -185,18 +186,71 @@ export function BukuBesarTable() {
 
   const dataWithBalance = calculateRunningBalance(currentData);
 
+  const calculateTotals = () => {
+    let totalDebit = 0;
+    let totalKredit = 0;
+
+    dataWithBalance.forEach(item => {
+      if (item.debit) totalDebit += item.debit;
+      if (item.kredit) totalKredit += item.kredit;
+    });
+
+    return {
+      totalDebit,
+      totalKredit,
+    };
+  };
+
   return (
-    <div className="space-y-4">
-      <BukuBesarCard selectedMainAccount={selectedMainAccount} />
-      
+    <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
+      <div className="flex gap-4 mb-6">
+        {/* Debit & Kredit Container */}
+        <div className="flex flex-1 flex-grow">
+          {/* Debit Card */}
+          <Card className="bg-red-400 p-4 rounded-r-none rounded-l-xl flex-1 border-r-0">
+            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-l-xl rounded-r-none h-full">
+              <p className="text-sm text-white/90">Debit</p>
+              <p className="text-lg font-medium text-white">
+                Rp {calculateTotals().totalDebit.toLocaleString()}
+              </p>
+            </div>
+          </Card>
+
+          {/* Kredit Card */}
+          <Card className="bg-red-400 p-4 rounded-l-none rounded-r-xl flex-1 border-l-0">
+            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-l-none rounded-r-xl h-full">
+              <p className="text-sm text-white/90">Kredit</p>
+              <p className="text-lg font-medium text-white">
+                Rp {calculateTotals().totalKredit.toLocaleString()}
+              </p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Unbalanced Card */}
+        <Card className="bg-red-400 p-4 rounded-xl w-1/3">
+          <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl h-full">
+            <p className="text-sm text-white/90">Saldo</p>
+            <p className="text-lg font-medium text-white">
+              Rp {Math.abs(calculateTotals().totalDebit - calculateTotals().totalKredit).toLocaleString()}
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      {/* <BukuBesarCard 
+        selectedMainAccount={selectedMainAccount} 
+        className="bg-red-500 text-white p-6 rounded-xl"
+      />
+       */}
       <div className="flex justify-between items-center gap-4 p-4">
         <div className="flex items-center gap-4">
           <Select
             value={selectedMainAccount}
             onValueChange={setSelectedMainAccount}
           >
-            <SelectTrigger className="w-[300px]">
-              <SelectValue placeholder="Filter by Main Account" />
+            <SelectTrigger className="w-[300px] bg-gray-50 border-gray-200 rounded-lg">
+              <SelectValue placeholder="Pilih akun Perusahaan" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Accounts</SelectItem>
@@ -215,14 +269,14 @@ export function BukuBesarTable() {
             placeholder="Search by Account Name or Code..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-[300px]"
+            className="w-[300px] bg-gray-50 border-gray-200 rounded-lg"
           />
           
           <Select
             value={showAll ? 'all' : pageSize.toString()}
             onValueChange={handlePageSizeChange}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] bg-gray-50 border-gray-200 rounded-lg">
               <SelectValue placeholder="Rows per page" />
             </SelectTrigger>
             <SelectContent>
@@ -235,17 +289,17 @@ export function BukuBesarTable() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Tanggal</TableHead>
-              <TableHead>Kode Akun</TableHead>
-              <TableHead>Nama Akun</TableHead>
-              <TableHead>Keterangan</TableHead>
-              <TableHead className="text-right">Debit</TableHead>
-              <TableHead className="text-right">Kredit</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
+            <TableRow className="bg-gray-50 border-b border-gray-200">
+              <TableHead className="text-gray-600">Tanggal</TableHead>
+              <TableHead className="text-gray-600">Kode Akun</TableHead>
+              <TableHead className="text-gray-600">Nama Akun</TableHead>
+              <TableHead className="text-gray-600">Keterangan</TableHead>
+              <TableHead className="text-gray-600 text-right">Debit</TableHead>
+              <TableHead className="text-gray-600 text-right">Kredit</TableHead>
+              <TableHead className="text-gray-600 text-right">Saldo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -277,20 +331,12 @@ export function BukuBesarTable() {
           </TableBody>
         </Table>
 
-        {/* Pagination Controls */}
+        {/* Pagination dengan nomor halaman merah */}
         {!showAll && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
             <div className="flex items-center gap-2">
               <p className="text-sm text-gray-700">
-                Showing{' '}
-                <span className="font-medium">{startIndex + 1}</span>
-                {' '}-{' '}
-                <span className="font-medium">
-                  {Math.min(endIndex, sortedData.length)}
-                </span>
-                {' '}of{' '}
-                <span className="font-medium">{sortedData.length}</span>
-                {' '}results
+                Showing {startIndex + 1} - {Math.min(endIndex, sortedData.length)} of {sortedData.length} results
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -299,7 +345,7 @@ export function BukuBesarTable() {
                 size="sm"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="!rounded-lg"
+                className="rounded-lg border-gray-200 px-2"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -309,8 +355,10 @@ export function BukuBesarTable() {
                   variant={currentPage === page ? "default" : "outline"}
                   size="sm"
                   onClick={() => handlePageChange(page)}
-                  className={`!rounded-lg ${
-                    currentPage === page ? 'bg-emerald-600 hover:bg-emerald-700' : ''
+                  className={`rounded-lg ${
+                    currentPage === page 
+                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                      : 'border-gray-200'
                   }`}
                 >
                   {page}
@@ -321,7 +369,7 @@ export function BukuBesarTable() {
                 size="sm"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="!rounded-lg"
+                className="rounded-lg border-gray-200 px-2"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,20 +42,18 @@ interface MainAccount {
   kredit: string;
 }
 
-export const SubAccountDetailModal = ({
-  isOpen,
+export function SubAccountDetailModal({
   onClose,
   onSave,
   mainAccount,
 }: {
-  isOpen: boolean;
   onClose: () => void;
   onSave: (data: {
     mainAccount: MainAccount;
     subAccounts: SubAccountFormData[];
   }) => void;
   mainAccount: MainAccount;
-}) => {
+}) {
   const [subAccounts, setSubAccounts] = useState<SubAccountFormData[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [subAccountForm, setSubAccountForm] = useState<SubAccountFormData>({
@@ -113,219 +113,211 @@ export const SubAccountDetailModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto p-6">
-        <DialogHeader className="p-8 pb-0">
-          <DialogTitle className="text-[2rem] font-normal text-primary">
-            Tambah Sub Akun
-          </DialogTitle>
-        </DialogHeader>
+    <div>
+      <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Form Section */}
+        <div className="space-y-6">
+          <div className="space-y-6 border-b pb-6">
+            <div className="space-y-2">
+              <label className="text-primary text-lg">Akun Utama</label>
+              <Input
+                value={mainAccount.namaAkun}
+                disabled
+                className="rounded-xl h-12 text-gray-500 text-base"
+              />
+            </div>
 
-        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Form Section */}
-          <div className="space-y-6">
-            <div className="space-y-6 border-b pb-6">
-              <div className="space-y-2">
-                <label className="text-primary text-lg">Akun Utama</label>
-                <Input
-                  value={mainAccount.namaAkun}
-                  disabled
-                  className="rounded-xl h-12 text-gray-500 text-base"
-                />
-              </div>
+            <div className="space-y-2">
+              <label className="text-primary text-lg">Nama Sub Akun</label>
+              <Input
+                value={subAccountForm.namaSubAkun}
+                onChange={(e) =>
+                  setSubAccountForm({
+                    ...subAccountForm,
+                    namaSubAkun: e.target.value,
+                  })
+                }
+                className="rounded-xl h-12 text-gray-500 text-base"
+              />
+            </div>
 
+            <div className="space-y-2">
+              <label className="text-primary text-lg">Kode Sub Akun</label>
+              <Input
+                value={`${mainAccount.kodeAkun},${subAccountForm.kodeSubAkun}`}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Hanya ambil angka setelah koma
+                  const parts = value.split(',');
+                  if (parts.length > 1 && /^\d+$/.test(parts[1])) {
+                    setSubAccountForm({
+                      ...subAccountForm,
+                      kodeSubAkun: parts[1],
+                      kodeAkunInduk: mainAccount.kodeAkun
+                    });
+                  }
+                }}
+                className="rounded-xl h-12 text-gray-500 text-base"
+                type="text"
+                placeholder={`${mainAccount.kodeAkun},00`}
+              />
+              <p className="text-xs text-gray-500">
+                *Format: kode akun induk,sub akun (contoh: {mainAccount.kodeAkun},001)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-primary text-lg">Nama Sub Akun</label>
+                <label className="text-primary text-lg">Debit</label>
                 <Input
-                  value={subAccountForm.namaSubAkun}
+                  value={subAccountForm.debit}
                   onChange={(e) =>
                     setSubAccountForm({
                       ...subAccountForm,
-                      namaSubAkun: e.target.value,
+                      debit: e.target.value,
+                      kredit: "",
                     })
                   }
                   className="rounded-xl h-12 text-gray-500 text-base"
+                  type="number"
+                  min="0"
                 />
               </div>
-
               <div className="space-y-2">
-                <label className="text-primary text-lg">Kode Sub Akun</label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    value={mainAccount.kodeAkun}
-                    disabled
-                    className="rounded-xl h-12 text-gray-500 text-base"
-                  />
-                  <span>,</span>
-                  <Input
-                    value={subAccountForm.kodeSubAkun}
-                    onChange={(e) =>
-                      setSubAccountForm({
-                        ...subAccountForm,
-                        kodeSubAkun: e.target.value,
-                      })
-                    }
-                    className="rounded-xl h-12 text-gray-500 text-base w-24"
-                    type="number"
-                    min="0"
-                    max="9"
-                  />
-                </div>
+                <label className="text-primary text-lg">Kredit</label>
+                <Input
+                  value={subAccountForm.kredit}
+                  onChange={(e) =>
+                    setSubAccountForm({
+                      ...subAccountForm,
+                      kredit: e.target.value,
+                      debit: "",
+                    })
+                  }
+                  className="rounded-xl h-12 text-gray-500 text-base"
+                  type="number"
+                  min="0"
+                />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-primary text-lg">Debit</label>
-                  <Input
-                    value={subAccountForm.debit}
-                    onChange={(e) =>
-                      setSubAccountForm({
-                        ...subAccountForm,
-                        debit: e.target.value,
-                        kredit: "",
-                      })
-                    }
-                    className="rounded-xl h-12 text-gray-500 text-base"
-                    type="number"
-                    min="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-primary text-lg">Kredit</label>
-                  <Input
-                    value={subAccountForm.kredit}
-                    onChange={(e) =>
-                      setSubAccountForm({
-                        ...subAccountForm,
-                        kredit: e.target.value,
-                        debit: "",
-                      })
-                    }
-                    className="rounded-xl h-12 text-gray-500 text-base"
-                    type="number"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <Button
-                className="w-full rounded-xl h-12"
-                onClick={handleAddOrUpdateSubAccount}
-              >
-                {editingIndex !== null ? "Update Sub Akun" : "Tambah Sub Akun"}
-              </Button>
             </div>
+
+            <Button
+              className="w-full rounded-xl h-12"
+              onClick={handleAddOrUpdateSubAccount}
+            >
+              {editingIndex !== null ? "Update Sub Akun" : "Tambah Sub Akun"}
+            </Button>
           </div>
-
-          {/* Summary Card */}
-          <Card className="flex-[2]">
-            <CardHeader className="sticky top-0 z-10 bg-background pt-4 pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-xl font-semibold text-primary">
-                  Ringkasan
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <ScrollArea className="h-[calc(80vh-180px)]">
-              <CardContent className="p-4 space-y-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Kode Sub Akun</TableHead>
-                      <TableHead>Nama Sub Akun</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Kredit</TableHead>
-                      <TableHead className="w-[100px]">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subAccounts.map((subAccount, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          {`${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`}
-                        </TableCell>
-                        <TableCell>{subAccount.namaSubAkun}</TableCell>
-                        <TableCell className="text-right">
-                          {parseFloat(subAccount.debit || "0").toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {parseFloat(
-                            subAccount.kredit || "0",
-                          ).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(index)}
-                            >
-                              <Pencil className="h-4 w-4 text-primary" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(index)}
-                            >
-                              <X className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                {/* Totals Section */}
-                {subAccounts.length > 0 && (
-                  <div className="border-t pt-4">
-                    <Table>
-                      <TableBody>
-                        <TableRow className="font-bold">
-                          <TableCell>Total</TableCell>
-                          <TableCell>-</TableCell>
-                          <TableCell className="text-right">
-                            {getTotals().debit.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {getTotals().kredit.toLocaleString()}
-                          </TableCell>
-                          <TableCell>-</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </ScrollArea>
-            <CardFooter className="border-t bg-background p-4">
-              <Button
-                className="w-full"
-                onClick={() => {
-                  if (subAccounts.length === 0) {
-                    alert("Harap tambahkan minimal satu sub akun");
-                    return;
-                  }
-
-                  // Validate sub account codes are unique
-                  const codes = subAccounts.map((sa) => sa.kodeSubAkun);
-                  if (new Set(codes).size !== codes.length) {
-                    alert("Kode sub akun harus unik");
-                    return;
-                  }
-
-                  onSave({
-                    mainAccount,
-                    subAccounts,
-                  });
-                }}
-              >
-                Simpan
-              </Button>
-            </CardFooter>
-          </Card>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Summary Card */}
+        <Card className="flex-[2]">
+          <CardHeader className="sticky top-0 z-10 bg-background pt-4 pb-2">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-xl font-semibold text-primary">
+                Ringkasan
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <ScrollArea className="h-[calc(80vh-180px)]">
+            <CardContent className="p-4 space-y-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kode Sub Akun</TableHead>
+                    <TableHead>Nama Sub Akun</TableHead>
+                    <TableHead className="text-right">Debit</TableHead>
+                    <TableHead className="text-right">Kredit</TableHead>
+                    <TableHead className="w-[100px]">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subAccounts.map((subAccount, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        {`${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`}
+                      </TableCell>
+                      <TableCell>{subAccount.namaSubAkun}</TableCell>
+                      <TableCell className="text-right">
+                        {parseFloat(subAccount.debit || "0").toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {parseFloat(
+                          subAccount.kredit || "0",
+                        ).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(index)}
+                          >
+                            <Pencil className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(index)}
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Totals Section */}
+              {subAccounts.length > 0 && (
+                <div className="border-t pt-4">
+                  <Table>
+                    <TableBody>
+                      <TableRow className="font-bold">
+                        <TableCell>Total</TableCell>
+                        <TableCell>-</TableCell>
+                        <TableCell className="text-right">
+                          {getTotals().debit.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {getTotals().kredit.toLocaleString()}
+                        </TableCell>
+                        <TableCell>-</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </ScrollArea>
+          <CardFooter className="border-t bg-background p-4">
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (subAccounts.length === 0) {
+                  alert("Harap tambahkan minimal satu sub akun");
+                  return;
+                }
+
+                // Validate sub account codes are unique
+                const codes = subAccounts.map((sa) => sa.kodeSubAkun);
+                if (new Set(codes).size !== codes.length) {
+                  alert("Kode sub akun harus unik");
+                  return;
+                }
+
+                onSave({
+                  mainAccount,
+                  subAccounts,
+                });
+              }}
+            >
+              Simpan
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
   );
-};
+}
