@@ -35,30 +35,39 @@ export default function JurnalPage() {
       <AppSidebar />
       <SidebarInset>
         {/* Header Section */}
-        <header className="border-b">
-          <div className="flex h-16 items-center px-4 gap-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4 w-full justify-between">
             <Breadcrumb>
               <BreadcrumbList>
-                <BreadcrumbItem>Jurnal</BreadcrumbItem>
+                <BreadcrumbItem className="hidden md:block">
+                  <h1 className="text-2xl font-bold ml-6 text-black">
+                    Dashboard
+                  </h1>
+                  <h2 className="text-sm ml-6">
+                    Let&apos;s check your Dashboard today
+                  </h2>
+                </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <div className="ml-auto flex items-center space-x-4">
-              <Avatar>
-                <AvatarImage
-                  src="https://github.com/shadcn.png"
-                  alt="@shadcn"
-                />
-              </Avatar>
-              <div className="text-left mr-12">
-                <div className="text-sm font-medium">Arthur</div>
-                <div className="text-xs text-gray-800">Student</div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage
+                    src="https://github.com/shadcn.png"
+                    alt="@shadcn"
+                  />
+                </Avatar>
+                <div className="text-left mr-12">
+                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-xs text-gray-800">Student</div>
+                </div>
               </div>
             </div>
           </div>
         </header>
 
         <section className="p-6 space-y-6">
-          {/* Transaction Cards */}
+          {/* Transaction Cards
           <div className="grid grid-cols-3 gap-4">
             <TransactionCard
               title="Total Debit"
@@ -76,7 +85,7 @@ export default function JurnalPage() {
               type="unbalanced"
               isBalanced={totals.unbalanced === 0}
             />
-          </div>
+          </div> */}
 
           {/* Add Transaction Table */}
           <AddTransactionTable 

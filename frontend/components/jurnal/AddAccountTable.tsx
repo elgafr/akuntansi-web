@@ -10,8 +10,8 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { Plus, Pencil, X, Download, Upload, Check } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Plus, Pencil, X, Download, Upload, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AccountDetailModal } from "@/components/perusahaan/AccountDetailForm";
 import {
   Select,
@@ -58,6 +58,8 @@ export function AddAccountTable({
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
   const [inlineEditData, setInlineEditData] = useState<any>(null);
   const [accountsState, setAccountsState] = useState<Account[]>(accounts);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     console.log("=== AddAccountTable Data ===");
@@ -261,20 +263,20 @@ export function AddAccountTable({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
       <div className="flex justify-between items-center gap-4 p-4">
         <div className="flex items-center gap-4">
           <Input
             placeholder="Search accounts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-[300px]"
+            className="w-[300px] bg-gray-50 border-gray-200 rounded-lg"
           />
           <Select
-            value={showAll ? "all" : pageSize.toString()}
+            value={showAll ? 'all' : pageSize.toString()}
             onValueChange={handlePageSizeChange}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] bg-gray-50 border-gray-200 rounded-lg">
               <SelectValue placeholder="Rows per page" />
             </SelectTrigger>
             <SelectContent>
@@ -288,221 +290,309 @@ export function AddAccountTable({
         <Button
           onClick={() => setIsFormModalOpen(true)}
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2 !rounded-lg"
+          className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2 !rounded-lg"
         >
           <Plus className="h-4 w-4" />
           Add Account
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Kode Akun</TableHead>
-            <TableHead>Nama Akun</TableHead>
-            <TableHead>Kode Sub Akun</TableHead>
-            <TableHead>Nama Sub Akun</TableHead>
-            <TableHead className="text-right">Debit</TableHead>
-            <TableHead className="text-right">Kredit</TableHead>
-            <TableHead className="w-[100px]">Aksi</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {accountsState.map((account) => (
-            <React.Fragment key={account.kodeAkun}>
-              {/* Main Account Row with gold background for kode akun */}
-              <TableRow className="border-t-2 border-gray-200">
-                <TableCell className="font-medium">
-                  {inlineEditId === account.kodeAkun ? (
-                    <Input
-                      value={inlineEditData.kodeAkun}
-                      onChange={(e) =>
-                        setInlineEditData({
-                          ...inlineEditData,
-                          kodeAkun: e.target.value,
-                        })
-                      }
-                      className="w-24"
-                    />
-                  ) : (
-                    <span className="bg-amber-100 px-2 py-1 rounded-md">
-                      {account.kodeAkun}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {inlineEditId === account.kodeAkun ? (
-                    <Input
-                      value={inlineEditData.namaAkun}
-                      onChange={(e) =>
-                        setInlineEditData({
-                          ...inlineEditData,
-                          namaAkun: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    account.namaAkun
-                  )}
-                </TableCell>
-                <TableCell>-</TableCell>
-                <TableCell>-</TableCell>
-                <TableCell className="text-right">
-                  {inlineEditId === account.kodeAkun ? (
-                    <Input
-                      value={inlineEditData.debit}
-                      onChange={(e) =>
-                        setInlineEditData({
-                          ...inlineEditData,
-                          debit: e.target.value,
-                          kredit: "",
-                        })
-                      }
-                      type="number"
-                      className="w-32 text-right"
-                    />
-                  ) : (
-                    account.debit.toLocaleString()
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  {inlineEditId === account.kodeAkun ? (
-                    <Input
-                      value={inlineEditData.kredit}
-                      onChange={(e) =>
-                        setInlineEditData({
-                          ...inlineEditData,
-                          kredit: e.target.value,
-                          debit: "",
-                        })
-                      }
-                      type="number"
-                      className="w-32 text-right"
-                    />
-                  ) : (
-                    account.kredit.toLocaleString()
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50 border-b border-gray-200">
+              <TableHead className="text-gray-600">Kode Akun</TableHead>
+              <TableHead className="text-gray-600">Nama Akun</TableHead>
+              <TableHead className="text-gray-600">Kode Sub Akun</TableHead>
+              <TableHead className="text-gray-600">Nama Sub Akun</TableHead>
+              <TableHead className="text-gray-600 text-right">Debit</TableHead>
+              <TableHead className="text-gray-600 text-right">Kredit</TableHead>
+              <TableHead className="text-gray-600 w-[100px]">Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {accountsState.map((account) => (
+              <React.Fragment key={account.kodeAkun}>
+                {/* Main Account Row */}
+                <TableRow className="hover:bg-gray-50 transition-colors">
+                  <TableCell className="font-medium">
                     {inlineEditId === account.kodeAkun ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleSaveInlineEdit(account.kodeAkun)}
-                        >
-                          <Check className="h-4 w-4 text-emerald-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setInlineEditId(null);
-                            setInlineEditData(null);
-                          }}
-                        >
-                          <X className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </>
+                      <Input
+                        value={inlineEditData.kodeAkun}
+                        onChange={(e) =>
+                          setInlineEditData({
+                            ...inlineEditData,
+                            kodeAkun: e.target.value,
+                          })
+                        }
+                        className="w-24"
+                      />
                     ) : (
-                      <>
+                      <span className="bg-amber-100 px-2 py-1 rounded-md">
+                        {account.kodeAkun}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {inlineEditId === account.kodeAkun ? (
+                      <Input
+                        value={inlineEditData.namaAkun}
+                        onChange={(e) =>
+                          setInlineEditData({
+                            ...inlineEditData,
+                            namaAkun: e.target.value,
+                          })
+                        }
+                      />
+                    ) : (
+                      account.namaAkun
+                    )}
+                  </TableCell>
+                  <TableCell>-</TableCell>
+                  <TableCell>-</TableCell>
+                  <TableCell className="text-right">
+                    {inlineEditId === account.kodeAkun ? (
+                      <Input
+                        value={inlineEditData.debit}
+                        onChange={(e) =>
+                          setInlineEditData({
+                            ...inlineEditData,
+                            debit: e.target.value,
+                            kredit: "",
+                          })
+                        }
+                        type="number"
+                        className="w-32 text-right"
+                      />
+                    ) : (
+                      account.debit.toLocaleString()
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {inlineEditId === account.kodeAkun ? (
+                      <Input
+                        value={inlineEditData.kredit}
+                        onChange={(e) =>
+                          setInlineEditData({
+                            ...inlineEditData,
+                            kredit: e.target.value,
+                            debit: "",
+                          })
+                        }
+                        type="number"
+                        className="w-32 text-right"
+                      />
+                    ) : (
+                      account.kredit.toLocaleString()
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      {inlineEditId === account.kodeAkun ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSaveInlineEdit(account.kodeAkun)}
+                          >
+                            <Check className="h-4 w-4 text-emerald-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setInlineEditId(null);
+                              setInlineEditData(null);
+                            }}
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleInlineEdit(account)}
+                          >
+                            <Pencil className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(account.kodeAkun)}
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="text-emerald-600 px-2"
+                            onClick={() => handleAddSubAccount(account)}
+                          >
+                            Tambah Sub Akun
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+
+                {/* Sub Accounts */}
+                {account.subAccounts?.map((subAccount) => (
+                  <TableRow
+                    key={`${account.kodeAkun}-${subAccount.kodeSubAkun}`}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <TableCell className="pl-8">{"-"}</TableCell>
+                    <TableCell>{"-"}</TableCell>
+                    <TableCell>{`${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`}</TableCell>
+                    <TableCell>{subAccount.namaSubAkun}</TableCell>
+                    <TableCell className="text-right">
+                      {parseFloat(subAccount.debit).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {parseFloat(subAccount.kredit).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleInlineEdit(account)}
+                          onClick={() =>
+                            handleEditSubAccount(account, subAccount)
+                          }
                         >
                           <Pencil className="h-4 w-4 text-primary" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(account.kodeAkun)}
+                          onClick={() =>
+                            handleDelete(
+                              `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`,
+                              true,
+                            )
+                          }
                         >
                           <X className="h-4 w-4 text-destructive" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          className="text-emerald-600 px-2"
-                          onClick={() => handleAddSubAccount(account)}
-                        >
-                          Tambah Sub Akun
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
-              {/* Sub Accounts indented and grouped */}
-              {account.subAccounts?.map((subAccount) => (
-                <TableRow
-                  key={`${account.kodeAkun}-${subAccount.kodeSubAkun}`}
-                  className="bg-muted/30"
-                >
-                  <TableCell className="pl-8">{"-"}</TableCell>
-                  <TableCell>{"-"}</TableCell>
-                  <TableCell>{`${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`}</TableCell>
-                  <TableCell>{subAccount.namaSubAkun}</TableCell>
-                  <TableCell className="text-right">
-                    {parseFloat(subAccount.debit).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {parseFloat(subAccount.kredit).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          handleEditSubAccount(account, subAccount)
-                        }
-                      >
-                        <Pencil className="h-4 w-4 text-primary" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          handleDelete(
-                            `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`,
-                            true,
-                          )
-                        }
-                      >
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </React.Fragment>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="flex items-center justify-between py-4">
+        <p className="text-sm text-gray-500">
+          Page {currentPage} of {totalPages}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="rounded-lg border-gray-200 px-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          {/* Page Numbers */}
+          <div className="flex gap-1">
+            {[...Array(totalPages)].map((_, index) => {
+              const pageNumber = index + 1;
+              // Show first page, current page, last page, and pages around current
+              if (
+                pageNumber === 1 ||
+                pageNumber === totalPages ||
+                (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+              ) {
+                return (
+                  <Button
+                    key={pageNumber}
+                    variant={currentPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`rounded-lg min-w-[40px] ${
+                      currentPage === pageNumber 
+                        ? "bg-red-500 text-white hover:bg-red-600" 
+                        : "border-gray-200"
+                    }`}
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              }
+              // Show ellipsis for gaps
+              if (
+                pageNumber === currentPage - 2 ||
+                pageNumber === currentPage + 2
+              ) {
+                return (
+                  <span key={pageNumber} className="px-2 py-2 text-gray-500">
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="rounded-lg border-gray-200 px-2"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       <Dialog open={isFormModalOpen} onOpenChange={setIsFormModalOpen}>
         <DialogContent className="sm:max-w-[1080px] p-6 !rounded-2xl overflow-hidden border">
-          {editData?.mainAccount && !editData?.subAccount ? (
-            <SubAccountDetailModal
-              isOpen={isFormModalOpen}
-              onClose={() => {
-                setIsFormModalOpen(false);
-                setEditData(null);
-              }}
-              onSave={handleSaveAccount}
-              mainAccount={editData.mainAccount}
-            />
+          <DialogTitle className="text-xl font-semibold mb-4">
+            {editData?.mainAccount && !editData?.subAccount 
+              ? "Tambah Sub Akun" 
+              : editData 
+                ? "Edit Akun" 
+                : "Tambah Akun Baru"
+            }
+          </DialogTitle>
+          
+          {editData ? (
+            editData.mainAccount && !editData.subAccount ? (
+              <SubAccountDetailModal
+                onClose={() => {
+                  setIsFormModalOpen(false);
+                  setEditData(null);
+                }}
+                onSave={handleSaveAccount}
+                mainAccount={editData.mainAccount}
+              />
+            ) : (
+              <AccountDetailModal
+                onClose={() => {
+                  setIsFormModalOpen(false);
+                  setEditData(null);
+                }}
+                onSave={handleSaveAccount}
+                editData={editData}
+              />
+            )
           ) : (
             <AccountDetailModal
-              isOpen={isFormModalOpen}
               onClose={() => {
                 setIsFormModalOpen(false);
                 setEditData(null);
               }}
               onSave={handleSaveAccount}
-              editData={editData}
+              editData={null}
             />
           )}
         </DialogContent>

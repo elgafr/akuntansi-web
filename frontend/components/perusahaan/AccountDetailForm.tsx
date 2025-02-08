@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,17 +45,15 @@ type SubAccountFormData = {
   kredit: string;
 };
 
-export const AccountDetailModal = ({
-  isOpen,
+export function AccountDetailModal({
   onClose,
   onSave,
   editData,
 }: {
-  isOpen: boolean;
   onClose: () => void;
   onSave: (data: Transactions & { subAccounts: SubAccountFormData[] }) => void;
   editData?: any;
-}) => {
+}) {
   // Separate state for form input and saved main account data
   const [formData, setFormData] = useState<Transactions>({
     namaAkun: "",
@@ -314,55 +314,168 @@ export const AccountDetailModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto p-6">
-        <DialogHeader className="p-8 pb-0">
-          <DialogTitle className="text-[2rem] font-normal text-primary">
-            Detail Akun
-          </DialogTitle>
-        </DialogHeader>
+    <div>
+      <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Form Section */}
+        <div className="space-y-6">
+          {/* Main Account Form */}
+          <div className="space-y-6 border-b pb-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Form Detail Akun</h3>
+              <Button variant="outline" size="sm" onClick={resetMainForm}>
+                Reset
+              </Button>
+            </div>
 
-        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Form Section */}
-          <div className="space-y-6">
-            {/* Main Account Form */}
-            <div className="space-y-6 border-b pb-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Form Detail Akun</h3>
-                <Button variant="outline" size="sm" onClick={resetMainForm}>
-                  Reset
-                </Button>
-              </div>
+            <div className="space-y-2">
+              <label className="text-primary text-lg">Nama Akun</label>
+              <Input
+                value={formData.namaAkun}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    namaAkun: e.target.value,
+                    isMainAccountSaved: false,
+                  })
+                }
+                disabled={formData.isMainAccountSaved}
+                className="rounded-xl h-12 text-gray-500 text-base"
+              />
+            </div>
 
+            <div className="space-y-2">
+              <label className="text-primary text-lg">Kode Akun</label>
+              <Input
+                value={formData.kodeAkun}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    kodeAkun: e.target.value,
+                    isMainAccountSaved: false,
+                  })
+                }
+                disabled={formData.isMainAccountSaved}
+                className="rounded-xl h-12 text-gray-500 text-base"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-primary text-lg">Nama Akun</label>
+                <label className="text-primary text-lg">Debit</label>
                 <Input
-                  value={formData.namaAkun}
+                  value={formData.debit}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      namaAkun: e.target.value,
+                      debit: e.target.value,
+                      kredit: "", // Reset kredit when debit is entered
                       isMainAccountSaved: false,
                     })
                   }
-                  disabled={formData.isMainAccountSaved}
+                  disabled={
+                    formData.isMainAccountSaved ||
+                    !isEffectivelyZero(formData.kredit)
+                  }
+                  className="rounded-xl h-12 text-gray-500 text-base"
+                  type="number"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-primary text-lg">Kredit</label>
+                <Input
+                  value={formData.kredit}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kredit: e.target.value,
+                      debit: "", // Reset debit when kredit is entered
+                      isMainAccountSaved: false,
+                    })
+                  }
+                  disabled={
+                    formData.isMainAccountSaved ||
+                    !isEffectivelyZero(formData.debit)
+                  }
+                  className="rounded-xl h-12 text-gray-500 text-base"
+                  type="number"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {!formData.isMainAccountSaved ? (
+                // Show "Simpan/Update Akun Utama" when form not saved
+                <Button
+                  className="w-full rounded-xl h-12"
+                  onClick={handleSaveMainAccount}
+                >
+                  {isEditing ? "Update Akun Utama" : "Simpan Akun Utama"}
+                </Button>
+              ) : (
+                // Show "Tambah/Tutup Sub Akun" after main account is saved
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl h-12"
+                  onClick={() => {
+                    setShowSubAccountForm(!showSubAccountForm);
+                    if (!showSubAccountForm) {
+                      setSubAccountForm({
+                        namaSubAkun: "",
+                        kodeAkunInduk: formData.kodeAkun,
+                        kodeSubAkun: "0",
+                        debit: "",
+                        kredit: "",
+                      });
+                      setEditingIndex(null);
+                    }
+                  }}
+                >
+                  {showSubAccountForm
+                    ? "Tutup Form Sub Akun"
+                    : "Tambah Sub Akun"}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Sub Account Form */}
+          {showSubAccountForm && savedMainAccounts.length > 0 && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium">Form Sub Akun</h3>
+              <div className="space-y-2">
+                <label className="text-primary text-lg">Nama Sub Akun</label>
+                <Input
+                  value={subAccountForm.namaSubAkun}
+                  onChange={(e) =>
+                    setSubAccountForm({
+                      ...subAccountForm,
+                      namaSubAkun: e.target.value,
+                    })
+                  }
                   className="rounded-xl h-12 text-gray-500 text-base"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-primary text-lg">Kode Akun</label>
+                <label className="text-primary text-lg">Kode Sub Akun</label>
                 <Input
-                  value={formData.kodeAkun}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      kodeAkun: e.target.value,
-                      isMainAccountSaved: false,
-                    })
-                  }
-                  disabled={formData.isMainAccountSaved}
+                  value={`${formData.kodeAkun},${subAccountForm.kodeSubAkun}`}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Hanya ambil angka setelah koma
+                    const parts = value.split(',');
+                    if (parts.length > 1) {
+                      setSubAccountForm({
+                        ...subAccountForm,
+                        kodeSubAkun: parts[1]
+                      });
+                    }
+                  }}
                   className="rounded-xl h-12 text-gray-500 text-base"
+                  type="text"
+                  placeholder={`${formData.kodeAkun},0`}
                 />
               </div>
 
@@ -370,344 +483,223 @@ export const AccountDetailModal = ({
                 <div className="space-y-2">
                   <label className="text-primary text-lg">Debit</label>
                   <Input
-                    value={formData.debit}
+                    value={subAccountForm.debit}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
+                      setSubAccountForm({
+                        ...subAccountForm,
                         debit: e.target.value,
                         kredit: "", // Reset kredit when debit is entered
-                        isMainAccountSaved: false,
                       })
-                    }
-                    disabled={
-                      formData.isMainAccountSaved ||
-                      !isEffectivelyZero(formData.kredit)
                     }
                     className="rounded-xl h-12 text-gray-500 text-base"
                     type="number"
                     min="0"
+                    disabled={!isEffectivelyZero(subAccountForm.kredit)}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-primary text-lg">Kredit</label>
                   <Input
-                    value={formData.kredit}
+                    value={subAccountForm.kredit}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
+                      setSubAccountForm({
+                        ...subAccountForm,
                         kredit: e.target.value,
                         debit: "", // Reset debit when kredit is entered
-                        isMainAccountSaved: false,
                       })
-                    }
-                    disabled={
-                      formData.isMainAccountSaved ||
-                      !isEffectivelyZero(formData.debit)
                     }
                     className="rounded-xl h-12 text-gray-500 text-base"
                     type="number"
                     min="0"
+                    disabled={!isEffectivelyZero(subAccountForm.debit)}
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                {!formData.isMainAccountSaved ? (
-                  // Show "Simpan/Update Akun Utama" when form not saved
-                  <Button
-                    className="w-full rounded-xl h-12"
-                    onClick={handleSaveMainAccount}
-                  >
-                    {isEditing ? "Update Akun Utama" : "Simpan Akun Utama"}
-                  </Button>
-                ) : (
-                  // Show "Tambah/Tutup Sub Akun" after main account is saved
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-xl h-12"
-                    onClick={() => {
-                      setShowSubAccountForm(!showSubAccountForm);
-                      if (!showSubAccountForm) {
-                        setSubAccountForm({
-                          namaSubAkun: "",
-                          kodeAkunInduk: formData.kodeAkun,
-                          kodeSubAkun: "0",
-                          debit: "",
-                          kredit: "",
-                        });
-                        setEditingIndex(null);
-                      }
-                    }}
-                  >
-                    {showSubAccountForm
-                      ? "Tutup Form Sub Akun"
-                      : "Tambah Sub Akun"}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Sub Account Form */}
-            {showSubAccountForm && savedMainAccounts.length > 0 && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-medium">Form Sub Akun</h3>
-                <div className="space-y-2">
-                  <label className="text-primary text-lg">Nama Sub Akun</label>
-                  <Input
-                    value={subAccountForm.namaSubAkun}
-                    onChange={(e) =>
-                      setSubAccountForm({
-                        ...subAccountForm,
-                        namaSubAkun: e.target.value,
-                      })
-                    }
-                    className="rounded-xl h-12 text-gray-500 text-base"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-primary text-lg">Kode Sub Akun</label>
-                  <Input
-                    value={`${formData.kodeAkun},${subAccountForm.kodeSubAkun}`}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Hanya ambil angka setelah koma
-                      const parts = value.split(',');
-                      if (parts.length > 1) {
-                        setSubAccountForm({
-                          ...subAccountForm,
-                          kodeSubAkun: parts[1]
-                        });
-                      }
-                    }}
-                    className="rounded-xl h-12 text-gray-500 text-base"
-                    type="text"
-                    placeholder={`${formData.kodeAkun},0`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-primary text-lg">Debit</label>
-                    <Input
-                      value={subAccountForm.debit}
-                      onChange={(e) =>
-                        setSubAccountForm({
-                          ...subAccountForm,
-                          debit: e.target.value,
-                          kredit: "", // Reset kredit when debit is entered
-                        })
-                      }
-                      className="rounded-xl h-12 text-gray-500 text-base"
-                      type="number"
-                      min="0"
-                      disabled={!isEffectivelyZero(subAccountForm.kredit)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-primary text-lg">Kredit</label>
-                    <Input
-                      value={subAccountForm.kredit}
-                      onChange={(e) =>
-                        setSubAccountForm({
-                          ...subAccountForm,
-                          kredit: e.target.value,
-                          debit: "", // Reset debit when kredit is entered
-                        })
-                      }
-                      className="rounded-xl h-12 text-gray-500 text-base"
-                      type="number"
-                      min="0"
-                      disabled={!isEffectivelyZero(subAccountForm.debit)}
-                    />
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full rounded-xl h-12"
-                  onClick={handleAddOrUpdateSubAccount}
-                >
-                  {editingIndex !== null
-                    ? "Update Sub Akun"
-                    : "Tambah Sub Akun"}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Summary Section */}
-          <Card className="flex-[2]">
-            <CardHeader className="sticky top-0 z-10 bg-background pt-4 pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-xl font-semibold text-primary">
-                  Ringkasan
-                </CardTitle>
-                <Button variant="destructive" size="sm" onClick={clearAllData}>
-                  Hapus Semua
-                </Button>
-              </div>
-            </CardHeader>
-            <ScrollArea className="h-[calc(80vh-180px)]">
-              <CardContent className="p-4 space-y-6">
-                {/* Main Accounts Table */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Akun Utama</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Kode Akun</TableHead>
-                        <TableHead>Nama Akun</TableHead>
-                        <TableHead className="text-right">Debit</TableHead>
-                        <TableHead className="text-right">Kredit</TableHead>
-                        <TableHead className="w-[100px]">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {savedMainAccounts.map((account, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{account.kodeAkun}</TableCell>
-                          <TableCell>{account.namaAkun}</TableCell>
-                          <TableCell className="text-right">
-                            {parseFloat(account.debit || "0").toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {parseFloat(account.kredit || "0").toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditMainAccount(index)}
-                              >
-                                <Pencil className="h-4 w-4 text-primary" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteMainAccount(index)}
-                              >
-                                <X className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Sub Accounts Table */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Sub Akun</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Kode Sub Akun</TableHead>
-                        <TableHead>Nama Sub Akun</TableHead>
-                        <TableHead>Akun Utama</TableHead>
-                        <TableHead className="text-right">Debit</TableHead>
-                        <TableHead className="text-right">Kredit</TableHead>
-                        <TableHead className="w-[100px]">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {subAccounts.map((subAccount, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            {getFormattedAccountCode(
-                              subAccount.kodeAkunInduk,
-                              subAccount.kodeSubAkun,
-                            )}
-                          </TableCell>
-                          <TableCell>{subAccount.namaSubAkun}</TableCell>
-                          <TableCell>
-                            {
-                              savedMainAccounts.find(
-                                (acc) =>
-                                  acc.kodeAkun === subAccount.kodeAkunInduk,
-                              )?.namaAkun
-                            }
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {parseFloat(
-                              subAccount.debit || "0",
-                            ).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {parseFloat(
-                              subAccount.kredit || "0",
-                            ).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(index)}
-                              >
-                                <Pencil className="h-4 w-4 text-primary" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(index)}
-                              >
-                                <X className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Totals Section */}
-                {(savedMainAccounts.length > 0 || subAccounts.length > 0) && (
-                  <div className="border-t pt-4">
-                    <Table>
-                      <TableBody>
-                        <TableRow className="font-bold">
-                          <TableCell>Total</TableCell>
-                          <TableCell>-</TableCell>
-                          <TableCell className="text-right">
-                            {getTotals().debit.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {getTotals().kredit.toLocaleString()}
-                          </TableCell>
-                          <TableCell>-</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </ScrollArea>
-            <CardFooter className="border-t bg-background p-4">
               <Button
-                className="w-full"
-                onClick={() => {
-                  if (savedMainAccounts.length === 0 && !formData.namaAkun) {
-                    alert("Harap isi setidaknya satu akun utama");
-                    return;
-                  }
-                  onSave({
-                    mainAccounts:
-                      savedMainAccounts.length > 0
-                        ? savedMainAccounts
-                        : [formData],
-                    subAccounts,
-                  });
-                }}
+                className="w-full rounded-xl h-12"
+                onClick={handleAddOrUpdateSubAccount}
               >
-                Simpan
+                {editingIndex !== null
+                  ? "Update Sub Akun"
+                  : "Tambah Sub Akun"}
               </Button>
-            </CardFooter>
-          </Card>
+            </div>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Summary Section */}
+        <Card className="flex-[2]">
+          <CardHeader className="sticky top-0 z-10 bg-background pt-4 pb-2">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-xl font-semibold text-primary">
+                Ringkasan
+              </CardTitle>
+              <Button variant="destructive" size="sm" onClick={clearAllData}>
+                Hapus Semua
+              </Button>
+            </div>
+          </CardHeader>
+          <ScrollArea className="h-[calc(80vh-180px)]">
+            <CardContent className="p-4 space-y-6">
+              {/* Main Accounts Table */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Akun Utama</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Kode Akun</TableHead>
+                      <TableHead>Nama Akun</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Kredit</TableHead>
+                      <TableHead className="w-[100px]">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {savedMainAccounts.map((account, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{account.kodeAkun}</TableCell>
+                        <TableCell>{account.namaAkun}</TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(account.debit || "0").toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(account.kredit || "0").toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditMainAccount(index)}
+                            >
+                              <Pencil className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteMainAccount(index)}
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Sub Accounts Table */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Sub Akun</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Kode Sub Akun</TableHead>
+                      <TableHead>Nama Sub Akun</TableHead>
+                      <TableHead>Akun Utama</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Kredit</TableHead>
+                      <TableHead className="w-[100px]">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subAccounts.map((subAccount, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          {getFormattedAccountCode(
+                            subAccount.kodeAkunInduk,
+                            subAccount.kodeSubAkun,
+                          )}
+                        </TableCell>
+                        <TableCell>{subAccount.namaSubAkun}</TableCell>
+                        <TableCell>
+                          {
+                            savedMainAccounts.find(
+                              (acc) =>
+                                acc.kodeAkun === subAccount.kodeAkunInduk,
+                            )?.namaAkun
+                          }
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(
+                            subAccount.debit || "0",
+                          ).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(
+                            subAccount.kredit || "0",
+                          ).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(index)}
+                            >
+                              <Pencil className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(index)}
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Totals Section */}
+              {(savedMainAccounts.length > 0 || subAccounts.length > 0) && (
+                <div className="border-t pt-4">
+                  <Table>
+                    <TableBody>
+                      <TableRow className="font-bold">
+                        <TableCell>Total</TableCell>
+                        <TableCell>-</TableCell>
+                        <TableCell className="text-right">
+                          {getTotals().debit.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {getTotals().kredit.toLocaleString()}
+                        </TableCell>
+                        <TableCell>-</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </ScrollArea>
+          <CardFooter className="border-t bg-background p-4">
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (savedMainAccounts.length === 0 && !formData.namaAkun) {
+                  alert("Harap isi setidaknya satu akun utama");
+                  return;
+                }
+                onSave({
+                  mainAccounts:
+                    savedMainAccounts.length > 0
+                      ? savedMainAccounts
+                      : [formData],
+                  subAccounts,
+                });
+              }}
+            >
+              Simpan
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
   );
-};
+}
