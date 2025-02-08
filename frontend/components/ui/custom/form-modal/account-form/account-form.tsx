@@ -8,14 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AccountFormData } from "@/components/ui/custom/form-modal/account.config";
+import type { Transactions } from "@/components/ui/custom/form-modal/account.config";
 
 export const AccountForm = ({
   onSubmit,
 }: {
-  onSubmit: (data: AccountFormData) => void;
+  onSubmit: (data: Transactions) => void;
 }) => {
-  const [formData, setFormData] = useState<AccountFormData>({
+  const [formData, setFormData] = useState<Transactions>({
     namaAkun: "",
     kodeAkun: "",
     debit: "",
