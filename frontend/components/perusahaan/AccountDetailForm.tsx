@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pencil, X } from "lucide-react";
@@ -49,10 +49,12 @@ export function AccountDetailModal({
   onClose,
   onSave,
   editData,
+  isOpen,
 }: {
   onClose: () => void;
   onSave: (data: Transactions & { subAccounts: SubAccountFormData[] }) => void;
   editData?: any;
+  isOpen: boolean;
 }) {
   // Separate state for form input and saved main account data
   const [formData, setFormData] = useState<Transactions>({
@@ -299,13 +301,61 @@ export function AccountDetailModal({
     return subCode ? `${mainCode},${subCode}` : mainCode;
   };
 
-  // Update the clearAllData function
+  // Load data when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const savedData = localStorage.getItem('accountDetailFormData');
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        setSavedMainAccounts(parsedData.mainAccounts || []);
+        setSubAccounts(parsedData.subAccounts || []);
+        setFormData(parsedData.formData || {
+          namaAkun: "",
+          kodeAkun: "",
+          debit: "",
+          kredit: "",
+          hasSubAccounts: false,
+          isMainAccountSaved: false,
+        });
+      }
+    }
+  }, [isOpen]);
+
+  // Save data when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      const dataToSave = {
+        mainAccounts: savedMainAccounts,
+        subAccounts: subAccounts,
+        formData: formData
+      };
+      localStorage.setItem('accountDetailFormData', JSON.stringify(dataToSave));
+    }
+  }, [isOpen, savedMainAccounts, subAccounts, formData]);
+
+  // Update clearAllData to also clear localStorage
   const clearAllData = () => {
-    setSubAccounts([]);
-    setSavedMainAccounts([]);
-    resetSubAccountForm();
-    setShowSubAccountForm(false);
-    resetMainForm();
+    if (window.confirm('Apakah Anda yakin ingin menghapus semua data?')) {
+      setSubAccounts([]);
+      setSavedMainAccounts([]);
+      resetSubAccountForm();
+      setShowSubAccountForm(false);
+      resetMainForm();
+      localStorage.removeItem('accountDetailFormData');
+    }
+  };
+
+  // Update handleFinalSave to clear localStorage only after successful save
+  const handleFinalSave = () => {
+    if (savedMainAccounts.length === 0 && !formData.namaAkun) {
+      alert("Harap isi setidaknya satu akun utama");
+      return;
+    }
+    onSave({
+      mainAccounts: savedMainAccounts.length > 0 ? savedMainAccounts : [formData],
+      subAccounts,
+    });
+    localStorage.removeItem('accountDetailFormData'); // Hapus draft setelah berhasil disimpan
   };
 
   // Add helper function to check if a value is effectively zero
@@ -314,7 +364,7 @@ export function AccountDetailModal({
   };
 
   return (
-    <div>
+    <div className="max-h-[80vh] overflow-y-auto">
       <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Form Section */}
         <div className="space-y-6">
@@ -678,22 +728,10 @@ export function AccountDetailModal({
               )}
             </CardContent>
           </ScrollArea>
-          <CardFooter className="border-t bg-background p-4">
+          <CardFooter className="sticky bottom-0 border-t bg-background p-4">
             <Button
               className="w-full"
-              onClick={() => {
-                if (savedMainAccounts.length === 0 && !formData.namaAkun) {
-                  alert("Harap isi setidaknya satu akun utama");
-                  return;
-                }
-                onSave({
-                  mainAccounts:
-                    savedMainAccounts.length > 0
-                      ? savedMainAccounts
-                      : [formData],
-                  subAccounts,
-                });
-              }}
+              onClick={handleFinalSave}
             >
               Simpan
             </Button>

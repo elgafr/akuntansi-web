@@ -52,14 +52,17 @@ export function AddAccountTable({
 }: AddAccountTableProps) {
   const [search, setSearch] = useState("");
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
-  const [showAll, setShowAll] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
   const [inlineEditData, setInlineEditData] = useState<any>(null);
   const [accountsState, setAccountsState] = useState<Account[]>(accounts);
+  const ITEMS_PER_PAGE = 10;
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [inlineEditSubAccount, setInlineEditSubAccount] = useState<{
+    mainAccountId: string;
+    subAccountId: string;
+    data: SubAccount;
+  } | null>(null);
 
   useEffect(() => {
     console.log("=== AddAccountTable Data ===");
@@ -168,16 +171,6 @@ export function AddAccountTable({
     }
   };
 
-  const handlePageSizeChange = (value: string) => {
-    if (value === "all") {
-      setShowAll(true);
-      setPageSize(accountsState.length);
-    } else {
-      setShowAll(false);
-      setPageSize(Number(value));
-    }
-  };
-
   const handleEditMainAccount = (account: Account) => {
     setEditData({
       mainAccount: {
@@ -262,11 +255,103 @@ export function AddAccountTable({
     setInlineEditData(null);
   };
 
+  const handleInlineEditSubAccount = (mainAccount: Account, subAccount: SubAccount) => {
+    setInlineEditSubAccount({
+      mainAccountId: mainAccount.kodeAkun,
+      subAccountId: subAccount.kodeSubAkun,
+      data: { ...subAccount }
+    });
+  };
+
+  const handleSaveInlineEditSubAccount = () => {
+    if (!inlineEditSubAccount) return;
+
+    const updatedAccounts = accountsState.map(account => {
+      if (account.kodeAkun === inlineEditSubAccount.mainAccountId) {
+        return {
+          ...account,
+          subAccounts: account.subAccounts?.map(sub => 
+            sub.kodeSubAkun === inlineEditSubAccount.subAccountId
+              ? inlineEditSubAccount.data
+              : sub
+          )
+        };
+      }
+      return account;
+    });
+
+    setAccountsState(updatedAccounts);
+    onAccountsChange(updatedAccounts);
+    setInlineEditSubAccount(null);
+  };
+
+  // Tambahkan helper function untuk mengecek apakah nilai efektif 0
+  const isEffectivelyZero = (value: string | number) => {
+    if (typeof value === 'string') {
+      return !value || parseFloat(value) === 0;
+    }
+    return !value || value === 0;
+  };
+
+  // Tambahkan fungsi untuk menghitung total baris (main + sub accounts)
+  const getTotalRows = () => {
+    return accountsState.reduce((total, account) => {
+      // Tambahkan 1 untuk akun utama
+      let count = 1;
+      // Tambahkan jumlah sub akun jika ada
+      if (account.subAccounts?.length) {
+        count += account.subAccounts.length;
+      }
+      return total + count;
+    }, 0);
+  };
+
+  // Fungsi untuk mengambil data yang akan ditampilkan di halaman saat ini
+  const getCurrentPageData = () => {
+    let currentRow = 0;
+    let result = [];
+    
+    for (const account of accountsState) {
+      // Jika baris saat ini masih di bawah startIndex, skip
+      if (currentRow < startIndex) {
+        currentRow += 1 + (account.subAccounts?.length || 0);
+        continue;
+      }
+      
+      // Jika sudah mencapai batas endIndex, berhenti
+      if (currentRow >= endIndex) {
+        break;
+      }
+      
+      // Tambahkan akun utama
+      result.push(account);
+      currentRow++;
+      
+      // Tambahkan sub akun jika masih dalam range
+      if (account.subAccounts?.length) {
+        const remainingSlots = endIndex - currentRow;
+        const subAccountsToAdd = account.subAccounts.slice(0, remainingSlots);
+        currentRow += subAccountsToAdd.length;
+      }
+    }
+    
+    return result;
+  };
+
+  // Update pagination calculations
+  const totalRows = getTotalRows();
+  const totalPages = Math.ceil(totalRows / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+
+  // Gunakan getCurrentPageData untuk render
+  const currentAccounts = getCurrentPageData();
+
   return (
     <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
       <div className="flex justify-between items-center gap-4 p-4">
         <div className="flex items-center gap-4">
-          <Input
+          {/* <Input
             placeholder="Search accounts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -285,7 +370,7 @@ export function AddAccountTable({
               <SelectItem value="50">50 rows</SelectItem>
               <SelectItem value="all">Show All</SelectItem>
             </SelectContent>
-          </Select>
+          </Select> */}
         </div>
         <Button
           onClick={() => setIsFormModalOpen(true)}
@@ -311,7 +396,7 @@ export function AddAccountTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {accountsState.map((account) => (
+            {currentAccounts.map((account) => (
               <React.Fragment key={account.kodeAkun}>
                 {/* Main Account Row */}
                 <TableRow className="hover:bg-gray-50 transition-colors">
@@ -328,7 +413,7 @@ export function AddAccountTable({
                         className="w-24"
                       />
                     ) : (
-                      <span className="bg-amber-100 px-2 py-1 rounded-md">
+                      <span className="bg-amber-0 px-2 py-1 rounded-md">
                         {account.kodeAkun}
                       </span>
                     )}
@@ -358,14 +443,15 @@ export function AddAccountTable({
                           setInlineEditData({
                             ...inlineEditData,
                             debit: e.target.value,
-                            kredit: "",
+                            kredit: "", // Reset kredit saat debit diisi
                           })
                         }
                         type="number"
                         className="w-32 text-right"
+                        disabled={!isEffectivelyZero(inlineEditData.kredit)}
                       />
                     ) : (
-                      account.debit.toLocaleString()
+                      (parseFloat(account.debit) || 0).toLocaleString()
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -376,14 +462,15 @@ export function AddAccountTable({
                           setInlineEditData({
                             ...inlineEditData,
                             kredit: e.target.value,
-                            debit: "",
+                            debit: "", // Reset debit saat kredit diisi
                           })
                         }
                         type="number"
                         className="w-32 text-right"
+                        disabled={!isEffectivelyZero(inlineEditData.debit)}
                       />
                     ) : (
-                      account.kredit.toLocaleString()
+                      (parseFloat(account.kredit) || 0).toLocaleString()
                     )}
                   </TableCell>
                   <TableCell>
@@ -394,6 +481,7 @@ export function AddAccountTable({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleSaveInlineEdit(account.kodeAkun)}
+                            className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                           >
                             <Check className="h-4 w-4 text-emerald-600" />
                           </Button>
@@ -404,6 +492,7 @@ export function AddAccountTable({
                               setInlineEditId(null);
                               setInlineEditData(null);
                             }}
+                            className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                           >
                             <X className="h-4 w-4 text-destructive" />
                           </Button>
@@ -414,6 +503,7 @@ export function AddAccountTable({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleInlineEdit(account)}
+                            className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                           >
                             <Pencil className="h-4 w-4 text-primary" />
                           </Button>
@@ -421,12 +511,13 @@ export function AddAccountTable({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(account.kodeAkun)}
+                            className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                           >
                             <X className="h-4 w-4 text-destructive" />
                           </Button>
                           <Button
                             variant="ghost"
-                            className="text-emerald-600 px-2"
+                            className="text-red-500 hover:text-red-600 px-3 py-1.5 border border-gray-200 rounded-3xl text-sm bg-white hover:bg-gray-50"
                             onClick={() => handleAddSubAccount(account)}
                           >
                             Tambah Sub Akun
@@ -445,37 +536,125 @@ export function AddAccountTable({
                   >
                     <TableCell className="pl-8">{"-"}</TableCell>
                     <TableCell>{"-"}</TableCell>
-                    <TableCell>{`${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`}</TableCell>
-                    <TableCell>{subAccount.namaSubAkun}</TableCell>
-                    <TableCell className="text-right">
-                      {parseFloat(subAccount.debit).toLocaleString()}
+                    <TableCell>
+                      {inlineEditSubAccount?.mainAccountId === account.kodeAkun && 
+                       inlineEditSubAccount?.subAccountId === subAccount.kodeSubAkun ? (
+                        <Input
+                          value={inlineEditSubAccount.data.kodeSubAkun}
+                          onChange={(e) => setInlineEditSubAccount({
+                            ...inlineEditSubAccount,
+                            data: {
+                              ...inlineEditSubAccount.data,
+                              kodeSubAkun: e.target.value
+                            }
+                          })}
+                          className="w-32"
+                        />
+                      ) : (
+                        `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {inlineEditSubAccount?.mainAccountId === account.kodeAkun && 
+                       inlineEditSubAccount?.subAccountId === subAccount.kodeSubAkun ? (
+                        <Input
+                          value={inlineEditSubAccount.data.namaSubAkun}
+                          onChange={(e) => setInlineEditSubAccount({
+                            ...inlineEditSubAccount,
+                            data: {
+                              ...inlineEditSubAccount.data,
+                              namaSubAkun: e.target.value
+                            }
+                          })}
+                        />
+                      ) : (
+                        subAccount.namaSubAkun
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {parseFloat(subAccount.kredit).toLocaleString()}
+                      {inlineEditSubAccount?.mainAccountId === account.kodeAkun && 
+                       inlineEditSubAccount?.subAccountId === subAccount.kodeSubAkun ? (
+                        <Input
+                          type="number"
+                          value={inlineEditSubAccount.data.debit}
+                          onChange={(e) => setInlineEditSubAccount({
+                            ...inlineEditSubAccount,
+                            data: {
+                              ...inlineEditSubAccount.data,
+                              debit: e.target.value,
+                              kredit: "", // Reset kredit saat debit diisi
+                            }
+                          })}
+                          className="w-32 text-right"
+                          disabled={!isEffectivelyZero(inlineEditSubAccount.data.kredit)}
+                        />
+                      ) : (
+                        (parseFloat(subAccount.debit) || 0).toLocaleString()
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {inlineEditSubAccount?.mainAccountId === account.kodeAkun && 
+                       inlineEditSubAccount?.subAccountId === subAccount.kodeSubAkun ? (
+                        <Input
+                          type="number"
+                          value={inlineEditSubAccount.data.kredit}
+                          onChange={(e) => setInlineEditSubAccount({
+                            ...inlineEditSubAccount,
+                            data: {
+                              ...inlineEditSubAccount.data,
+                              kredit: e.target.value,
+                              debit: "", // Reset debit saat kredit diisi
+                            }
+                          })}
+                          className="w-32 text-right"
+                          disabled={!isEffectivelyZero(inlineEditSubAccount.data.debit)}
+                        />
+                      ) : (
+                        (parseFloat(subAccount.kredit) || 0).toLocaleString()
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            handleEditSubAccount(account, subAccount)
-                          }
-                        >
-                          <Pencil className="h-4 w-4 text-primary" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            handleDelete(
-                              `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`,
-                              true,
-                            )
-                          }
-                        >
-                          <X className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {inlineEditSubAccount?.mainAccountId === account.kodeAkun && 
+                         inlineEditSubAccount?.subAccountId === subAccount.kodeSubAkun ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={handleSaveInlineEditSubAccount}
+                              className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                            >
+                              <Check className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setInlineEditSubAccount(null)}
+                              className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleInlineEditSubAccount(account, subAccount)}
+                              className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                            >
+                              <Pencil className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(`${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`, true)}
+                              className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -487,9 +666,11 @@ export function AddAccountTable({
       </div>
 
       <div className="flex items-center justify-between py-4">
-        <p className="text-sm text-gray-500">
-          Page {currentPage} of {totalPages}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-gray-700">
+            Showing {startIndex + 1} - {Math.min(endIndex, totalRows)} of {totalRows} results
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -503,43 +684,21 @@ export function AddAccountTable({
 
           {/* Page Numbers */}
           <div className="flex gap-1">
-            {[...Array(totalPages)].map((_, index) => {
-              const pageNumber = index + 1;
-              // Show first page, current page, last page, and pages around current
-              if (
-                pageNumber === 1 ||
-                pageNumber === totalPages ||
-                (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
-              ) {
-                return (
-                  <Button
-                    key={pageNumber}
-                    variant={currentPage === pageNumber ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNumber)}
-                    className={`rounded-lg min-w-[40px] ${
-                      currentPage === pageNumber 
-                        ? "bg-red-500 text-white hover:bg-red-600" 
-                        : "border-gray-200"
-                    }`}
-                  >
-                    {pageNumber}
-                  </Button>
-                );
-              }
-              // Show ellipsis for gaps
-              if (
-                pageNumber === currentPage - 2 ||
-                pageNumber === currentPage + 2
-              ) {
-                return (
-                  <span key={pageNumber} className="px-2 py-2 text-gray-500">
-                    ...
-                  </span>
-                );
-              }
-              return null;
-            })}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCurrentPage(page)}
+                className={`rounded-lg ${
+                  currentPage === page 
+                    ? 'bg-red-500 hover:bg-red-600 text-white' 
+                    : 'border-gray-200'
+                }`}
+              >
+                {page}
+              </Button>
+            ))}
           </div>
 
           <Button
@@ -568,6 +727,7 @@ export function AddAccountTable({
           {editData ? (
             editData.mainAccount && !editData.subAccount ? (
               <SubAccountDetailModal
+                isOpen={isFormModalOpen}
                 onClose={() => {
                   setIsFormModalOpen(false);
                   setEditData(null);
@@ -577,6 +737,7 @@ export function AddAccountTable({
               />
             ) : (
               <AccountDetailModal
+                isOpen={isFormModalOpen}
                 onClose={() => {
                   setIsFormModalOpen(false);
                   setEditData(null);
@@ -587,6 +748,7 @@ export function AddAccountTable({
             )
           ) : (
             <AccountDetailModal
+              isOpen={isFormModalOpen}
               onClose={() => {
                 setIsFormModalOpen(false);
                 setEditData(null);
