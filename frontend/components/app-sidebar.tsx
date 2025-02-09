@@ -59,7 +59,7 @@ const data = {
   navMain: [
     {
       title: "Perusahaan",
-      url: "/perusahaan2",
+      url: "/perusahaan",
       icon: SquareTerminal,
       isActive: true,
     },
