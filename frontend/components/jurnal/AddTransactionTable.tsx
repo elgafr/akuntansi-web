@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -58,13 +58,11 @@ export function AddTransactionTable({
   const [search, setSearch] = useState("");
   const [newTransactions, setNewTransactions] = useState<Transaction[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [pageSize, setPageSize] = useState(10);
-  const [showAll, setShowAll] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [inlineEditIndex, setInlineEditIndex] = useState<number | null>(null);
   const [inlineEditData, setInlineEditData] = useState<Transaction | null>(null);
+  const ITEMS_PER_PAGE = 10;
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -271,17 +269,6 @@ export function AddTransactionTable({
     event.target.value = '';
   };
 
-  // Add page size change handler
-  const handlePageSizeChange = (value: string) => {
-    if (value === 'all') {
-      setShowAll(true);
-      setPageSize(transactions.length);
-    } else {
-      setShowAll(false);
-      setPageSize(Number(value));
-    }
-  };
-
   // Tambahkan fungsi untuk menangani inline edit
   const handleInlineEdit = (index: number) => {
     const transaction = transactions[index];
@@ -306,6 +293,19 @@ export function AddTransactionTable({
   const getTotalKredit = () => {
     return transactions.reduce((total, transaction) => total + transaction.kredit, 0);
   };
+
+  // Update data yang ditampilkan
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  // Update total pages berdasarkan data yang difilter
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
+
+  // Reset currentPage saat ada perubahan data
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [transactions.length, search]);
 
   return (
     <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
@@ -354,20 +354,6 @@ export function AddTransactionTable({
             onChange={(e) => setSearch(e.target.value)}
             className="w-[300px] rounded-lg border-gray-200"
           />
-          <Select
-            value={showAll ? 'all' : pageSize.toString()}
-            onValueChange={handlePageSizeChange}
-          >
-            <SelectTrigger className="w-[180px] rounded-lg border-gray-200">
-              <SelectValue placeholder="Rows per page" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 rows</SelectItem>
-              <SelectItem value="20">20 rows</SelectItem>
-              <SelectItem value="50">50 rows</SelectItem>
-              <SelectItem value="all">Show All</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -504,11 +490,21 @@ export function AddTransactionTable({
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button variant="default" size="icon" onClick={() => handleSave(index)}>
-                      <Save className="h-4 w-4" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleSave(index)}
+                      className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                    >
+                      <Save className="h-4 w-4 text-primary" />
                     </Button>
-                    <Button variant="destructive" size="icon" onClick={() => handleDelete(index, true)}>
-                      <X className="h-4 w-4" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleDelete(index, true)}
+                      className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                    >
+                      <X className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </TableCell>
@@ -516,7 +512,7 @@ export function AddTransactionTable({
             ))}
 
             {/* Existing Transactions */}
-            {filteredTransactions.map((transaction, index) => (
+            {currentTransactions.map((transaction, index) => (
               <TableRow key={index}>
                 <TableCell>
                   {inlineEditIndex === index ? (
@@ -651,6 +647,7 @@ export function AddTransactionTable({
                         variant="ghost"
                         size="icon"
                         onClick={() => handleInlineSave(index)}
+                        className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                       >
                         <Check className="h-4 w-4 text-primary" />
                       </Button>
@@ -659,6 +656,7 @@ export function AddTransactionTable({
                         variant="ghost"
                         size="icon"
                         onClick={() => handleInlineEdit(index)}
+                        className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                       >
                         <Pencil className="h-4 w-4 text-primary" />
                       </Button>
@@ -667,6 +665,7 @@ export function AddTransactionTable({
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(index, false)}
+                      className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                     >
                       <X className="h-4 w-4 text-destructive" />
                     </Button>
@@ -752,8 +751,8 @@ export function AddTransactionTable({
           </DialogTitle>
           <AddTransactionForm
             accounts={accounts}
-            onSave={(data) => {
-              onTransactionsChange([...transactions, data]);
+            onSave={(formTransactions) => {
+              onTransactionsChange([...transactions, ...formTransactions]);
               setIsFormModalOpen(false);
             }}
             onCancel={() => setIsFormModalOpen(false)}

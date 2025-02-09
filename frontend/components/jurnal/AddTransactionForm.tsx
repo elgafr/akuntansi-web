@@ -36,7 +36,7 @@ interface Account {
 
 interface AddTransactionFormProps {
     accounts: Account[];
-    onSave: (data: Transaction) => void;
+    onSave: (data: Transaction[]) => void;
     onCancel: () => void;
 }
 
@@ -144,15 +144,12 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
         setEditingIndex(index);
     };
 
-    const handleSubmit = () => {
-        // Kirim semua transaksi yang ada di ringkasan
-        transactions.forEach(transaction => {
-            onSave(transaction);
-        });
+    const handleSave = () => {
+        // Kirim semua transaksi ke parent component
+        onSave(transactions);
         
-        // Clear ringkasan setelah submit
+        // Clear form dan localStorage setelah berhasil
         clearAllData();
-        onCancel();
     };
 
     const handleDeleteTransaction = (index: number) => {
@@ -459,7 +456,7 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
                             Batal
                         </Button>
                         <Button 
-                            onClick={handleSubmit}
+                            onClick={handleSave}
                             disabled={transactions.length === 0}
                         >
                             Tambah ke Jurnal Umum
