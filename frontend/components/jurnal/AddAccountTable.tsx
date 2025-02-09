@@ -348,7 +348,7 @@ export function AddAccountTable({
   const currentAccounts = getCurrentPageData();
 
   return (
-    <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
+    <div className="space-y-4 p-6 rounded-xl">
       <div className="flex justify-between items-center gap-4 p-4">
         <div className="flex items-center gap-4">
           {/* <Input

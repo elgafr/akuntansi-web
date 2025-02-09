@@ -40,8 +40,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AddAccountTable } from "@/components/jurnal/AddAccountTable";
+import { useAccounts } from "@/contexts/AccountContext";
 
 export default function Page() {
+  const { accounts, setAccounts } = useAccounts();
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -135,8 +138,10 @@ export default function Page() {
                   Simpan
                 </Button>
               </div>
+
             </CardContent>
           </Card>
+          
 
           <Card className="w-[400px]">
             <CardHeader>
@@ -172,7 +177,14 @@ export default function Page() {
               </div>
             </CardContent>
           </Card>
+
         </div>
+        <section className="p-6">
+            <AddAccountTable
+              accounts={accounts}
+              onAccountsChange={setAccounts}
+            />
+          </section>
       </SidebarInset>
     </SidebarProvider>
   );
