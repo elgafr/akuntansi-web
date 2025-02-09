@@ -307,6 +307,14 @@ export function AddTransactionTable({
     setCurrentPage(1);
   }, [transactions.length, search]);
 
+  // Tambahkan helper function untuk mengecek nilai
+  const isEffectivelyZero = (value: string | number | undefined | null) => {
+    if (typeof value === 'string') {
+      return !value || parseFloat(value) === 0;
+    }
+    return !value || value === 0;
+  };
+
   return (
     <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
       {/* Header Section with Totals */}
@@ -623,8 +631,11 @@ export function AddTransactionTable({
                       value={inlineEditData?.debit}
                       onChange={(e) => setInlineEditData({
                         ...inlineEditData!,
-                        debit: parseFloat(e.target.value) || 0
+                        debit: parseFloat(e.target.value) || 0,
+                        kredit: 0 // Reset kredit saat debit diisi
                       })}
+                      className="w-32 text-right"
+                      disabled={!isEffectivelyZero(inlineEditData?.kredit)}
                     />
                   ) : transaction.debit.toLocaleString()}
                 </TableCell>
@@ -635,8 +646,11 @@ export function AddTransactionTable({
                       value={inlineEditData?.kredit}
                       onChange={(e) => setInlineEditData({
                         ...inlineEditData!,
-                        kredit: parseFloat(e.target.value) || 0
+                        kredit: parseFloat(e.target.value) || 0,
+                        debit: 0 // Reset debit saat kredit diisi
                       })}
+                      className="w-32 text-right"
+                      disabled={!isEffectivelyZero(inlineEditData?.debit)}
                     />
                   ) : transaction.kredit.toLocaleString()}
                 </TableCell>
@@ -752,6 +766,16 @@ export function AddTransactionTable({
           <AddTransactionForm
             accounts={accounts}
             onSave={(formTransactions) => {
+              // Validasi total debit dan kredit
+              const totalDebit = formTransactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+              const totalKredit = formTransactions.reduce((sum, t) => sum + (t.kredit || 0), 0);
+
+              if (totalDebit !== totalKredit) {
+                alert("Total debit dan kredit harus sama sebelum ditambahkan ke jurnal umum");
+                return;
+              }
+
+              // Jika valid, tambahkan ke jurnal umum
               onTransactionsChange([...transactions, ...formTransactions]);
               setIsFormModalOpen(false);
             }}
