@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { TransactionCard } from "@/components/jurnal/TransactionCard";
-import { TransactionTable } from "@/components/jurnal/TransactionTable";
+
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
@@ -105,10 +105,7 @@ export default function JurnalPage() {
           </div>
 
           {/* Transaction Table */}
-          <TransactionTable
-            transactions={transactions}
-            onTransactionsChange={setTransactions}
-          />
+          
           
           <AddAccountTable 
             accounts={accounts} 
