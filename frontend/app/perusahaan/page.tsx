@@ -72,8 +72,8 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-10">Perusahaan</h1>
-                  <h2 className="text-sm ml-10">
+                  <h1 className="text-2xl font-bold ml-6">Perusahaan</h1>
+                  <h2 className="text-sm ml-6">
                     Let&apos;s check your Company today
                   </h2>
                 </BreadcrumbItem>
@@ -99,7 +99,7 @@ export default function Page() {
         {/* Search and Add Button Section */}
         <div className="flex flex-col gap-4 p-4">
           <div className="flex items-center gap-4 w-full">
-            <div className="relative w-full flex-1 ml-10">
+            <div className="relative w-full flex-1 ml-6">
               <Input
                 placeholder="Cari Perusahaan"
                 className="w-full pl-10 h-10 rounded-xl"
