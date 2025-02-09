@@ -34,12 +34,13 @@ export function BukuBesarTable() {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
+  const ITEMS_PER_PAGE = 10;
 
   // Combine account opening balances with transactions
   const combinedData = [
-    // Add opening balances from accounts, filtering out empty parents
+    // Add opening balances from main accounts
     ...accounts
-      .filter(account => account.namaAkun && account.kodeAkun) // Only include accounts with non-empty values
+      .filter(account => account.namaAkun && account.kodeAkun)
       .map(account => ({
         date: "Saldo Awal",
         namaAkun: account.namaAkun,
@@ -49,23 +50,20 @@ export function BukuBesarTable() {
         isOpeningBalance: true,
         description: "Saldo Awal"
       })),
-    // Add sub-account opening balances
-    ...accounts
-      .filter(account => 
-        account.subNamaAkun && 
-        account.subKodeAkun && 
-        account.subNamaAkun.trim() !== "" && 
-        account.subKodeAkun.trim() !== ""
-      )
-      .map(account => ({
-        date: "Saldo Awal",
-        namaAkun: account.subNamaAkun || "",
-        kodeAkun: account.subKodeAkun || "",
-        debit: account.debit || 0,
-        kredit: account.kredit || 0,
-        isOpeningBalance: true,
-        description: "Saldo Awal"
-      })),
+    // Add opening balances from sub accounts
+    ...accounts.flatMap(account => 
+      (account.subAccounts || [])
+        .filter(sub => sub.namaSubAkun && sub.kodeSubAkun)
+        .map(sub => ({
+          date: "Saldo Awal",
+          namaAkun: sub.namaSubAkun,
+          kodeAkun: `${sub.kodeAkunInduk},${sub.kodeSubAkun}`,
+          debit: parseFloat(sub.debit) || 0,
+          kredit: parseFloat(sub.kredit) || 0,
+          isOpeningBalance: true,
+          description: "Saldo Awal"
+        }))
+    ),
     // Add transactions
     ...transactions.map(transaction => ({
       date: transaction.date,
@@ -99,35 +97,16 @@ export function BukuBesarTable() {
     }, []);
 
   // Calculate running balance based on filter selection
-  const calculateRunningBalance = (data: typeof sortedData) => {
-    if (selectedMainAccount === "all") {
-      // When showing all accounts, just return "-" for balance
-      return data.map(item => ({
+  const calculateRunningBalance = (data: any[]) => {
+    let balance = 0;
+    return data.map(item => {
+      // Hitung saldo
+      balance += (item.debit || 0) - (item.kredit || 0);
+      return {
         ...item,
-        balance: "-"
-      }));
-    } else {
-      // When a main account is selected, calculate running balance
-      const mainCode = selectedMainAccount.split(' ')[0];
-      let balance = 0;
-      
-      return data.map(item => {
-        const itemMainCode = item.kodeAkun.split(',')[0];
-        
-        if (itemMainCode === mainCode) {
-          balance += (item.debit || 0) - (item.kredit || 0);
-          return {
-            ...item,
-            balance
-          };
-        }
-        
-        return {
-          ...item,
-          balance: "-"
-        };
-      });
-    }
+        balance
+      };
+    });
   };
 
   // Filter and sort data
@@ -164,10 +143,10 @@ export function BukuBesarTable() {
   });
 
   // Pagination calculations
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-  const startIndex = showAll ? 0 : (currentPage - 1) * pageSize;
-  const endIndex = showAll ? sortedData.length : startIndex + pageSize;
-  const currentData = sortedData.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentData = filteredData.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -336,7 +315,7 @@ export function BukuBesarTable() {
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
             <div className="flex items-center gap-2">
               <p className="text-sm text-gray-700">
-                Showing {startIndex + 1} - {Math.min(endIndex, sortedData.length)} of {sortedData.length} results
+                Showing {startIndex + 1} - {Math.min(endIndex, filteredData.length)} of {filteredData.length} results
               </p>
             </div>
             <div className="flex items-center gap-2">
