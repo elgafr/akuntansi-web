@@ -713,7 +713,16 @@ export function AddAccountTable({
         </div>
       </div>
 
-      <Dialog open={isFormModalOpen} onOpenChange={setIsFormModalOpen}>
+      <Dialog 
+        open={isFormModalOpen} 
+        onOpenChange={(open) => {
+          setIsFormModalOpen(open);
+          if (!open) {
+            // Reset editData saat modal ditutup
+            setEditData(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[1080px] p-6 !rounded-2xl overflow-hidden border">
           <DialogTitle className="text-xl font-semibold mb-4">
             {editData?.mainAccount && !editData?.subAccount 
@@ -730,9 +739,12 @@ export function AddAccountTable({
                 isOpen={isFormModalOpen}
                 onClose={() => {
                   setIsFormModalOpen(false);
-                  setEditData(null);
+                  setEditData(null); // Reset editData saat modal ditutup
                 }}
-                onSave={handleSaveAccount}
+                onSave={(data) => {
+                  handleSaveAccount(data);
+                  setEditData(null); // Reset editData setelah save
+                }}
                 mainAccount={editData.mainAccount}
               />
             ) : (
@@ -740,9 +752,12 @@ export function AddAccountTable({
                 isOpen={isFormModalOpen}
                 onClose={() => {
                   setIsFormModalOpen(false);
-                  setEditData(null);
+                  setEditData(null); // Reset editData saat modal ditutup
                 }}
-                onSave={handleSaveAccount}
+                onSave={(data) => {
+                  handleSaveAccount(data);
+                  setEditData(null); // Reset editData setelah save
+                }}
                 editData={editData}
               />
             )
@@ -751,9 +766,12 @@ export function AddAccountTable({
               isOpen={isFormModalOpen}
               onClose={() => {
                 setIsFormModalOpen(false);
-                setEditData(null);
+                setEditData(null); // Reset editData saat modal ditutup
               }}
-              onSave={handleSaveAccount}
+              onSave={(data) => {
+                handleSaveAccount(data);
+                setEditData(null); // Reset editData setelah save
+              }}
               editData={null}
             />
           )}
