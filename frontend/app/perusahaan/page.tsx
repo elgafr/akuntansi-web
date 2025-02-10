@@ -30,7 +30,7 @@ interface Company {
 
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false); // State to manage modal visibility
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Load companies from localStorage on mount
   useEffect(() => {
@@ -56,11 +56,13 @@ export default function Page() {
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
   };
 
-  const hendleDeleteCompany = (companyName: string) =>{
-    const updatedCompanies = companyList.filter((company) => company.name !== companyName);
+  const handleDeleteCompany = (companyName: string) => {
+    const updatedCompanies = companyList.filter(
+      (company) => company.name !== companyName
+    );
     setCompanyList(updatedCompanies);
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-  }
+  };
 
   return (
     <SidebarProvider>
@@ -108,10 +110,10 @@ export default function Page() {
                 <FaBuilding className="w-5 h-5 text-gray-700" />
               </div>
             </div>
-            {/* Add Company Button is placed below the profile, triggering modal */}
+            {/* Add Company Button */}
             <Button
               className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10"
-              onClick={() => setIsModalOpen(true)} // Open the modal when this button is clicked
+              onClick={() => setIsModalOpen(true)}
             >
               <PlusCircle className="w-6 h-6 text-white" />
               Tambah Perusahaan
@@ -120,41 +122,46 @@ export default function Page() {
         </div>
 
         {/* Company Cards Section */}
-        <div className="flex flex-wrap gap-4 ml-24 mt-4">
-          {companyList.map((company, index) => (
-            <Card key={index} className="w-[350px]">
-              <CardHeader>
-                <CardTitle className="text-2xl text-center text-destructive">
-                  {company.name}
-                </CardTitle>
-                <CardDescription className="text-center">
-                  Kategori - {company.category}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid w-full items-center gap-4">
-                  <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white" onClick={() => hendleDeleteCompany(company.name)}>
-                      Hapus Perusahaan
-                    </Button>
-                  </div>
-                  <Link href="/detail-akun">
+        <div className="px-6 mr-8 ml-4"> {/* Padding untuk sejajar dengan header */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {companyList.map((company, index) => (
+              <Card key={index} className="w-full">
+                <CardHeader>
+                  <CardTitle className="text-2xl text-center text-destructive">
+                    {company.name}
+                  </CardTitle>
+                  <CardDescription className="text-center">
+                    Kategori - {company.category}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid w-full items-center gap-4">
                     <div className="flex flex-col space-y-1.5">
-                      <Button className="rounded-xl">Detail dan Akun</Button>
+                      <Button
+                        className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white"
+                        onClick={() => handleDeleteCompany(company.name)}
+                      >
+                        Hapus Perusahaan
+                      </Button>
                     </div>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <Link href="/detail-akun">
+                      <div className="flex flex-col space-y-1.5">
+                        <Button className="rounded-xl">Detail dan Akun</Button>
+                      </div>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
         {/* Add Company Modal */}
         <FormModal
           title="Input Data Perusahaan"
-          isOpen={isModalOpen} // Control the modal open state from parent
-          onOpenChange={setIsModalOpen} // Close the modal when needed
-          onSave={handleAddCompany} // Handle saving data to parent
+          isOpen={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          onSave={handleAddCompany}
         />
       </SidebarInset>
     </SidebarProvider>

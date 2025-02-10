@@ -104,7 +104,7 @@ export default function Page() {
                     alt="@shadcn"
                   />
                 </Avatar>
-                <div className="text-left mr-12">
+                <div className="text-left mr-8">
                   <div className="text-sm font-medium">Arthur</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
@@ -134,7 +134,7 @@ export default function Page() {
                           className="w-full pl-10 h-10 rounded-xl"
                         />
                         <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                          <FaBuilding className="w-5 h-5 text-gray-700" />{" "}
+                          <FaBuilding className="w-5 h-5 text-gray-700" />
                           {/* Ikon perusahaan */}
                         </div>
                       </div>
@@ -147,7 +147,7 @@ export default function Page() {
               {/* Tombol di samping input */}
               <Button
                 type="submit"
-                className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10" // Sama dengan tinggi input dan padding
+                className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8" // Sama dengan tinggi input dan padding
               >
                 <span className="flex items-center justify-center">
                   <PlusCircle className="w-6 h-6 text-white" />
