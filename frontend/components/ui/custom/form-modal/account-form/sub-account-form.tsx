@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type {
-  AccountFormData,
+  Transactions,
   SubAccountFormData,
 } from "@/components/ui/custom/form-modal/account.config";
 
@@ -11,7 +11,7 @@ export const SubAccountForm = ({
   onSubmit,
   onDelete,
 }: {
-  parentAccount: AccountFormData;
+  parentAccount: Transactions;
   onSubmit: (data: SubAccountFormData) => void;
   onDelete: () => void;
 }) => {

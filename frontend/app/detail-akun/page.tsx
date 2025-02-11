@@ -30,6 +30,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AddAccountTable } from "@/components/jurnal/AddAccountTable";
+import { useAccounts } from "@/contexts/AccountContext";
 
 interface Company {
   name: string;
@@ -52,6 +54,7 @@ interface ProfileData {
 }
 
 export default function Page() {
+  
   const searchParams = useSearchParams();
   const companyName = searchParams.get("name");
   const [company, setCompany] = useState<Company | null>(null);
@@ -269,6 +272,13 @@ export default function Page() {
                   ))}
                 </TableBody>
               </Table>
+
+              <div className="flex justify-end mt-24">
+                <Button className="rounded-xl w-32 h-10 flex items-center">
+                  Simpan
+                </Button>
+              </div>
+
             </CardContent>
 
             <div className="flex justify-end mt-4">
@@ -280,6 +290,7 @@ export default function Page() {
               </Button>
             </div>
           </Card>
+          
 
           <Card className="w-[400px]">
             <CardHeader>
@@ -315,7 +326,14 @@ export default function Page() {
               </div>
             </CardContent>
           </Card>
+
         </div>
+        <section className="p-6">
+            <AddAccountTable
+              accounts={accounts}
+              onAccountsChange={setAccounts}
+            />
+          </section>
       </SidebarInset>
     </SidebarProvider>
   );

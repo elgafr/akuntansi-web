@@ -32,12 +32,12 @@ const data = {
     },
     {
       title: "Jurnal",
-      url: "#",
+      url: "/jurnal2",
       icon: FileTextIcon,
     },
     {
       title: "Buku Besar",
-      url: "#",
+      url: "/buku-besar",
       icon: BookAIcon,
     },
     {

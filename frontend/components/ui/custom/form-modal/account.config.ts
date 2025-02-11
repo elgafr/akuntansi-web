@@ -1,6 +1,15 @@
-export type AccountFormData = {
+export type Transactions = {
+  date: string;
+  documentType: string;
+  description: string;
   namaAkun: string;
   kodeAkun: string;
+  debit: number;
+  kredit: number;
+};
+
+export type AccountFormData = {
+  namaAkun: string;
   debit: string;
   kredit: string;
 };
