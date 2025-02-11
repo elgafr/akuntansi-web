@@ -62,23 +62,48 @@ interface Company {
   tahunBerdiri: number;
 }
 
+// Tipe data Account
+interface Account {
+  name: string;
+  kodeAkun: string;
+  debit: number;
+  kredit: number;
+  isEditing: boolean;
+}
+
+// Fungsi untuk memformat angka ke dalam notasi singkat (misal: 10jt, 100jt, dll.)
+const formatNumber = (value: number): string => {
+  if (value >= 1_000_000_000) {
+    // Misalnya: 1.200.000.000 → "1,2M"
+    return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  } else if (value >= 1_000_000) {
+    // Misalnya: 2.500.000 → "2,5jt"
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}jt`;
+  } else if (value >= 100_000) {
+    // Misalnya: 100.000 → "100k"
+    return `${(value / 1_000).toFixed(0)}k`;
+  } else {
+    return value.toLocaleString("id-ID");
+  }
+};
+
 export default function Page() {
-  // Inisialisasi react-hook-form
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
-    defaultValues: {
-      companyName: "",
-    },
+    defaultValues: { companyName: "" },
   });
 
-  // State untuk daftar perusahaan
   const [companyList, setCompanyList] = useState<Company[]>([]);
-  // State untuk mengontrol tampilan saran (autocomplete)
   const [showSuggestions, setShowSuggestions] = useState(true);
-  // State untuk menandai perusahaan yang sudah dipilih
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
-  // Load daftar perusahaan dari localStorage (misalnya sudah tersimpan sebelumnya)
+  // State untuk pilihan akun pada dropdown
+  const [selectedAccount1, setSelectedAccount1] = useState<string | null>(null);
+  const [selectedAccount2, setSelectedAccount2] = useState<string | null>(null);
+  const [selectedAccount3, setSelectedAccount3] = useState<string | null>(null);
+
+  // Load daftar perusahaan dari localStorage
   useEffect(() => {
     const savedCompanies = localStorage.getItem("companies");
     if (savedCompanies) {
@@ -86,48 +111,73 @@ export default function Page() {
     }
   }, []);
 
-  // Saat komponen mount, inisialisasi nilai form dari localStorage (jika ada)
+  // Saat komponen mount, inisialisasi nilai perusahaan dan data akun (jika ada) dari localStorage
   useEffect(() => {
     const storedCompany = localStorage.getItem("selectedCompany");
     if (storedCompany) {
       form.setValue("companyName", storedCompany);
       setSelectedCompany(storedCompany);
       setShowSuggestions(false);
+      const accountKey = `accounts_${storedCompany}`;
+      const savedAccounts = localStorage.getItem(accountKey);
+      if (savedAccounts) {
+        setAccounts(JSON.parse(savedAccounts));
+      } else {
+        setAccounts([]);
+      }
     }
   }, [form]);
 
-  // Ambil nilai input secara real-time
   const searchTerm = form.watch("companyName");
 
-  // Filter daftar perusahaan berdasarkan input (case-insensitive)
   const filteredCompanies = companyList.filter((company) =>
     company.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Fungsi submit form
   function onSubmit(data: z.infer<typeof FormSchema>) {
-    // Simpan nilai perusahaan yang dipilih ke localStorage
     localStorage.setItem("selectedCompany", data.companyName);
     setSelectedCompany(data.companyName);
     setShowSuggestions(false);
+    const accountKey = `accounts_${data.companyName}`;
+    const savedAccounts = localStorage.getItem(accountKey);
+    if (savedAccounts) {
+      setAccounts(JSON.parse(savedAccounts));
+    } else {
+      setAccounts([]);
+    }
     alert(`Form submitted with Company Name: ${data.companyName}`);
   }
 
-  // Data dummy untuk chart
-  const chartData = [
-    { month: "January", Kas_Kecil: 186, Kas_Besar: 120, Kas_Bank: 90 },
-    { month: "February", Kas_Kecil: 305, Kas_Besar: 230, Kas_Bank: 180 },
-    { month: "March", Kas_Kecil: 237, Kas_Besar: 180, Kas_Bank: 160 },
-    { month: "April", Kas_Kecil: 73, Kas_Besar: 90, Kas_Bank: 60 },
-    { month: "May", Kas_Kecil: 209, Kas_Besar: 150, Kas_Bank: 130 },
-    { month: "June", Kas_Kecil: 214, Kas_Besar: 175, Kas_Bank: 140 },
-  ];
+  // Fungsi helper untuk mendapatkan nilai debit dari sebuah akun
+  const getAccountDebit = (kodeAkun: string): number => {
+    const account = accounts.find((acc) => acc.kodeAkun === kodeAkun);
+    return account ? account.debit : 0;
+  };
+
+  // Generate data grafik berdasarkan pilihan akun.
+  // Misal: untuk masing-masing bulan, nilai akun dihasilkan dari nilai debit dasar + variasi
+  const months = ["January", "February", "March", "April", "May", "June"];
+  const mergedChartData = months.map((month, index) => ({
+    month,
+    account1: selectedAccount1
+      ? getAccountDebit(selectedAccount1) + index * 5
+      : undefined,
+    account2: selectedAccount2
+      ? getAccountDebit(selectedAccount2) + index * 3
+      : undefined,
+    account3: selectedAccount3
+      ? getAccountDebit(selectedAccount3) + index * 4
+      : undefined,
+  }));
+
+  // Misalnya nilai total buku besar (ini dapat diganti dengan nilai dinamis)
+  const totalValue = 9846;
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        {/* Header */}
+        {/* Header Section */}
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
           <Breadcrumb>
             <BreadcrumbList>
@@ -177,9 +227,12 @@ export default function Page() {
                               className="w-full pl-10 h-10 rounded-xl"
                               onChange={(e) => {
                                 field.onChange(e);
-                                // Jika input berubah dari nilai yang sudah dipilih, anggap perusahaan belum dipilih lagi
-                                if (selectedCompany && e.target.value !== selectedCompany) {
+                                if (
+                                  selectedCompany &&
+                                  e.target.value !== selectedCompany
+                                ) {
                                   setSelectedCompany(null);
+                                  setAccounts([]);
                                 }
                                 setShowSuggestions(true);
                               }}
@@ -187,7 +240,6 @@ export default function Page() {
                             <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                               <FaBuilding className="w-5 h-5 text-gray-700" />
                             </div>
-                            {/* Tampilkan saran hanya jika ada searchTerm, showSuggestions true, dan belum ada perusahaan yang dipilih */}
                             {searchTerm && showSuggestions && !selectedCompany && (
                               <>
                                 {filteredCompanies.length > 0 ? (
@@ -197,10 +249,25 @@ export default function Page() {
                                         key={index}
                                         className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                                         onClick={() => {
-                                          form.setValue("companyName", company.name);
-                                          localStorage.setItem("selectedCompany", company.name);
+                                          form.setValue(
+                                            "companyName",
+                                            company.name
+                                          );
+                                          localStorage.setItem(
+                                            "selectedCompany",
+                                            company.name
+                                          );
                                           setSelectedCompany(company.name);
                                           setShowSuggestions(false);
+                                          const accountKey = `accounts_${company.name}`;
+                                          const savedAccounts = localStorage.getItem(
+                                            accountKey
+                                          );
+                                          if (savedAccounts) {
+                                            setAccounts(JSON.parse(savedAccounts));
+                                          } else {
+                                            setAccounts([]);
+                                          }
                                         }}
                                       >
                                         {company.name}
@@ -222,7 +289,6 @@ export default function Page() {
                     </div>
                   )}
                 />
-
                 <Button
                   type="submit"
                   className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8"
@@ -235,17 +301,23 @@ export default function Page() {
           </Form>
         </div>
 
-        {/* Container Utama */}
+        {/* Bagian Pilih Akun */}
         <div className="flex flex-col ml-10 mt-6 gap-4">
           <div className="flex items-start gap-20">
-            <h2 className="text-lg font-semibold mb-2 w-[420px]">Informasi Mahasiswa</h2>
-            <h2 className="text-lg font-semibold mb-2 w-[450px]">Chart Pergerakan Akun</h2>
+            <h2 className="text-lg font-semibold mb-2 w-[420px]">
+              Informasi Mahasiswa
+            </h2>
+            <h2 className="text-lg font-semibold mb-2 w-[450px]">
+              Chart Pergerakan Akun
+            </h2>
           </div>
 
           <div className="flex items-start gap-4">
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
-                <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
+                <Avatar
+                  className="w-20 h-20 ring-white flex-shrink-0 self-center"
+                >
                   <AvatarImage
                     src="https://randomuser.me/api/portraits/women/79.jpg"
                     alt="Mahasiswa"
@@ -260,13 +332,19 @@ export default function Page() {
                     <p className="text-left break-words">Cody Alexander</p>
                     <p className="font-semibold whitespace-nowrap">NIM</p>
                     <p className="text-right w-[20px]">:</p>
-                    <p className="text-left break-words">123456789101112</p>
+                    <p className="text-left break-words">
+                      123456789101112
+                    </p>
                     <p className="font-semibold whitespace-nowrap">
                       Program Studi
                     </p>
                     <p className="text-right w-[20px]">:</p>
-                    <p className="text-left break-words">Computer Science</p>
-                    <p className="font-semibold whitespace-nowrap">Semester</p>
+                    <p className="text-left break-words">
+                      Computer Science
+                    </p>
+                    <p className="font-semibold whitespace-nowrap">
+                      Semester
+                    </p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left">5</p>
                   </div>
@@ -274,74 +352,66 @@ export default function Page() {
               </CardContent>
             </Card>
 
+            {/* Dropdown Pilih Akun */}
             <div className="flex flex-col gap-3 text-gray-600 w-[450px]">
+              {/* Pilih Akun Pertama */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-destructive">
                   Pilih Akun Pertama
                 </label>
-                <Select>
+                <Select onValueChange={(value) => setSelectedAccount1(value)}>
                   <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
                     <SelectValue placeholder="Pilih Akun Pertama" />
                   </SelectTrigger>
                   <SelectContent className="text-gray-500">
                     <SelectGroup>
-                      <SelectItem value="kas kecil">
-                        11111 - Kas Kecil
-                      </SelectItem>
-                      <SelectItem value="kas besar">
-                        11112 - Kas Besar
-                      </SelectItem>
-                      <SelectItem value="kas bank">
-                        11113 - Kas Bank
-                      </SelectItem>
+                      {accounts.map((account, index) => (
+                        <SelectItem key={index} value={account.kodeAkun}>
+                          {account.kodeAkun} - {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Pilih Akun Kedua */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-destructive">
                   Pilih Akun Kedua
                 </label>
-                <Select>
+                <Select onValueChange={(value) => setSelectedAccount2(value)}>
                   <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
                     <SelectValue placeholder="Pilih Akun Kedua" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="kas kecil">
-                        11111 - Kas Kecil
-                      </SelectItem>
-                      <SelectItem value="kas besar">
-                        11112 - Kas Besar
-                      </SelectItem>
-                      <SelectItem value="kas bank">
-                        11113 - Kas Bank
-                      </SelectItem>
+                      {accounts.map((account, index) => (
+                        <SelectItem key={index} value={account.kodeAkun}>
+                          {account.kodeAkun} - {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Pilih Akun Ketiga */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-destructive">
                   Pilih Akun Ketiga
                 </label>
-                <Select>
+                <Select onValueChange={(value) => setSelectedAccount3(value)}>
                   <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
                     <SelectValue placeholder="Pilih Akun Ketiga" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="kas kecil">
-                        11111 - Kas Kecil
-                      </SelectItem>
-                      <SelectItem value="kas besar">
-                        11112 - Kas Besar
-                      </SelectItem>
-                      <SelectItem value="kas bank">
-                        11113 - Kas Bank
-                      </SelectItem>
+                      {accounts.map((account, index) => (
+                        <SelectItem key={index} value={account.kodeAkun}>
+                          {account.kodeAkun} - {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -349,58 +419,96 @@ export default function Page() {
             </div>
           </div>
 
+          {/* Chart Section */}
           <Card className="mt-10 w-[174vh] p-4 shadow-md">
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
-                <CardTitle className="mb-4 text-gray-500">Buku Besar</CardTitle>
+                <CardTitle className="mb-4 text-gray-500">
+                  Buku Besar
+                </CardTitle>
                 <CardDescription className="text-black text-2xl font-bold">
-                  9,846
+                  {formatNumber(totalValue)}
                 </CardDescription>
               </div>
+              {/* Legend berdasarkan akun yang dipilih */}
               <div className="flex flex-col gap-2 mt-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[#8884d8]"></div>
-                  <span>Kas Kecil</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[#82ca9d]"></div>
-                  <span>Kas Besar</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[#ffc658]"></div>
-                  <span>Kas Bank</span>
-                </div>
+                {selectedAccount1 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-[#8884d8]"></div>
+                    <span>
+                      {
+                        accounts.find(
+                          (acc) => acc.kodeAkun === selectedAccount1
+                        )?.name
+                      }
+                    </span>
+                  </div>
+                )}
+                {selectedAccount2 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-[#82ca9d]"></div>
+                    <span>
+                      {
+                        accounts.find(
+                          (acc) => acc.kodeAkun === selectedAccount2
+                        )?.name
+                      }
+                    </span>
+                  </div>
+                )}
+                {selectedAccount3 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-[#ffc658]"></div>
+                    <span>
+                      {
+                        accounts.find(
+                          (acc) => acc.kodeAkun === selectedAccount3
+                        )?.name
+                      }
+                    </span>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
               <div className="w-full h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={chartData}
+                    data={mergedChartData}
                     margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line
-                      dataKey="Kas_Kecil"
-                      stroke="#8884d8"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      dataKey="Kas_Besar"
-                      stroke="#82ca9d"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      dataKey="Kas_Bank"
-                      stroke="#ffc658"
-                      strokeWidth={2}
-                      dot={false}
-                    />
+                    <YAxis tickFormatter={formatNumber} />
+                    <Tooltip formatter={(value) => formatNumber(value as number)} />
+                    {/* Render garis hanya jika akun sudah dipilih */}
+                    {selectedAccount1 && (
+                      <Line
+                        type="monotone"
+                        dataKey="account1"
+                        stroke="#8884d8"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
+                    {selectedAccount2 && (
+                      <Line
+                        type="monotone"
+                        dataKey="account2"
+                        stroke="#82ca9d"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
+                    {selectedAccount3 && (
+                      <Line
+                        type="monotone"
+                        dataKey="account3"
+                        stroke="#ffc658"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
                   </LineChart>
                 </ResponsiveContainer>
               </div>

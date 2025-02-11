@@ -60,7 +60,7 @@ export default function Page() {
     },
     {
       name: "Kas besar",
-      kodeAkun: "1113",
+      kodeAkun: "1112",
       debit: 0,
       kredit: 0,
       isEditing: false,
