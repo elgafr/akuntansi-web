@@ -32,7 +32,7 @@ export function InputOTPControlled() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4 mb-14 mt-2 items-center">
       <InputOTP
-        maxLength={4}
+        maxLength={6}
         value={value}
         onChange={(value) => setValue(value)}
       >
@@ -41,6 +41,8 @@ export function InputOTPControlled() {
           <InputOTPSlot index={1} />
           <InputOTPSlot index={2} />
           <InputOTPSlot index={3} />
+          <InputOTPSlot index={4} />
+          <InputOTPSlot index={5} />
         </InputOTPGroup>
       </InputOTP>
       <div className="text-center text-sm">

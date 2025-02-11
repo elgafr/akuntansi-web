@@ -1,7 +1,6 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { useForm } from "react-hook-form";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,18 +8,10 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { z } from "zod";
-import { PlusCircle } from "lucide-react";
 import { FaArrowLeft } from "react-icons/fa";
 import { FaEdit } from "react-icons/fa";
 import Link from "next/link";
@@ -34,7 +25,6 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -43,8 +33,123 @@ import {
 import { AddAccountTable } from "@/components/jurnal/AddAccountTable";
 import { useAccounts } from "@/contexts/AccountContext";
 
+interface Company {
+  name: string;
+  category: string;
+  alamat: string;
+  tahunBerdiri: number;
+}
+
+interface Account {
+  name: string;
+  kodeAkun: string;
+  debit: number;
+  kredit: number;
+  isEditing: boolean;
+}
+
+interface ProfileData {
+  fullName: string;
+  // tambahkan properti lain jika diperlukan
+}
+
 export default function Page() {
-  const { accounts, setAccounts } = useAccounts();
+  
+  const searchParams = useSearchParams();
+  const companyName = searchParams.get("name");
+  const [company, setCompany] = useState<Company | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([
+    {
+      name: "Kas Kecil",
+      kodeAkun: "1111",
+      debit: 0,
+      kredit: 0,
+      isEditing: false,
+    },
+    {
+      name: "Kas besar",
+      kodeAkun: "1112",
+      debit: 0,
+      kredit: 0,
+      isEditing: false,
+    },
+    {
+      name: "Kas bank",
+      kodeAkun: "1113",
+      debit: 0,
+      kredit: 0,
+      isEditing: false,
+    },
+  ]);
+
+  const [profileData, setProfileData] = useState<ProfileData>({
+      fullName: "Guest",
+    });
+  
+    useEffect(() => {
+      const storedProfile = localStorage.getItem("profileData");
+      if (storedProfile) {
+        setProfileData(JSON.parse(storedProfile));
+      }
+    }, []);
+
+  useEffect(() => {
+    if (companyName) {
+      // Load detail perusahaan dari localStorage
+      const savedCompanies = localStorage.getItem("companies");
+      if (savedCompanies) {
+        const companies: Company[] = JSON.parse(savedCompanies);
+        const selectedCompany = companies.find((c) => c.name === companyName);
+        setCompany(selectedCompany || null);
+      }
+
+      // Load data akun spesifik perusahaan dari localStorage (jika ada)
+      const accountKey = `accounts_${companyName}`;
+      const savedAccounts = localStorage.getItem(accountKey);
+      if (savedAccounts) {
+        setAccounts(JSON.parse(savedAccounts));
+      }
+    }
+  }, [companyName]);
+
+  if (!company) {
+    return <div>Perusahaan tidak ditemukan</div>;
+  }
+
+  // Fungsi untuk mengaktifkan mode edit pada akun tertentu
+  const handleEditAccount = (index: number) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[index].isEditing = true;
+    setAccounts(updatedAccounts);
+  };
+
+  // Fungsi untuk menyimpan perubahan data akun (debit/kredit)
+  const handleSaveAccount = () => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts.forEach((account) => {
+      account.isEditing = false;
+    });
+    setAccounts(updatedAccounts);
+
+    // Simpan data akun ke localStorage dengan key spesifik perusahaan
+    if (companyName) {
+      const accountKey = `accounts_${companyName}`;
+      localStorage.setItem(accountKey, JSON.stringify(updatedAccounts));
+    }
+  };
+
+  const handleDebitChange = (index: number, value: string) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[index].debit = value ? parseInt(value) : 0;
+    setAccounts(updatedAccounts);
+  };
+
+  const handleKreditChange = (index: number, value: string) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[index].kredit = value ? parseInt(value) : 0;
+    setAccounts(updatedAccounts);
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -71,13 +176,14 @@ export default function Page() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">{profileData.fullName}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
             </div>
           </div>
         </header>
+
         <div className="mt-10 ml-14">
           <Link href="/perusahaan">
             <Button className="rounded-xl w-32 h-10 flex items-center">
@@ -86,14 +192,15 @@ export default function Page() {
             </Button>
           </Link>
         </div>
+
         <div className="mt-10 ml-14 flex gap-x-6">
           <Card className="w-[700px]">
             <CardHeader>
               <CardTitle className="text-5xl text-primary py-2 mb-4">
-                PT. Jaya Abadi
+                {company.name}
               </CardTitle>
               <CardTitle className="text-3xl text-primary">
-                Akun Perusahaan
+                {company.category}
               </CardTitle>
               <CardDescription className="text-lg">
                 Kelola Kredit dan debit akun perusahaan
@@ -116,23 +223,56 @@ export default function Page() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="text-center py-2">
-                      Kas Kecil
-                    </TableCell>
-                    <TableCell className="text-center py-2">1111</TableCell>
-                    <TableCell className="text-center py-2">
-                      Rp.1.000.000.000.000.000
-                    </TableCell>
-                    <TableCell className="text-center py-2">Rp.0</TableCell>
-                    <TableCell className="text-center py-2">
-                      <button className="text-blue-500">
-                        <FaEdit />
-                      </button>
-                    </TableCell>
-                  </TableRow>
+                  {accounts.map((account, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="text-center py-2">
+                        {account.name}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.kodeAkun}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.isEditing ? (
+                          <Input
+                            type="number"
+                            value={account.debit || ""}
+                            onChange={(e) =>
+                              handleDebitChange(index, e.target.value)
+                            }
+                            disabled={account.kredit > 0} // Disable jika kredit sudah diisi
+                          />
+                        ) : (
+                          `Rp.${account.debit.toLocaleString()}`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.isEditing ? (
+                          <Input
+                            type="number"
+                            value={account.kredit || ""}
+                            onChange={(e) =>
+                              handleKreditChange(index, e.target.value)
+                            }
+                            disabled={account.debit > 0} // Disable jika debit sudah diisi
+                          />
+                        ) : (
+                          `Rp.${account.kredit.toLocaleString()}`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        <Button
+                          variant="outline"
+                          className="text-xs w-full"
+                          onClick={() => handleEditAccount(index)}
+                        >
+                          <FaEdit />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
+
               <div className="flex justify-end mt-24">
                 <Button className="rounded-xl w-32 h-10 flex items-center">
                   Simpan
@@ -140,6 +280,15 @@ export default function Page() {
               </div>
 
             </CardContent>
+
+            <div className="flex justify-end mt-4">
+              <Button
+                className="rounded-xl w-32 h-10 flex items-center"
+                onClick={handleSaveAccount}
+              >
+                Simpan
+              </Button>
+            </div>
           </Card>
           
 
@@ -156,23 +305,23 @@ export default function Page() {
                     Nama Perusahaan
                   </p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">PT. Jaya Abadi</p>
+                  <p className="text-left break-words">{company.name}</p>
 
                   <p className="font-semibold whitespace-nowrap">
                     Kategori Perusahaan
                   </p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">Jasa</p>
+                  <p className="text-left break-words">{company.category}</p>
 
                   <p className="font-semibold whitespace-nowrap">Alamat</p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">Jl. Jaya Abadi</p>
+                  <p className="text-left break-words">{company.alamat}</p>
 
                   <p className="font-semibold whitespace-nowrap">
                     Tahun Berdiri
                   </p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left">2022</p>
+                  <p className="text-left">{company.tahunBerdiri}</p>
                 </div>
               </div>
             </CardContent>

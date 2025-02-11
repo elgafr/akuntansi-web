@@ -26,26 +26,39 @@ import {
 interface Company {
   name: string;
   category: string;
+  alamat: string;
+  tahunBerdiri: number;
+}
+
+interface ProfileData {
+  fullName: string;
 }
 
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false); // State to manage modal visibility
+  const [filteredCompanyList, setFilteredCompanyList] = useState<Company[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const [profileData, setProfileData] = useState<ProfileData>({
+    fullName: "Guest",
+  });
+
+  // Ambil data profil dari localStorage (sama seperti di halaman profile)
+  useEffect(() => {
+    const storedProfile = localStorage.getItem("profileData");
+    if (storedProfile) {
+      setProfileData(JSON.parse(storedProfile));
+    }
+  }, []);
 
   // Load companies from localStorage on mount
   useEffect(() => {
     const savedCompanies = localStorage.getItem("companies");
     if (savedCompanies) {
-      setCompanyList(JSON.parse(savedCompanies));
-    } else {
-      // Initialize with default companies if none exist
-      const defaultCompanies = [
-        { name: "PT. Jaya Abadi", category: "Jasa" },
-        { name: "PT. Sukses Makmur", category: "Manufaktur" },
-        { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
-      ];
-      setCompanyList(defaultCompanies);
-      localStorage.setItem("companies", JSON.stringify(defaultCompanies));
+      const companies = JSON.parse(savedCompanies);
+      setCompanyList(companies);
+      setFilteredCompanyList(companies); // Initialize filtered list with all companies
     }
   }, []);
 
@@ -53,14 +66,42 @@ export default function Page() {
   const handleAddCompany = (newCompany: Company) => {
     const updatedCompanies = [...companyList, newCompany];
     setCompanyList(updatedCompanies);
+    setFilteredCompanyList(updatedCompanies); // Update filtered list as well
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
   };
 
-  const hendleDeleteCompany = (companyName: string) =>{
-    const updatedCompanies = companyList.filter((company) => company.name !== companyName);
+  const handleDeleteCompany = (companyName: string) => {
+    // Filter daftar perusahaan untuk mengeluarkan perusahaan yang ingin dihapus
+    const updatedCompanies = companyList.filter(
+      (company) => company.name !== companyName
+    );
     setCompanyList(updatedCompanies);
+    setFilteredCompanyList(updatedCompanies);
+
+    // Perbarui data perusahaan di localStorage
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-  }
+
+    // Jika ada data akun atau data lain yang terkait dengan perusahaan tersebut, hapus juga
+    localStorage.removeItem(`accounts_${companyName}`);
+
+    // Jika perusahaan yang dihapus merupakan perusahaan yang sedang dipilih, hapus key-nya
+    const selectedCompany = localStorage.getItem("selectedCompany");
+    if (selectedCompany === companyName) {
+      localStorage.removeItem("selectedCompany");
+    }
+  };
+
+  // Handle search functionality
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSearchTerm(value);
+
+    // Filter companies based on search term
+    const filteredCompanies = companyList.filter((company) =>
+      company.name.toLowerCase().includes(value.toLowerCase())
+    );
+    setFilteredCompanyList(filteredCompanies);
+  };
 
   return (
     <SidebarProvider>
@@ -72,8 +113,8 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-10">Perusahaan</h1>
-                  <h2 className="text-sm ml-10">
+                  <h1 className="text-2xl font-bold ml-6">Perusahaan</h1>
+                  <h2 className="text-sm ml-6">
                     Let&apos;s check your Company today
                   </h2>
                 </BreadcrumbItem>
@@ -88,7 +129,9 @@ export default function Page() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">
+                    {profileData.fullName}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -99,19 +142,21 @@ export default function Page() {
         {/* Search and Add Button Section */}
         <div className="flex flex-col gap-4 p-4">
           <div className="flex items-center gap-4 w-full">
-            <div className="relative w-full flex-1 ml-10">
+            <div className="relative w-full flex-1 ml-6">
               <Input
                 placeholder="Cari Perusahaan"
                 className="w-full pl-10 h-10 rounded-xl"
+                value={searchTerm}
+                onChange={handleSearchChange} // Call the search handler
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                 <FaBuilding className="w-5 h-5 text-gray-700" />
               </div>
             </div>
-            {/* Add Company Button is placed below the profile, triggering modal */}
+            {/* Add Company Button */}
             <Button
               className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10"
-              onClick={() => setIsModalOpen(true)} // Open the modal when this button is clicked
+              onClick={() => setIsModalOpen(true)}
             >
               <PlusCircle className="w-6 h-6 text-white" />
               Tambah Perusahaan
@@ -120,41 +165,52 @@ export default function Page() {
         </div>
 
         {/* Company Cards Section */}
-        <div className="flex flex-wrap gap-4 ml-24 mt-4">
-          {companyList.map((company, index) => (
-            <Card key={index} className="w-[350px]">
-              <CardHeader>
-                <CardTitle className="text-2xl text-center text-destructive">
-                  {company.name}
-                </CardTitle>
-                <CardDescription className="text-center">
-                  Kategori - {company.category}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid w-full items-center gap-4">
-                  <div className="flex flex-col space-y-1.5">
-                    <Button className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white" onClick={() => hendleDeleteCompany(company.name)}>
-                      Hapus Perusahaan
-                    </Button>
-                  </div>
-                  <Link href="/detail-akun">
+        <div className="px-6 mr-8 ml-4">
+          {" "}
+          {/* Padding untuk sejajar dengan header */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredCompanyList.map((company, index) => (
+              <Card key={index} className="w-full">
+                <CardHeader>
+                  <CardTitle className="text-2xl text-center text-destructive">
+                    {company.name}
+                  </CardTitle>
+                  <CardDescription className="text-center">
+                    Kategori - {company.category}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid w-full items-center gap-4">
                     <div className="flex flex-col space-y-1.5">
-                      <Button className="rounded-xl">Detail dan Akun</Button>
+                      <Button
+                        className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white"
+                        onClick={() => handleDeleteCompany(company.name)}
+                      >
+                        Hapus Perusahaan
+                      </Button>
                     </div>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <Link
+                      href={`/detail-akun?name=${encodeURIComponent(
+                        company.name
+                      )}`}
+                    >
+                      <div className="flex flex-col space-y-1.5">
+                        <Button className="rounded-xl">Detail dan Akun</Button>
+                      </div>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
         {/* Add Company Modal */}
         <FormModal
           title="Input Data Perusahaan"
-          isOpen={isModalOpen} // Control the modal open state from parent
-          onOpenChange={setIsModalOpen} // Close the modal when needed
-          onSave={handleAddCompany} // Handle saving data to parent
+          isOpen={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          onSave={handleAddCompany}
         />
       </SidebarInset>
     </SidebarProvider>
