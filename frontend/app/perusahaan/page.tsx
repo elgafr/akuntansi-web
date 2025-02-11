@@ -26,33 +26,31 @@ import {
 interface Company {
   name: string;
   category: string;
+  alamat: string;
+  tahunBerdiri: number;
 }
 
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
+  const [filteredCompanyList, setFilteredCompanyList] = useState<Company[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Load companies from localStorage on mount
   useEffect(() => {
     const savedCompanies = localStorage.getItem("companies");
     if (savedCompanies) {
-      setCompanyList(JSON.parse(savedCompanies));
-    } else {
-      // Initialize with default companies if none exist
-      const defaultCompanies = [
-        { name: "PT. Jaya Abadi", category: "Jasa" },
-        { name: "PT. Sukses Makmur", category: "Manufaktur" },
-        { name: "CV. Berkah Sejahtera", category: "Perdagangan" },
-      ];
-      setCompanyList(defaultCompanies);
-      localStorage.setItem("companies", JSON.stringify(defaultCompanies));
-    }
-  }, []);
+      const companies = JSON.parse(savedCompanies);
+      setCompanyList(companies);
+      setFilteredCompanyList(companies); // Initialize filtered list with all companies
+    } 
+  },[]);
 
   // Handle adding new company from modal
   const handleAddCompany = (newCompany: Company) => {
     const updatedCompanies = [...companyList, newCompany];
     setCompanyList(updatedCompanies);
+    setFilteredCompanyList(updatedCompanies); // Update filtered list as well
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
   };
 
@@ -61,7 +59,20 @@ export default function Page() {
       (company) => company.name !== companyName
     );
     setCompanyList(updatedCompanies);
+    setFilteredCompanyList(updatedCompanies); // Update filtered list after deletion
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+  };
+
+  // Handle search functionality
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSearchTerm(value);
+
+    // Filter companies based on search term
+    const filteredCompanies = companyList.filter((company) =>
+      company.name.toLowerCase().includes(value.toLowerCase())
+    );
+    setFilteredCompanyList(filteredCompanies);
   };
 
   return (
@@ -75,19 +86,14 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6">Perusahaan</h1>
-                  <h2 className="text-sm ml-6">
-                    Let&apos;s check your Company today
-                  </h2>
+                  <h2 className="text-sm ml-6">Let&apos;s check your Company today</h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                  />
+                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">Arthur</div>
@@ -105,6 +111,8 @@ export default function Page() {
               <Input
                 placeholder="Cari Perusahaan"
                 className="w-full pl-10 h-10 rounded-xl"
+                value={searchTerm}
+                onChange={handleSearchChange} // Call the search handler
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                 <FaBuilding className="w-5 h-5 text-gray-700" />
@@ -124,7 +132,7 @@ export default function Page() {
         {/* Company Cards Section */}
         <div className="px-6 mr-8 ml-4"> {/* Padding untuk sejajar dengan header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {companyList.map((company, index) => (
+            {filteredCompanyList.map((company, index) => (
               <Card key={index} className="w-full">
                 <CardHeader>
                   <CardTitle className="text-2xl text-center text-destructive">
@@ -144,7 +152,7 @@ export default function Page() {
                         Hapus Perusahaan
                       </Button>
                     </div>
-                    <Link href="/detail-akun">
+                    <Link href={`/detail-akun?name=${encodeURIComponent(company.name)}`}>
                       <div className="flex flex-col space-y-1.5">
                         <Button className="rounded-xl">Detail dan Akun</Button>
                       </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { useForm } from "react-hook-form";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,18 +8,10 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { z } from "zod";
-import { PlusCircle } from "lucide-react";
 import { FaArrowLeft } from "react-icons/fa";
 import { FaEdit } from "react-icons/fa";
 import Link from "next/link";
@@ -34,14 +25,99 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 
+interface Company {
+  name: string;
+  category: string;
+  alamat: string;
+  tahunBerdiri: number;
+}
+
 export default function Page() {
+
+  const searchParams = useSearchParams();
+  const companyName = searchParams.get("name");
+  const [company, setCompany] = useState<Company | null>(null);
+  const [accounts, setAccounts] = useState([
+    {
+      name: "Kas Kecil",
+      kodeAkun: "1111",
+      debit: 0,
+      kredit: 0,
+      isEditing: false,
+    },
+    {
+      name: "Kas besar",
+      kodeAkun: "1113",
+      debit: 0,
+      kredit: 0,
+      isEditing: false,
+    },
+    {
+      name: "Kas bank",
+      kodeAkun: "1113",
+      debit: 0,
+      kredit: 0,
+      isEditing: false,
+    },
+  ]);
+
+  useEffect(() => {
+    if (companyName) {
+      const savedCompanies = localStorage.getItem("companies");
+      if (savedCompanies) {
+        const companies: Company[] = JSON.parse(savedCompanies);
+        const selectedCompany = companies.find((c) => c.name === companyName);
+        setCompany(selectedCompany || null);
+      }
+    }
+
+    // Load accounts from localStorage if available
+    const savedAccounts = localStorage.getItem("accounts");
+    if (savedAccounts) {
+      setAccounts(JSON.parse(savedAccounts));
+    }
+  }, [companyName]);
+
+  if (!company) {
+    return <div>Perusahaan tidak ditemukan</div>;
+  }
+
+  // Handle edit and save changes in debit/kredit
+  const handleEditAccount = (index: number) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[index].isEditing = true;
+    setAccounts(updatedAccounts);
+  };
+
+  const handleSaveAccount = () => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts.forEach((account) => {
+      account.isEditing = false;
+    });
+    setAccounts(updatedAccounts);
+
+    // Save updated accounts to localStorage
+    localStorage.setItem("accounts", JSON.stringify(updatedAccounts));
+  };
+
+  const handleDebitChange = (index: number, value: string) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[index].debit = value ? parseInt(value) : 0;
+    setAccounts(updatedAccounts);
+  };
+
+  const handleKreditChange = (index: number, value: string) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[index].kredit = value ? parseInt(value) : 0;
+    setAccounts(updatedAccounts);
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -75,6 +151,7 @@ export default function Page() {
             </div>
           </div>
         </header>
+
         <div className="mt-10 ml-14">
           <Link href="/perusahaan">
             <Button className="rounded-xl w-32 h-10 flex items-center">
@@ -83,14 +160,15 @@ export default function Page() {
             </Button>
           </Link>
         </div>
+
         <div className="mt-10 ml-14 flex gap-x-6">
           <Card className="w-[700px]">
             <CardHeader>
               <CardTitle className="text-5xl text-primary py-2 mb-4">
-                PT. Jaya Abadi
+                {company.name}
               </CardTitle>
               <CardTitle className="text-3xl text-primary">
-                Akun Perusahaan
+                {company.category}
               </CardTitle>
               <CardDescription className="text-lg">
                 Kelola Kredit dan debit akun perusahaan
@@ -113,29 +191,57 @@ export default function Page() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="text-center py-2">
-                      Kas Kecil
-                    </TableCell>
-                    <TableCell className="text-center py-2">1111</TableCell>
-                    <TableCell className="text-center py-2">
-                      Rp.1.000.000.000.000.000
-                    </TableCell>
-                    <TableCell className="text-center py-2">Rp.0</TableCell>
-                    <TableCell className="text-center py-2">
-                      <button className="text-blue-500">
-                        <FaEdit />
-                      </button>
-                    </TableCell>
-                  </TableRow>
+                  {accounts.map((account, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="text-center py-2">{account.name}</TableCell>
+                      <TableCell className="text-center py-2">{account.kodeAkun}</TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.isEditing ? (
+                          <Input
+                            type="number"
+                            value={account.debit || ""}
+                            onChange={(e) => handleDebitChange(index, e.target.value)}
+                            disabled={account.kredit > 0} // Disable if kredit is filled
+                          />
+                        ) : (
+                          `Rp.${account.debit.toLocaleString()}`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.isEditing ? (
+                          <Input
+                            type="number"
+                            value={account.kredit || ""}
+                            onChange={(e) => handleKreditChange(index, e.target.value)}
+                            disabled={account.debit > 0} // Disable if debit is filled
+                          />
+                        ) : (
+                          `Rp.${account.kredit.toLocaleString()}`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        <Button
+                          variant="outline"
+                          className="text-xs w-full"
+                          onClick={() => handleEditAccount(index)}
+                        >
+                          <FaEdit />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
-              <div className="flex justify-end mt-24">
-                <Button className="rounded-xl w-32 h-10 flex items-center">
-                  Simpan
-                </Button>
-              </div>
             </CardContent>
+
+            <div className="flex justify-end mt-4">
+              <Button
+                className="rounded-xl w-32 h-10 flex items-center"
+                onClick={handleSaveAccount}
+              >
+                Simpan
+              </Button>
+            </div>
           </Card>
 
           <Card className="w-[400px]">
@@ -151,23 +257,23 @@ export default function Page() {
                     Nama Perusahaan
                   </p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">PT. Jaya Abadi</p>
+                  <p className="text-left break-words">{company.name}</p>
 
                   <p className="font-semibold whitespace-nowrap">
                     Kategori Perusahaan
                   </p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">Jasa</p>
+                  <p className="text-left break-words">{company.category}</p>
 
                   <p className="font-semibold whitespace-nowrap">Alamat</p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">Jl. Jaya Abadi</p>
+                  <p className="text-left break-words">{company.alamat}</p>
 
                   <p className="font-semibold whitespace-nowrap">
                     Tahun Berdiri
                   </p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left">2022</p>
+                  <p className="text-left">{company.tahunBerdiri}</p>
                 </div>
               </div>
             </CardContent>

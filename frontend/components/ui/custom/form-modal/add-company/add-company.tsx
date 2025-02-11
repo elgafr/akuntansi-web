@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,7 @@ interface FormModalProps {
   title?: string;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: { name: string; category: string }) => void;
+  onSave?: (data: { name: string; category: string; alamat: string; tahunBerdiri: number }) => void;
 }
 
 export const FormModal = ({
@@ -31,16 +30,22 @@ export const FormModal = ({
 }: FormModalProps) => {
   const [companyName, setCompanyName] = useState("");
   const [category, setCategory] = useState("");
+  const [alamat, setAlamat] = useState(""); // Tambahkan state untuk alamat
+  const [tahunBerdiri, setTahunBerdiri] = useState<number | string>(""); // Tambahkan state untuk tahun berdiri
 
   const handleSubmit = () => {
-    if (companyName && category && onSave) {
+    if (companyName && category && alamat && tahunBerdiri && onSave) {
       onSave({
         name: companyName,
         category: category,
+        alamat: alamat,
+        tahunBerdiri: typeof tahunBerdiri === "string" ? parseInt(tahunBerdiri) : tahunBerdiri,
       });
     }
     setCompanyName(""); // Reset company name
     setCategory(""); // Reset category
+    setAlamat(""); // Reset alamat
+    setTahunBerdiri(""); // Reset tahun berdiri
     onOpenChange(false); // Close the modal after saving
   };
 
@@ -83,6 +88,8 @@ export const FormModal = ({
             <Input
               placeholder="Input alamat perusahaan"
               className="rounded-xl h-12 text-gray-500 text-base"
+              value={alamat}
+              onChange={(e) => setAlamat(e.target.value)}
             />
           </div>
 
@@ -91,6 +98,9 @@ export const FormModal = ({
             <Input
               placeholder="Input tahun berdiri perusahaan"
               className="rounded-xl h-12 text-gray-500 text-base"
+              type="string"
+              value={tahunBerdiri}
+              onChange={(e) => setTahunBerdiri(e.target.value)}
             />
           </div>
 
