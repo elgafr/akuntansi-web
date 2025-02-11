@@ -32,11 +32,11 @@ export function NavMain({
               <Link href={item.url} passHref>
                 <SidebarMenuButton
                   tooltip={item.title}
-                  className={`${
+                  className={`flex items-center gap-2 rounded-xl transition-colors duration-200 p-7 ${
                     isActive
-                      ? "bg-destructive text-white"
-                      : "text-gray-700"
-                  } rounded-xl p-3 hover:bg-destructive transition-colors duration-200 flex items-center gap-2`}
+                      ? "bg-red-400 text-white"
+                      : "text-gray-700 hover:bg-destructive hover:text-white"
+                  }`}
                 >
                   {item.icon && <item.icon className="w-5 h-5" />}
                   <span className="text-lg font-bold">{item.title}</span>

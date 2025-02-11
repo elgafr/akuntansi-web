@@ -47,7 +47,7 @@ export default function Page() {
     setIsEditModalOpen(false);
   };
 
-  // Fungsi untuk menyimpan perubahan ke localStorage
+  // Interface untuk data profil
   interface ProfileData {
     fullName: string;
     nim: string;
@@ -59,6 +59,7 @@ export default function Page() {
     phone: string;
   }
 
+  // Fungsi untuk menyimpan perubahan ke localStorage
   const saveProfileData = (newData: ProfileData) => {
     setProfileData(newData);
     localStorage.setItem("profileData", JSON.stringify(newData));
@@ -78,7 +79,7 @@ export default function Page() {
       <AppSidebar />
       <SidebarInset>
         {/* Header Section */}
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
           <div className="flex items-center gap-2 px-4 w-full justify-between">
             <Breadcrumb>
               <BreadcrumbList>
@@ -101,7 +102,7 @@ export default function Page() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">{profileData.fullName}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -180,7 +181,7 @@ export default function Page() {
 
         {/* Modal Edit Profile */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent>
+          <DialogContent className="rounded-xl overflow-hidden">
             <DialogHeader>
               <DialogTitle>Edit Profile</DialogTitle>
             </DialogHeader>
@@ -202,52 +203,86 @@ export default function Page() {
               }}
             >
               <div className="space-y-4">
-                <Input
-                  name="fullName"
-                  defaultValue={profileData.fullName}
-                  placeholder="Nama Lengkap"
-                />
-                <Input
-                  name="nim"
-                  defaultValue={profileData.nim}
-                  placeholder="NIM"
-                />
-                <Input
-                  name="gender"
-                  defaultValue={profileData.gender}
-                  placeholder="Gender"
-                />
-                <Input
-                  name="birthPlace"
-                  defaultValue={profileData.birthPlace}
-                  placeholder="Tempat Lahir"
-                />
-                <Input
-                  name="birthDate"
-                  defaultValue={profileData.birthDate}
-                  placeholder="Tanggal Lahir"
-                />
-                <Input
-                  name="email"
-                  defaultValue={profileData.email}
-                  placeholder="Email"
-                />
-                <Input
-                  name="address"
-                  defaultValue={profileData.address}
-                  placeholder="Alamat Rumah"
-                />
-                <Input
-                  name="phone"
-                  defaultValue={profileData.phone}
-                  placeholder="No Handphone"
-                />
+                <div>
+                  <Label className="block mb-1">Nama Lengkap</Label>
+                  <Input
+                    name="fullName"
+                    defaultValue={profileData.fullName}
+                    placeholder="Nama Lengkap"
+                    disabled
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">NIM</Label>
+                  <Input
+                    name="nim"
+                    defaultValue={profileData.nim}
+                    placeholder="NIM"
+                    disabled
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">Gender</Label>
+                  <Input
+                    name="gender"
+                    defaultValue={profileData.gender}
+                    placeholder="Gender"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">Tempat Lahir</Label>
+                  <Input
+                    name="birthPlace"
+                    defaultValue={profileData.birthPlace}
+                    placeholder="Tempat Lahir"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">Tanggal Lahir</Label>
+                  <Input
+                    name="birthDate"
+                    defaultValue={profileData.birthDate}
+                    placeholder="Tanggal Lahir"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">Email</Label>
+                  <Input
+                    name="email"
+                    defaultValue={profileData.email}
+                    placeholder="Email"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">Alamat Rumah</Label>
+                  <Input
+                    name="address"
+                    defaultValue={profileData.address}
+                    placeholder="Alamat Rumah"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="block mb-1">No Handphone</Label>
+                  <Input
+                    name="phone"
+                    defaultValue={profileData.phone}
+                    placeholder="No Handphone"
+                    className="rounded-xl"
+                  />
+                </div>
               </div>
               <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={closeEditModal}>
+                <Button type="button" variant="outline" onClick={closeEditModal} className="rounded-xl">
                   Cancel
                 </Button>
-                <Button type="submit">Save</Button>
+                <Button type="submit" className="rounded-xl">Save</Button>
               </DialogFooter>
             </form>
           </DialogContent>
