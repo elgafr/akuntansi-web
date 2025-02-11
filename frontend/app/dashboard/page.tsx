@@ -71,6 +71,10 @@ interface Account {
   isEditing: boolean;
 }
 
+interface ProfileData {
+  fullName: string;
+  // tambahkan properti lain jika diperlukan
+}
 // Fungsi untuk memformat angka ke dalam notasi singkat (misal: 10jt, 100jt, dll.)
 const formatNumber = (value: number): string => {
   if (value >= 1_000_000_000) {
@@ -102,6 +106,17 @@ export default function Page() {
   const [selectedAccount1, setSelectedAccount1] = useState<string | null>(null);
   const [selectedAccount2, setSelectedAccount2] = useState<string | null>(null);
   const [selectedAccount3, setSelectedAccount3] = useState<string | null>(null);
+
+  const [profileData, setProfileData] = useState<ProfileData>({
+    fullName: "Guest",
+  });
+
+  useEffect(() => {
+    const storedProfile = localStorage.getItem("profileData");
+    if (storedProfile) {
+      setProfileData(JSON.parse(storedProfile));
+    }
+  }, []);
 
   // Load daftar perusahaan dari localStorage
   useEffect(() => {
@@ -197,7 +212,7 @@ export default function Page() {
                 <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
               </Avatar>
               <div className="text-left mr-8">
-                <div className="text-sm font-medium">Arthur</div>
+                <div className="text-sm font-medium">{profileData.fullName}</div>
                 <div className="text-xs text-gray-800">Student</div>
               </div>
             </div>

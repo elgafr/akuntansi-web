@@ -46,6 +46,11 @@ interface Account {
   isEditing: boolean;
 }
 
+interface ProfileData {
+  fullName: string;
+  // tambahkan properti lain jika diperlukan
+}
+
 export default function Page() {
   const searchParams = useSearchParams();
   const companyName = searchParams.get("name");
@@ -73,6 +78,17 @@ export default function Page() {
       isEditing: false,
     },
   ]);
+
+  const [profileData, setProfileData] = useState<ProfileData>({
+      fullName: "Guest",
+    });
+  
+    useEffect(() => {
+      const storedProfile = localStorage.getItem("profileData");
+      if (storedProfile) {
+        setProfileData(JSON.parse(storedProfile));
+      }
+    }, []);
 
   useEffect(() => {
     if (companyName) {
@@ -157,7 +173,7 @@ export default function Page() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">{profileData.fullName}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>

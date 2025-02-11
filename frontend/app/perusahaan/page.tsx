@@ -30,11 +30,27 @@ interface Company {
   tahunBerdiri: number;
 }
 
+interface ProfileData {
+  fullName: string;
+}
+
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
   const [filteredCompanyList, setFilteredCompanyList] = useState<Company[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [profileData, setProfileData] = useState<ProfileData>({
+    fullName: "Guest",
+  });
+
+  // Ambil data profil dari localStorage (sama seperti di halaman profile)
+  useEffect(() => {
+    const storedProfile = localStorage.getItem("profileData");
+    if (storedProfile) {
+      setProfileData(JSON.parse(storedProfile));
+    }
+  }, []);
 
   // Load companies from localStorage on mount
   useEffect(() => {
@@ -43,8 +59,8 @@ export default function Page() {
       const companies = JSON.parse(savedCompanies);
       setCompanyList(companies);
       setFilteredCompanyList(companies); // Initialize filtered list with all companies
-    } 
-  },[]);
+    }
+  }, []);
 
   // Handle adding new company from modal
   const handleAddCompany = (newCompany: Company) => {
@@ -55,12 +71,24 @@ export default function Page() {
   };
 
   const handleDeleteCompany = (companyName: string) => {
+    // Filter daftar perusahaan untuk mengeluarkan perusahaan yang ingin dihapus
     const updatedCompanies = companyList.filter(
       (company) => company.name !== companyName
     );
     setCompanyList(updatedCompanies);
-    setFilteredCompanyList(updatedCompanies); // Update filtered list after deletion
+    setFilteredCompanyList(updatedCompanies);
+
+    // Perbarui data perusahaan di localStorage
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+
+    // Jika ada data akun atau data lain yang terkait dengan perusahaan tersebut, hapus juga
+    localStorage.removeItem(`accounts_${companyName}`);
+
+    // Jika perusahaan yang dihapus merupakan perusahaan yang sedang dipilih, hapus key-nya
+    const selectedCompany = localStorage.getItem("selectedCompany");
+    if (selectedCompany === companyName) {
+      localStorage.removeItem("selectedCompany");
+    }
   };
 
   // Handle search functionality
@@ -86,17 +114,24 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6">Perusahaan</h1>
-                  <h2 className="text-sm ml-6">Let&apos;s check your Company today</h2>
+                  <h2 className="text-sm ml-6">
+                    Let&apos;s check your Company today
+                  </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                  <AvatarImage
+                    src="https://github.com/shadcn.png"
+                    alt="@shadcn"
+                  />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">
+                    {profileData.fullName}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -130,7 +165,9 @@ export default function Page() {
         </div>
 
         {/* Company Cards Section */}
-        <div className="px-6 mr-8 ml-4"> {/* Padding untuk sejajar dengan header */}
+        <div className="px-6 mr-8 ml-4">
+          {" "}
+          {/* Padding untuk sejajar dengan header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredCompanyList.map((company, index) => (
               <Card key={index} className="w-full">
@@ -152,7 +189,11 @@ export default function Page() {
                         Hapus Perusahaan
                       </Button>
                     </div>
-                    <Link href={`/detail-akun?name=${encodeURIComponent(company.name)}`}>
+                    <Link
+                      href={`/detail-akun?name=${encodeURIComponent(
+                        company.name
+                      )}`}
+                    >
                       <div className="flex flex-col space-y-1.5">
                         <Button className="rounded-xl">Detail dan Akun</Button>
                       </div>
