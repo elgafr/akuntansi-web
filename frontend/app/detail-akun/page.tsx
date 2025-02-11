@@ -38,12 +38,19 @@ interface Company {
   tahunBerdiri: number;
 }
 
-export default function Page() {
+interface Account {
+  name: string;
+  kodeAkun: string;
+  debit: number;
+  kredit: number;
+  isEditing: boolean;
+}
 
+export default function Page() {
   const searchParams = useSearchParams();
   const companyName = searchParams.get("name");
   const [company, setCompany] = useState<Company | null>(null);
-  const [accounts, setAccounts] = useState([
+  const [accounts, setAccounts] = useState<Account[]>([
     {
       name: "Kas Kecil",
       kodeAkun: "1111",
@@ -69,18 +76,20 @@ export default function Page() {
 
   useEffect(() => {
     if (companyName) {
+      // Load detail perusahaan dari localStorage
       const savedCompanies = localStorage.getItem("companies");
       if (savedCompanies) {
         const companies: Company[] = JSON.parse(savedCompanies);
         const selectedCompany = companies.find((c) => c.name === companyName);
         setCompany(selectedCompany || null);
       }
-    }
 
-    // Load accounts from localStorage if available
-    const savedAccounts = localStorage.getItem("accounts");
-    if (savedAccounts) {
-      setAccounts(JSON.parse(savedAccounts));
+      // Load data akun spesifik perusahaan dari localStorage (jika ada)
+      const accountKey = `accounts_${companyName}`;
+      const savedAccounts = localStorage.getItem(accountKey);
+      if (savedAccounts) {
+        setAccounts(JSON.parse(savedAccounts));
+      }
     }
   }, [companyName]);
 
@@ -88,13 +97,14 @@ export default function Page() {
     return <div>Perusahaan tidak ditemukan</div>;
   }
 
-  // Handle edit and save changes in debit/kredit
+  // Fungsi untuk mengaktifkan mode edit pada akun tertentu
   const handleEditAccount = (index: number) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[index].isEditing = true;
     setAccounts(updatedAccounts);
   };
 
+  // Fungsi untuk menyimpan perubahan data akun (debit/kredit)
   const handleSaveAccount = () => {
     const updatedAccounts = [...accounts];
     updatedAccounts.forEach((account) => {
@@ -102,8 +112,11 @@ export default function Page() {
     });
     setAccounts(updatedAccounts);
 
-    // Save updated accounts to localStorage
-    localStorage.setItem("accounts", JSON.stringify(updatedAccounts));
+    // Simpan data akun ke localStorage dengan key spesifik perusahaan
+    if (companyName) {
+      const accountKey = `accounts_${companyName}`;
+      localStorage.setItem(accountKey, JSON.stringify(updatedAccounts));
+    }
   };
 
   const handleDebitChange = (index: number, value: string) => {
@@ -193,15 +206,21 @@ export default function Page() {
                 <TableBody>
                   {accounts.map((account, index) => (
                     <TableRow key={index}>
-                      <TableCell className="text-center py-2">{account.name}</TableCell>
-                      <TableCell className="text-center py-2">{account.kodeAkun}</TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.name}
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        {account.kodeAkun}
+                      </TableCell>
                       <TableCell className="text-center py-2">
                         {account.isEditing ? (
                           <Input
                             type="number"
                             value={account.debit || ""}
-                            onChange={(e) => handleDebitChange(index, e.target.value)}
-                            disabled={account.kredit > 0} // Disable if kredit is filled
+                            onChange={(e) =>
+                              handleDebitChange(index, e.target.value)
+                            }
+                            disabled={account.kredit > 0} // Disable jika kredit sudah diisi
                           />
                         ) : (
                           `Rp.${account.debit.toLocaleString()}`
@@ -212,8 +231,10 @@ export default function Page() {
                           <Input
                             type="number"
                             value={account.kredit || ""}
-                            onChange={(e) => handleKreditChange(index, e.target.value)}
-                            disabled={account.debit > 0} // Disable if debit is filled
+                            onChange={(e) =>
+                              handleKreditChange(index, e.target.value)
+                            }
+                            disabled={account.debit > 0} // Disable jika debit sudah diisi
                           />
                         ) : (
                           `Rp.${account.kredit.toLocaleString()}`

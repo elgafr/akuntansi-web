@@ -1,7 +1,8 @@
 "use client";
 
-import { AppSidebar } from "@/components/app-sidebar";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,7 +15,6 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +36,6 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  // CardFooter,
 } from "@/components/ui/card";
 import {
   LineChart,
@@ -48,14 +47,23 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// Schema for form validation
+// Schema validasi form
 const FormSchema = z.object({
   companyName: z.string().min(2, {
     message: "Company name must be at least 2 characters.",
   }),
 });
 
+// Tipe data Company
+interface Company {
+  name: string;
+  category: string;
+  alamat: string;
+  tahunBerdiri: number;
+}
+
 export default function Page() {
+  // Inisialisasi react-hook-form
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -63,11 +71,49 @@ export default function Page() {
     },
   });
 
+  // State untuk daftar perusahaan
+  const [companyList, setCompanyList] = useState<Company[]>([]);
+  // State untuk mengontrol tampilan saran (autocomplete)
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  // State untuk menandai perusahaan yang sudah dipilih
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+
+  // Load daftar perusahaan dari localStorage (misalnya sudah tersimpan sebelumnya)
+  useEffect(() => {
+    const savedCompanies = localStorage.getItem("companies");
+    if (savedCompanies) {
+      setCompanyList(JSON.parse(savedCompanies));
+    }
+  }, []);
+
+  // Saat komponen mount, inisialisasi nilai form dari localStorage (jika ada)
+  useEffect(() => {
+    const storedCompany = localStorage.getItem("selectedCompany");
+    if (storedCompany) {
+      form.setValue("companyName", storedCompany);
+      setSelectedCompany(storedCompany);
+      setShowSuggestions(false);
+    }
+  }, [form]);
+
+  // Ambil nilai input secara real-time
+  const searchTerm = form.watch("companyName");
+
+  // Filter daftar perusahaan berdasarkan input (case-insensitive)
+  const filteredCompanies = companyList.filter((company) =>
+    company.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Fungsi submit form
   function onSubmit(data: z.infer<typeof FormSchema>) {
+    // Simpan nilai perusahaan yang dipilih ke localStorage
+    localStorage.setItem("selectedCompany", data.companyName);
+    setSelectedCompany(data.companyName);
+    setShowSuggestions(false);
     alert(`Form submitted with Company Name: ${data.companyName}`);
   }
 
-  // Data untuk chart
+  // Data dummy untuk chart
   const chartData = [
     { month: "January", Kas_Kecil: 186, Kas_Besar: 120, Kas_Bank: 90 },
     { month: "February", Kas_Kecil: 305, Kas_Besar: 230, Kas_Bank: 180 },
@@ -81,134 +127,145 @@ export default function Page() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        {/* Header Section */}
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4 w-full justify-between">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-6 text-black">
-                    Dashboard
-                  </h1>
-                  <h2 className="text-sm ml-6">
-                    Let&apos;s check your Dashboard today
-                  </h2>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                  />
-                </Avatar>
-                <div className="text-left mr-8">
-                  <div className="text-sm font-medium">Arthur</div>
-                  <div className="text-xs text-gray-800">Student</div>
-                </div>
+        {/* Header */}
+        <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem className="hidden md:block">
+                <h1 className="text-2xl font-bold ml-6 text-black">
+                  Dashboard
+                </h1>
+                <h2 className="text-sm ml-6">
+                  Let&apos;s check your Dashboard today
+                </h2>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Avatar>
+                <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+              </Avatar>
+              <div className="text-left mr-8">
+                <div className="text-sm font-medium">Arthur</div>
+                <div className="text-xs text-gray-800">Student</div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Form Section */}
-        <div className="flex flex-col gap-4 p-4">
+        {/* Form Pencarian & Tombol */}
+        <div className="p-4 relative">
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
-              className="flex items-center gap-4 w-full"
+              className="w-full"
+              autoComplete="off"
             >
-              <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem className="w-full flex-1 ml-6">
-                    <FormControl>
-                      <div className="relative">
-                        {/* Input dengan padding untuk ikon */}
-                        <Input
-                          placeholder="Cari Perusahaan"
-                          {...field}
-                          className="w-full pl-10 h-10 rounded-xl"
-                        />
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                          <FaBuilding className="w-5 h-5 text-gray-700" />
-                          {/* Ikon perusahaan */}
-                        </div>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="flex items-center gap-4 w-full h-10">
+                <FormField
+                  control={form.control}
+                  name="companyName"
+                  render={({ field }) => (
+                    <div className="flex-1 ml-6">
+                      <FormItem className="mb-0">
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              placeholder="Cari Perusahaan"
+                              {...field}
+                              className="w-full pl-10 h-10 rounded-xl"
+                              onChange={(e) => {
+                                field.onChange(e);
+                                // Jika input berubah dari nilai yang sudah dipilih, anggap perusahaan belum dipilih lagi
+                                if (selectedCompany && e.target.value !== selectedCompany) {
+                                  setSelectedCompany(null);
+                                }
+                                setShowSuggestions(true);
+                              }}
+                            />
+                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                              <FaBuilding className="w-5 h-5 text-gray-700" />
+                            </div>
+                            {/* Tampilkan saran hanya jika ada searchTerm, showSuggestions true, dan belum ada perusahaan yang dipilih */}
+                            {searchTerm && showSuggestions && !selectedCompany && (
+                              <>
+                                {filteredCompanies.length > 0 ? (
+                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                                    {filteredCompanies.map((company, index) => (
+                                      <div
+                                        key={index}
+                                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          form.setValue("companyName", company.name);
+                                          localStorage.setItem("selectedCompany", company.name);
+                                          setSelectedCompany(company.name);
+                                          setShowSuggestions(false);
+                                        }}
+                                      >
+                                        {company.name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                                    <div className="px-4 py-2 text-gray-500">
+                                      Perusahaan tidak ditemukan
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    </div>
+                  )}
+                />
 
-              {/* Tombol di samping input */}
-              <Button
-                type="submit"
-                className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8" // Sama dengan tinggi input dan padding
-              >
-                <span className="flex items-center justify-center">
+                <Button
+                  type="submit"
+                  className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8"
+                >
                   <PlusCircle className="w-6 h-6 text-white" />
-                </span>
-                Pilih Perusahaan
-              </Button>
+                  Pilih Perusahaan
+                </Button>
+              </div>
             </form>
           </Form>
         </div>
 
-        {/* Container utama */}
+        {/* Container Utama */}
         <div className="flex flex-col ml-10 mt-6 gap-4">
-          {/* Wrapper untuk memastikan header sejajar */}
           <div className="flex items-start gap-20">
-            {/* Header Informasi Mahasiswa */}
-            <h2 className="text-lg font-semibold mb-2 w-[420px]">
-              Informasi Mahasiswa
-            </h2>
-
-            {/* Header Chart Pergerakan Akun */}
-            <h2 className="text-lg font-semibold mb-2 w-[450px]">
-              Chart Pergerakan Akun
-            </h2>
+            <h2 className="text-lg font-semibold mb-2 w-[420px]">Informasi Mahasiswa</h2>
+            <h2 className="text-lg font-semibold mb-2 w-[450px]">Chart Pergerakan Akun</h2>
           </div>
 
-          {/* Wrapper untuk Card & Select agar tetap sejajar */}
           <div className="flex items-start gap-4">
-            {/* Card Informasi Mahasiswa */}
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
-                {/* Avatar (Selalu di Tengah) */}
                 <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
                   <AvatarImage
                     src="https://randomuser.me/api/portraits/women/79.jpg"
                     alt="Mahasiswa"
                   />
                 </Avatar>
-
-                {/* Informasi Mahasiswa */}
                 <div className="text-md w-full">
                   <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
-                    {/* Nama Mahasiswa */}
                     <p className="font-semibold whitespace-nowrap">
                       Nama Mahasiswa
                     </p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left break-words">Cody Alexander</p>
-
-                    {/* NIM */}
                     <p className="font-semibold whitespace-nowrap">NIM</p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left break-words">123456789101112</p>
-
-                    {/* Program Studi */}
                     <p className="font-semibold whitespace-nowrap">
                       Program Studi
                     </p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left break-words">Computer Science</p>
-
-                    {/* Semester */}
                     <p className="font-semibold whitespace-nowrap">Semester</p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left">5</p>
@@ -217,9 +274,7 @@ export default function Page() {
               </CardContent>
             </Card>
 
-            {/* Select di Samping Card */}
             <div className="flex flex-col gap-3 text-gray-600 w-[450px]">
-              {/* Select 1 */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-destructive">
                   Pilih Akun Pertama
@@ -236,13 +291,14 @@ export default function Page() {
                       <SelectItem value="kas besar">
                         11112 - Kas Besar
                       </SelectItem>
-                      <SelectItem value="kas bank">11113 - Kas Bank</SelectItem>
+                      <SelectItem value="kas bank">
+                        11113 - Kas Bank
+                      </SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Select 2 */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-destructive">
                   Pilih Akun Kedua
@@ -259,13 +315,14 @@ export default function Page() {
                       <SelectItem value="kas besar">
                         11112 - Kas Besar
                       </SelectItem>
-                      <SelectItem value="kas bank">11113 - Kas Bank</SelectItem>
+                      <SelectItem value="kas bank">
+                        11113 - Kas Bank
+                      </SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Select 3 */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-destructive">
                   Pilih Akun Ketiga
@@ -282,7 +339,9 @@ export default function Page() {
                       <SelectItem value="kas besar">
                         11112 - Kas Besar
                       </SelectItem>
-                      <SelectItem value="kas bank">11113 - Kas Bank</SelectItem>
+                      <SelectItem value="kas bank">
+                        11113 - Kas Bank
+                      </SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -290,7 +349,6 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Chart Section - Wrapped in a Card */}
           <Card className="mt-10 w-[174vh] p-4 shadow-md">
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
@@ -299,7 +357,6 @@ export default function Page() {
                   9,846
                 </CardDescription>
               </div>
-              {/* Color legend moved to the top */}
               <div className="flex flex-col gap-2 mt-2">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-full bg-[#8884d8]"></div>
