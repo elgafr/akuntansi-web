@@ -242,31 +242,48 @@ export function AddTransactionTable({
     document.body.removeChild(link);
   };
 
-  // Handle CSV import
+  // Update fungsi handleImportCSV
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       Papa.parse(file, {
         complete: (results) => {
           const importedTransactions = results.data
-            .filter((row: any) => row.Date)
+            .filter((row: any) => row.Tanggal || row.Date) // Filter baris kosong
             .map((row: any) => ({
-              date: row.Date,
-              documentType: "",
-              kodeAkun: row['Account Code'],
-              namaAkun: row['Account Name'],
-              description: row.Description,
-              debit: Number(row.Debit) || 0,
-              kredit: Number(row.Credit) || 0
+              date: row.Tanggal || row.Date || "",
+              documentType: row.Bukti || row['Document Type'] || "",
+              description: row.Keterangan || row.Description || "",
+              kodeAkun: row['Kode Akun'] || row['Account Code'] || "",
+              namaAkun: row['Nama Akun'] || row['Account Name'] || "",
+              debit: parseFloat(row.Debit) || 0,
+              kredit: parseFloat(row.Kredit || row.Credit) || 0
             }));
-          onTransactionsChange([...transactions, ...importedTransactions]);
+
+          if (importedTransactions.length > 0) {
+            // Tambahkan transaksi baru ke state
+            const updatedTransactions = [...transactions, ...importedTransactions];
+            onTransactionsChange(updatedTransactions);
+            
+            // Reset file input
+            if (event.target) {
+              event.target.value = '';
+            }
+            
+            // Tampilkan notifikasi sukses
+            alert(`Berhasil mengimpor ${importedTransactions.length} transaksi`);
+          } else {
+            alert("Tidak ada data valid yang dapat diimpor");
+          }
         },
         header: true,
-        skipEmptyLines: true
+        skipEmptyLines: true,
+        error: (error) => {
+          console.error('Error parsing CSV:', error);
+          alert("Gagal mengimpor file. Pastikan format file sesuai.");
+        }
       });
     }
-    // Reset file input
-    event.target.value = '';
   };
 
   // Tambahkan fungsi untuk menangani inline edit
