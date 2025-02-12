@@ -1,0 +1,3 @@
+[submodule "akuntansi-api"]
+	path = akuntansi-api
+	url = https://github.com/AhmadFahmy021/akuntansi-api
