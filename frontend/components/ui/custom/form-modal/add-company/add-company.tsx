@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -41,8 +41,10 @@ export const FormModal = ({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get('http://127.0.0.1:8000/api/instruktur/kategori');
-        setCategories(response.data.data); // Pastikan Anda mengakses `data` dari response
+        const response = await axios.get('/instruktur/kategori');
+        if (response.data.success) {
+          setCategories(response.data.data);
+        }
       } catch (error) {
         console.error('Gagal mengambil kategori:', error);
       }
@@ -57,35 +59,16 @@ export const FormModal = ({
     if (!companyName || !category || !alamat || !tahunBerdiri) return;
   
     try {
-      // Mengambil token dari localStorage
-      const token = localStorage.getItem("auth_token"); // Pastikan token ada
-  
-      // Cek apakah token ada
-      if (!token) {
-        console.error("User not authenticated");
-        return;
-      }
-  
       const payload = {
         nama: companyName,
         alamat: alamat,
         tahun_berdiri: Number(tahunBerdiri),
-        kategori_id: category, // Kirimkan ID kategori yang dipilih
-        krs_id: krsId, // Kirimkan krsId
-        status: "active" // Status default
+        kategori_id: category,
+        krs_id: krsId,
+        status: "active"
       };
   
-      // Mengirim data ke backend Laravel dengan menambahkan header Authorization
-      const response = await axios.post(
-        'http://localhost:8000/api/mahasiswa/perusahaan', // Pastikan URL backend Laravel benar
-        payload,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`, // Menambahkan token ke header Authorization
-            'Content-Type': 'application/json',
-          }
-        }
-      );
+      const response = await axios.post('/mahasiswa/perusahaan', payload);
   
       if (response.data.success) {
         // Reset form
@@ -93,9 +76,8 @@ export const FormModal = ({
         setCategory("");
         setAlamat("");
         setTahunBerdiri("");
-        onOpenChange(false); // Menutup modal setelah berhasil menambahkan perusahaan
+        onOpenChange(false);
         
-        // Panggil callback onSave jika ada
         if (onSave) {
           onSave({
             name: companyName,
@@ -105,8 +87,8 @@ export const FormModal = ({
           });
         }
       }
-    } catch (error) {
-      console.error('Gagal menyimpan perusahaan:', error);
+    } catch (error: any) {
+      console.error('Gagal menyimpan perusahaan:', error.response?.data?.message || error.message);
       // Tambahkan notifikasi error jika perlu
     }
   };

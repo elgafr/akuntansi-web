@@ -22,13 +22,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import axios from "axios";
+import axios from "@/lib/axios";
 
 interface Company {
-  name: string;
-  category: string;
+  id: string;
+  nama: string;
   alamat: string;
-  tahunBerdiri: number;
+  tahun_berdiri: number;
+  status: string;
+  kategori: {
+    id: string;
+    nama: string;
+  };
 }
 
 interface ProfileData {
@@ -54,40 +59,45 @@ export default function Page() {
     }
   }, []);
 
-  // Ambil krsId dari localStorage atau API
+  // Update useEffect untuk fetch krsId
   useEffect(() => {
     const fetchKrsId = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
-        if (!token) {
-          console.error("User not authenticated");
-          return;
+        const response = await axios.get('/mahasiswa/krs');
+        if (response.data.success) {
+          setKrsId(response.data.krsId);
         }
-  
-        const response = await axios.get("/mahasiswa/krs", {
-          headers: {
-            "Authorization": `Bearer ${token}`,
-          },
-        });
-        
-        setKrsId(response.data.krsId); // Jika respons berhasil, set krsId
       } catch (error) {
         console.error("Gagal mengambil krsId:", error);
       }
     };
-  
+
     fetchKrsId();
   }, []);
-  
-  
-  // Load companies from localStorage on mount
+
+  // Update useEffect untuk fetch companies
   useEffect(() => {
-    const savedCompanies = localStorage.getItem("companies");
-    if (savedCompanies) {
-      const companies = JSON.parse(savedCompanies);
-      setCompanyList(companies);
-      setFilteredCompanyList(companies);
-    }
+    const fetchCompanies = async () => {
+      try {
+        const response = await axios.get('/mahasiswa/perusahaan');
+        if (response.data.success) {
+          const companies = response.data.data.map((item: any) => ({
+            id: item.id,
+            nama: item.nama,
+            alamat: item.alamat,
+            tahun_berdiri: item.tahun_berdiri,
+            status: item.status,
+            kategori: item.kategori
+          }));
+          setCompanyList(companies);
+          setFilteredCompanyList(companies);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data perusahaan:", error);
+      }
+    };
+
+    fetchCompanies();
   }, []);
 
   // Handle adding new company from modal
@@ -100,7 +110,7 @@ export default function Page() {
 
   const handleDeleteCompany = (companyName: string) => {
     const updatedCompanies = companyList.filter(
-      (company) => company.name !== companyName
+      (company) => company.nama !== companyName
     );
     setCompanyList(updatedCompanies);
     setFilteredCompanyList(updatedCompanies);
@@ -117,7 +127,7 @@ export default function Page() {
     const value = event.target.value;
     setSearchTerm(value);
     const filteredCompanies = companyList.filter((company) =>
-      company.name.toLowerCase().includes(value.toLowerCase())
+      company.nama.toLowerCase().includes(value.toLowerCase())
     );
     setFilteredCompanyList(filteredCompanies);
   };
@@ -185,14 +195,14 @@ export default function Page() {
         {/* Company Cards Section */}
         <div className="px-6 mr-8 ml-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredCompanyList.map((company, index) => (
-              <Card key={index} className="w-full">
+            {filteredCompanyList.map((company) => (
+              <Card key={company.id} className="w-full">
                 <CardHeader>
                   <CardTitle className="text-2xl text-center text-destructive">
-                    {company.name}
+                    {company.nama}
                   </CardTitle>
                   <CardDescription className="text-center">
-                    Kategori - {company.category}
+                    Kategori - {company.kategori.nama}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -200,14 +210,14 @@ export default function Page() {
                     <div className="flex flex-col space-y-1.5">
                       <Button
                         className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white"
-                        onClick={() => handleDeleteCompany(company.name)}
+                        onClick={() => handleDeleteCompany(company.nama)}
                       >
                         Hapus Perusahaan
                       </Button>
                     </div>
                     <Link
                       href={`/detail-akun?name=${encodeURIComponent(
-                        company.name
+                        company.nama
                       )}`}
                     >
                       <div className="flex flex-col space-y-1.5">
