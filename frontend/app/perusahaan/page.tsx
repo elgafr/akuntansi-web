@@ -22,6 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import axios from "axios";
 
 interface Company {
   name: string;
@@ -39,12 +40,13 @@ export default function Page() {
   const [filteredCompanyList, setFilteredCompanyList] = useState<Company[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [krsId, setKrsId] = useState<string>(""); // Definisikan state untuk krsId
 
   const [profileData, setProfileData] = useState<ProfileData>({
     fullName: "Guest",
   });
 
-  // Ambil data profil dari localStorage (sama seperti di halaman profile)
+  // Ambil data profil dari localStorage
   useEffect(() => {
     const storedProfile = localStorage.getItem("profileData");
     if (storedProfile) {
@@ -52,13 +54,39 @@ export default function Page() {
     }
   }, []);
 
+  // Ambil krsId dari localStorage atau API
+  useEffect(() => {
+    const fetchKrsId = async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        if (!token) {
+          console.error("User not authenticated");
+          return;
+        }
+  
+        const response = await axios.get("/mahasiswa/krs", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+        
+        setKrsId(response.data.krsId); // Jika respons berhasil, set krsId
+      } catch (error) {
+        console.error("Gagal mengambil krsId:", error);
+      }
+    };
+  
+    fetchKrsId();
+  }, []);
+  
+  
   // Load companies from localStorage on mount
   useEffect(() => {
     const savedCompanies = localStorage.getItem("companies");
     if (savedCompanies) {
       const companies = JSON.parse(savedCompanies);
       setCompanyList(companies);
-      setFilteredCompanyList(companies); // Initialize filtered list with all companies
+      setFilteredCompanyList(companies);
     }
   }, []);
 
@@ -66,25 +94,18 @@ export default function Page() {
   const handleAddCompany = (newCompany: Company) => {
     const updatedCompanies = [...companyList, newCompany];
     setCompanyList(updatedCompanies);
-    setFilteredCompanyList(updatedCompanies); // Update filtered list as well
+    setFilteredCompanyList(updatedCompanies);
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
   };
 
   const handleDeleteCompany = (companyName: string) => {
-    // Filter daftar perusahaan untuk mengeluarkan perusahaan yang ingin dihapus
     const updatedCompanies = companyList.filter(
       (company) => company.name !== companyName
     );
     setCompanyList(updatedCompanies);
     setFilteredCompanyList(updatedCompanies);
-
-    // Perbarui data perusahaan di localStorage
     localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-
-    // Jika ada data akun atau data lain yang terkait dengan perusahaan tersebut, hapus juga
     localStorage.removeItem(`accounts_${companyName}`);
-
-    // Jika perusahaan yang dihapus merupakan perusahaan yang sedang dipilih, hapus key-nya
     const selectedCompany = localStorage.getItem("selectedCompany");
     if (selectedCompany === companyName) {
       localStorage.removeItem("selectedCompany");
@@ -95,8 +116,6 @@ export default function Page() {
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setSearchTerm(value);
-
-    // Filter companies based on search term
     const filteredCompanies = companyList.filter((company) =>
       company.name.toLowerCase().includes(value.toLowerCase())
     );
@@ -147,13 +166,12 @@ export default function Page() {
                 placeholder="Cari Perusahaan"
                 className="w-full pl-10 h-10 rounded-xl"
                 value={searchTerm}
-                onChange={handleSearchChange} // Call the search handler
+                onChange={handleSearchChange}
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                 <FaBuilding className="w-5 h-5 text-gray-700" />
               </div>
             </div>
-            {/* Add Company Button */}
             <Button
               className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-10"
               onClick={() => setIsModalOpen(true)}
@@ -166,8 +184,6 @@ export default function Page() {
 
         {/* Company Cards Section */}
         <div className="px-6 mr-8 ml-4">
-          {" "}
-          {/* Padding untuk sejajar dengan header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredCompanyList.map((company, index) => (
               <Card key={index} className="w-full">
@@ -211,6 +227,7 @@ export default function Page() {
           isOpen={isModalOpen}
           onOpenChange={setIsModalOpen}
           onSave={handleAddCompany}
+          krsId={krsId} // Kirim krsId ke FormModal
         />
       </SidebarInset>
     </SidebarProvider>

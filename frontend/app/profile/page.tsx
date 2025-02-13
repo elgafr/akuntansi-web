@@ -20,6 +20,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export default function Page() {
   // State untuk data diri
@@ -36,6 +42,13 @@ export default function Page() {
 
   // State untuk mengontrol pop-up modal
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+
+  // State untuk menyimpan kelas yang dipilih
+  const [selectedClasses, setSelectedClasses] = React.useState({
+    akuntansiSyariah: "",
+    pemeriksaanAkuntansi: "",
+    akuntansiSektorPublik: "",
+  });
 
   // Fungsi untuk membuka modal edit
   const openEditModal = () => {
@@ -64,6 +77,14 @@ export default function Page() {
     setProfileData(newData);
     localStorage.setItem("profileData", JSON.stringify(newData));
     closeEditModal();
+  };
+
+  // Fungsi untuk mengatur kelas yang dipilih
+  const handleClassSelection = (category: string, className: string) => {
+    setSelectedClasses((prev) => ({
+      ...prev,
+      [category]: className,
+    }));
   };
 
   // Mengambil data dari localStorage saat komponen dimuat
@@ -102,7 +123,9 @@ export default function Page() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData.fullName}</div>
+                  <div className="text-sm font-medium">
+                    {profileData.fullName}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -119,7 +142,9 @@ export default function Page() {
                 <AvatarImage src="https://github.com/shadcn.png" />
               </Avatar>
               <div className="w-full text-start">
-                <h1 className="text-2xl font-semibold">{profileData.fullName}</h1>
+                <h1 className="text-2xl font-semibold">
+                  {profileData.fullName}
+                </h1>
                 <h2 className="text-xl text-gray-600">{profileData.nim}</h2>
                 <Button className="text-black font-bold rounded-xl mt-2">
                   Student
@@ -144,7 +169,9 @@ export default function Page() {
                 {/* Kiri */}
                 <div className="space-y-1">
                   <Label className="text-xl">Nama Lengkap</Label>
-                  <p className="text-gray-600 text-lg">{profileData.fullName}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.fullName}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
@@ -279,14 +306,195 @@ export default function Page() {
                 </div>
               </div>
               <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={closeEditModal} className="rounded-xl">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeEditModal}
+                  className="rounded-xl"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" className="rounded-xl">Save</Button>
+                <Button type="submit" className="rounded-xl">
+                  Save
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Text untuk Pilih Kelas dan Kelas yang Dipilih */}
+        <div className="flex justify-between items-center mt-6 px-10">
+          <div className="text-xl font-medium text-gray-700">Pilih Kelas</div>
+          <div className="text-xl font-medium text-gray-700 mr-[400px]">
+            Kelas yang Dipilih
+          </div>
+        </div>
+
+        {/* Accordion Card */}
+        <div className="flex gap-6">
+          <Card className="w-1/2 mt-4 ml-10">
+            <CardContent className="p-6">
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1">
+                  <AccordionTrigger>Akuntansi Syariah</AccordionTrigger>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "akuntansiSyariah",
+                        "Akuntansi Syariah A"
+                      )
+                    }
+                  >
+                    Akuntansi Syariah A
+                  </AccordionContent>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "akuntansiSyariah",
+                        "Akuntansi Syariah B"
+                      )
+                    }
+                  >
+                    Akuntansi Syariah B
+                  </AccordionContent>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "akuntansiSyariah",
+                        "Akuntansi Syariah C"
+                      )
+                    }
+                  >
+                    Akuntansi Syariah C
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-2">
+                  <AccordionTrigger>Pemeriksaan Akuntansi</AccordionTrigger>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "pemeriksaanAkuntansi",
+                        "Pemeriksaan Akuntansi A"
+                      )
+                    }
+                  >
+                    Pemeriksaan Akuntansi A
+                  </AccordionContent>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "pemeriksaanAkuntansi",
+                        "Pemeriksaan Akuntansi B"
+                      )
+                    }
+                  >
+                    Pemeriksaan Akuntansi B
+                  </AccordionContent>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "pemeriksaanAkuntansi",
+                        "Pemeriksaan Akuntansi C"
+                      )
+                    }
+                  >
+                    Pemeriksaan Akuntansi C
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-3">
+                  <AccordionTrigger>Akuntansi Sektor Publik</AccordionTrigger>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "akuntansiSektorPublik",
+                        "Akuntansi Sektor Publik A"
+                      )
+                    }
+                  >
+                    Akuntansi Sektor Publik A
+                  </AccordionContent>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "akuntansiSektorPublik",
+                        "Akuntansi Sektor Publik B"
+                      )
+                    }
+                  >
+                    Akuntansi Sektor Publik B
+                  </AccordionContent>
+                  <AccordionContent
+                    className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
+                    onClick={() =>
+                      handleClassSelection(
+                        "akuntansiSektorPublik",
+                        "Akuntansi Sektor Publik C"
+                      )
+                    }
+                  >
+                    Akuntansi Sektor Publik C
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </CardContent>
+          </Card>
+
+          {/* Kelas yang Dipilih Card */}
+          <Card className="w-1/2 mt-4 mr-10">
+            <CardContent className="p-6 space-y-4">
+              {selectedClasses.akuntansiSyariah && (
+                <Card className="bg-purple-50 border-purple-200">
+                  <CardContent className="p-3">
+                    <p className="text-lg font-medium">Akuntansi Syariah</p>
+                    <p className="text-gray-600">
+                      {selectedClasses.akuntansiSyariah}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {selectedClasses.pemeriksaanAkuntansi && (
+                <Card className="bg-purple-50 border-purple-200">
+                  <CardContent className="p-3">
+                    <p className="text-lg font-medium">Pemeriksaan Akuntansi</p>
+                    <p className="text-gray-600">
+                      {selectedClasses.pemeriksaanAkuntansi}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {selectedClasses.akuntansiSektorPublik && (
+                <Card className="bg-purple-50 border-purple-200">
+                  <CardContent className="p-3">
+                    <p className="text-lg font-medium">
+                      Akuntansi Sektor Publik
+                    </p>
+                    <p className="text-gray-600">
+                      {selectedClasses.akuntansiSektorPublik}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!selectedClasses.akuntansiSyariah &&
+                !selectedClasses.pemeriksaanAkuntansi &&
+                !selectedClasses.akuntansiSektorPublik && (
+                  <p className="text-gray-500 text-center py-4">
+                    Belum ada kelas yang dipilih
+                  </p>
+                )}
+            </CardContent>
+          </Card>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

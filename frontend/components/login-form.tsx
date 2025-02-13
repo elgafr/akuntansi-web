@@ -27,8 +27,9 @@ export function LoginForm({
     try {
       const response = await axios.post("/mahasiswa/login", { nim, password }); // Kirim data login ke backend
       console.log(response.data); // Cek respons sukses
+      localStorage.setItem("auth_token", response.data.token); // **Simpan token ke localStorage**
 
-      // Jika login berhasil, redirect ke halaman setelah login
+      // Jika login berhasil, redirect ke halaman setelah login berhasil
       window.location.href = "/perusahaan"; // Ganti URL tujuan setelah login berhasil
     } catch (error) {
       setError("Invalid credentials"); // Menangani error jika login gagal
