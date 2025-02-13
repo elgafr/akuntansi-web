@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import axios from "@/lib/axios";
+import { useRouter } from "next/navigation";
 
 interface Company {
   id: string;
@@ -46,6 +47,8 @@ export default function Page() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [krsId, setKrsId] = useState<string>(""); // Definisikan state untuk krsId
+  const [selectedPerusahaan, setSelectedPerusahaan] = useState<Company | null>(null);
+  const router = useRouter();
 
   const [profileData, setProfileData] = useState<ProfileData>({
     fullName: "Guest",
@@ -132,6 +135,22 @@ export default function Page() {
     setFilteredCompanyList(filteredCompanies);
   };
 
+  const handleSelectPerusahaan = async (perusahaan: Company) => {
+    try {
+      // Simpan data perusahaan ke localStorage
+      localStorage.setItem('perusahaan', JSON.stringify(perusahaan));
+      
+      // Set perusahaan yang dipilih ke state
+      setSelectedPerusahaan(perusahaan);
+      
+      // Redirect ke halaman detail
+      router.push(`/detail-akun`);
+    } catch (error) {
+      console.error('Error selecting perusahaan:', error);
+      alert('Gagal memilih perusahaan');
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -215,15 +234,14 @@ export default function Page() {
                         Hapus Perusahaan
                       </Button>
                     </div>
-                    <Link
-                      href={`/detail-akun?name=${encodeURIComponent(
-                        company.nama
-                      )}`}
-                    >
-                      <div className="flex flex-col space-y-1.5">
-                        <Button className="rounded-xl">Detail dan Akun</Button>
-                      </div>
-                    </Link>
+                    <div className="flex flex-col space-y-1.5">
+                      <Button 
+                        className="rounded-xl"
+                        onClick={() => handleSelectPerusahaan(company)}
+                      >
+                        Detail dan Akun
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

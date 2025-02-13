@@ -41,7 +41,7 @@ const data = {
       icon: BookAIcon,
     },
     {
-      title: "Neraca Lanjut",
+      title: "Neraca Lajur",
       url: "/neraca-lajur",
       icon: BarChart2,
     },

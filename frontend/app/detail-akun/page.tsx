@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useRouter } from "next/navigation";
 
 interface Company {
   name: string;
@@ -83,6 +84,8 @@ export default function Page() {
     fullName: "Guest",
   });
 
+  const router = useRouter();
+
   useEffect(() => {
     const storedProfile = localStorage.getItem("profileData");
     if (storedProfile) {
@@ -109,8 +112,36 @@ export default function Page() {
     }
   }, [companyName]);
 
+  useEffect(() => {
+    // Ambil data perusahaan dari localStorage
+    const storedPerusahaan = localStorage.getItem('perusahaan');
+    if (!storedPerusahaan) {
+      alert('Perusahaan tidak ditemukan');
+      router.push('/perusahaan');
+      return;
+    }
+
+    try {
+      const perusahaanData = JSON.parse(storedPerusahaan);
+      setCompany({
+        name: perusahaanData.nama,
+        category: perusahaanData.kategori.nama,
+        alamat: perusahaanData.alamat,
+        tahunBerdiri: perusahaanData.tahun_berdiri
+      });
+    } catch (error) {
+      console.error('Error parsing perusahaan data:', error);
+      alert('Error loading perusahaan data');
+      router.push('/perusahaan');
+    }
+  }, [router]);
+
   if (!company) {
-    return <div>Perusahaan tidak ditemukan</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+      </div>
+    );
   }
 
   // Fungsi untuk mengaktifkan mode edit pada akun tertentu
