@@ -180,6 +180,45 @@ export function BukuBesarTable() {
     };
   };
 
+  // Tambahkan fungsi untuk mengelompokkan data per kejadian
+  const groupDataByEvent = (data: any[]) => {
+    let currentEvent = {
+      date: '',
+      documentType: '',
+      description: ''
+    };
+
+    return data.map((item, index, array) => {
+      // Selalu tampilkan saldo awal
+      if (item.isOpeningBalance) {
+        return item;
+      }
+
+      // Cek apakah ini transaksi pertama atau ada perubahan event
+      const isNewEvent = index === 0 || 
+        item.date !== array[index - 1].date ||
+        item.documentType !== array[index - 1].documentType ||
+        item.description !== array[index - 1].description;
+
+      if (isNewEvent) {
+        currentEvent = {
+          date: item.date,
+          documentType: item.documentType,
+          description: item.description
+        };
+        return item;
+      }
+
+      // Return item tanpa data event untuk transaksi dalam event yang sama
+      return {
+        ...item,
+        date: '',
+        documentType: '',
+        description: ''
+      };
+    });
+  };
+
   return (
     <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
       <div className="flex gap-4 mb-6">
@@ -275,38 +314,40 @@ export function BukuBesarTable() {
               <TableHead className="text-gray-600">Tanggal</TableHead>
               <TableHead className="text-gray-600">Kode Akun</TableHead>
               <TableHead className="text-gray-600">Nama Akun</TableHead>
-              <TableHead className="text-gray-600">Keterangan</TableHead>
               <TableHead className="text-gray-600 text-right">Debit</TableHead>
               <TableHead className="text-gray-600 text-right">Kredit</TableHead>
               <TableHead className="text-gray-600 text-right">Saldo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dataWithBalance.map((item, index) => (
-              <TableRow 
-                key={index}
-                className={`
-                  hover:bg-gray-50 transition-colors
-                  ${item.isOpeningBalance ? 'bg-gray-50/30' : ''}
-                `}
-              >
-                <TableCell>{item.date}</TableCell>
-                <TableCell>{item.kodeAkun}</TableCell>
-                <TableCell>{item.namaAkun}</TableCell>
-                <TableCell>{item.description}</TableCell>
-                <TableCell className="text-right">
-                  {item.debit ? `Rp ${item.debit.toLocaleString()}` : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  {item.kredit ? `Rp ${item.kredit.toLocaleString()}` : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  {typeof item.balance === 'number' 
-                    ? `Rp ${item.balance.toLocaleString()}` 
-                    : '-'}
-                </TableCell>
-              </TableRow>
-            ))}
+            {dataWithBalance.map((item, index) => {
+              const displayItem = groupDataByEvent(dataWithBalance)[index];
+              return (
+                <TableRow 
+                  key={index}
+                  className={`
+                    hover:bg-gray-50 transition-colors
+                    ${item.isOpeningBalance ? 'bg-gray-50/30' : ''}
+                    ${!displayItem.date && 'text-gray-500'}
+                  `}
+                >
+                  <TableCell>{displayItem.date}</TableCell>
+                  <TableCell>{displayItem.kodeAkun}</TableCell>
+                  <TableCell>{displayItem.namaAkun}</TableCell>
+                  <TableCell className="text-right">
+                    {item.debit ? `Rp ${item.debit.toLocaleString()}` : ''}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {item.kredit ? `Rp ${item.kredit.toLocaleString()}` : ''}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {typeof item.balance === 'number' 
+                      ? `Rp ${item.balance.toLocaleString()}` 
+                      : ''}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
 

@@ -42,7 +42,7 @@ const data = {
     },
     {
       title: "Neraca Lanjut",
-      url: "#",
+      url: "/neraca-lajur",
       icon: BarChart2,
     },
     {
