@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { useAccounts } from "@/contexts/AccountContext";
 import { useTransactions } from "@/contexts/TransactionContext";
 import { BukuBesarCard } from "./BukuBesarCard";
 import { Card } from "@/components/ui/card";
+import axios from "@/lib/axios";
 
 interface Transaction {
   date: string;
@@ -26,6 +29,34 @@ interface Transaction {
   documentType?: string;
 }
 
+interface Akun {
+  id: string;
+  kode: number;
+  nama: string;
+  status: string;
+}
+
+interface SubAkun {
+  id: string;
+  kode: number;
+  nama: string;
+  akun: {
+    id: string;
+    kode: number;
+    nama: string;
+  };
+}
+
+interface BukuBesarEntry {
+  id: string;
+  tanggal: string;
+  bukti: string;
+  keterangan: string;
+  debit: number;
+  kredit: number;
+  saldo: number;
+}
+
 export function BukuBesarTable() {
   const { accounts } = useAccounts();
   const { transactions } = useTransactions();
@@ -35,6 +66,10 @@ export function BukuBesarTable() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
   const ITEMS_PER_PAGE = 10;
+  const [akunList, setAkunList] = useState<Akun[]>([]);
+  const [subAkunList, setSubAkunList] = useState<SubAkun[]>([]);
+  const [selectedAkunId, setSelectedAkunId] = useState<string>("");
+  const [bukuBesarData, setBukuBesarData] = useState<BukuBesarEntry[]>([]);
 
   // Combine account opening balances with transactions
   const combinedData = [
@@ -169,9 +204,9 @@ export function BukuBesarTable() {
     let totalDebit = 0;
     let totalKredit = 0;
 
-    dataWithBalance.forEach(item => {
-      if (item.debit) totalDebit += item.debit;
-      if (item.kredit) totalKredit += item.kredit;
+    bukuBesarData.forEach(entry => {
+      totalDebit += entry.debit || 0;
+      totalKredit += entry.kredit || 0;
     });
 
     return {
@@ -216,6 +251,91 @@ export function BukuBesarTable() {
         documentType: '',
         description: ''
       };
+    });
+  };
+
+  // Fetch akun dan sub akun
+  useEffect(() => {
+    const fetchAkunData = async () => {
+      try {
+        const [akunResponse, subAkunResponse] = await Promise.all([
+          axios.get('/instruktur/akun'),
+          axios.get('/mahasiswa/subakun')
+        ]);
+
+        if (akunResponse.data.success) {
+          setAkunList(akunResponse.data.data);
+          // Set default value ke akun pertama jika ada
+          if (akunResponse.data.data.length > 0) {
+            const defaultAkun = akunResponse.data.data.sort((a: Akun, b: Akun) => a.kode - b.kode)[0];
+            setSelectedAkunId(defaultAkun.id);
+          }
+        }
+        if (subAkunResponse.data.success) {
+          setSubAkunList(subAkunResponse.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching akun data:', error);
+      }
+    };
+
+    fetchAkunData();
+  }, []);
+
+  // Fetch buku besar data when akun is selected
+  useEffect(() => {
+    const fetchBukuBesarData = async () => {
+      if (!selectedAkunId) return;
+
+      try {
+        const response = await axios.get('/mahasiswa/bukubesar/sort', {
+          params: { akun_id: selectedAkunId }
+        });
+
+        if (response.data.success) {
+          // Transform dan kelompokkan data
+          const transformedData = response.data.data.map((entry: any, index: number, array: any[]) => {
+            let saldo = 0;
+            // Hitung saldo berjalan
+            for (let i = 0; i <= index; i++) {
+              saldo += (array[i].debit || 0) - (array[i].kredit || 0);
+            }
+
+            // Cek apakah ini baris pertama atau berbeda dengan baris sebelumnya
+            const isFirstInGroup = index === 0 || 
+              entry.tanggal !== array[index - 1].tanggal ||
+              entry.bukti !== array[index - 1].bukti ||
+              entry.keterangan !== array[index - 1].keterangan;
+            
+            return {
+              ...entry,
+              debit: entry.debit || 0,
+              kredit: entry.kredit || 0,
+              saldo: Math.abs(saldo),
+              // Jika bukan yang pertama dalam grup, kosongkan informasi kejadian
+              tanggal: isFirstInGroup ? entry.tanggal : '',
+              bukti: isFirstInGroup ? entry.bukti : '',
+              keterangan: isFirstInGroup ? entry.keterangan : ''
+            };
+          });
+
+          setBukuBesarData(transformedData);
+        }
+      } catch (error) {
+        console.error('Error fetching buku besar data:', error);
+      }
+    };
+
+    fetchBukuBesarData();
+  }, [selectedAkunId]);
+
+  // Update bagian table untuk menampilkan format tanggal yang lebih baik
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
     });
   };
 
@@ -264,31 +384,58 @@ export function BukuBesarTable() {
       <div className="flex justify-between items-center gap-4 p-4">
         <div className="flex items-center gap-4">
           <Select
-            value={selectedMainAccount}
-            onValueChange={setSelectedMainAccount}
+            value={selectedAkunId}
+            onValueChange={setSelectedAkunId}
           >
-            <SelectTrigger className="w-[300px] bg-gray-50 border-gray-200 rounded-lg">
-              <SelectValue placeholder="Pilih akun Perusahaan" />
+            <SelectTrigger className="w-[300px]">
+              <SelectValue placeholder="Pilih Akun">
+                {selectedAkunId && (
+                  <>
+                    {(() => {
+                      const selectedAkun = akunList.find(akun => akun.id === selectedAkunId);
+                      if (selectedAkun) {
+                        return `${selectedAkun.kode} - ${selectedAkun.nama}`;
+                      }
+                      const selectedSubAkun = subAkunList.find(sub => sub.akun.id === selectedAkunId);
+                      if (selectedSubAkun) {
+                        return `${selectedSubAkun.kode} - ${selectedSubAkun.nama}`;
+                      }
+                      return 'Pilih Akun';
+                    })()}
+                  </>
+                )}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Accounts</SelectItem>
-              {mainAccounts.map((account) => (
-                <SelectItem 
-                  key={account.kodeAkun} 
-                  value={`${account.kodeAkun} ${account.namaAkun}`}
-                >
-                  {account.kodeAkun} - {account.namaAkun}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                <SelectLabel>Akun</SelectLabel>
+                {akunList
+                  .sort((a, b) => a.kode - b.kode) // Sort berdasarkan kode akun
+                  .map((akun) => (
+                    <SelectItem key={akun.id} value={akun.id}>
+                      {akun.kode} - {akun.nama}
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel>Sub Akun</SelectLabel>
+                {subAkunList
+                  .sort((a, b) => a.kode - b.kode) // Sort berdasarkan kode sub akun
+                  .map((subAkun) => (
+                    <SelectItem key={subAkun.id} value={subAkun.akun.id}>
+                      {subAkun.kode} - {subAkun.nama}
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
 
-          <Input
+          {/* <Input
             placeholder="Search by Account Name or Code..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-[300px] bg-gray-50 border-gray-200 rounded-lg"
-          />
+          /> */}
           
           <Select
             value={showAll ? 'all' : pageSize.toString()}
@@ -310,44 +457,50 @@ export function BukuBesarTable() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-gray-50 border-b border-gray-200">
-              <TableHead className="text-gray-600">Tanggal</TableHead>
-              <TableHead className="text-gray-600">Kode Akun</TableHead>
-              <TableHead className="text-gray-600">Nama Akun</TableHead>
-              <TableHead className="text-gray-600 text-right">Debit</TableHead>
-              <TableHead className="text-gray-600 text-right">Kredit</TableHead>
-              <TableHead className="text-gray-600 text-right">Saldo</TableHead>
+            <TableRow>
+              <TableHead>Tanggal</TableHead>
+              <TableHead>Bukti</TableHead>
+              <TableHead>Keterangan</TableHead>
+              <TableHead className="text-right">Debit</TableHead>
+              <TableHead className="text-right">Kredit</TableHead>
+              <TableHead className="text-right">Saldo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dataWithBalance.map((item, index) => {
-              const displayItem = groupDataByEvent(dataWithBalance)[index];
-              return (
-                <TableRow 
-                  key={index}
-                  className={`
-                    hover:bg-gray-50 transition-colors
-                    ${item.isOpeningBalance ? 'bg-gray-50/30' : ''}
-                    ${!displayItem.date && 'text-gray-500'}
-                  `}
-                >
-                  <TableCell>{displayItem.date}</TableCell>
-                  <TableCell>{displayItem.kodeAkun}</TableCell>
-                  <TableCell>{displayItem.namaAkun}</TableCell>
-                  <TableCell className="text-right">
-                    {item.debit ? `Rp ${item.debit.toLocaleString()}` : ''}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {item.kredit ? `Rp ${item.kredit.toLocaleString()}` : ''}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {typeof item.balance === 'number' 
-                      ? `Rp ${item.balance.toLocaleString()}` 
-                      : ''}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {bukuBesarData.length > 0 ? (
+              bukuBesarData.map((entry, index) => {
+                const isFirstInGroup = index === 0 || 
+                  entry.tanggal !== bukuBesarData[index - 1].tanggal ||
+                  entry.bukti !== bukuBesarData[index - 1].bukti ||
+                  entry.keterangan !== bukuBesarData[index - 1].keterangan;
+
+                return (
+                  <TableRow 
+                    key={entry.id}
+                    className={!isFirstInGroup ? 'bg-gray-50/50' : ''}
+                  >
+                    <TableCell>{entry.tanggal ? formatDate(entry.tanggal) : ''}</TableCell>
+                    <TableCell>{entry.bukti}</TableCell>
+                    <TableCell>{entry.keterangan}</TableCell>
+                    <TableCell className="text-right">
+                      {entry.debit ? `Rp ${entry.debit.toLocaleString()}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {entry.kredit ? `Rp ${entry.kredit.toLocaleString()}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      Rp {entry.saldo.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-4">
+                  {selectedAkunId ? 'Tidak ada data untuk akun ini' : 'Pilih akun untuk melihat data'}
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
 
