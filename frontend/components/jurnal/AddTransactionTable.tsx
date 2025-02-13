@@ -17,6 +17,7 @@ import Papa from 'papaparse';
 import { AddTransactionForm } from "./AddTransactionForm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
+import axios from "@/lib/axios";
 
 interface Transaction {
   date: string;
@@ -63,6 +64,8 @@ export function AddTransactionTable({
   const [inlineEditData, setInlineEditData] = useState<Transaction | null>(null);
   const ITEMS_PER_PAGE = 10;
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -332,6 +335,94 @@ export function AddTransactionTable({
     return !value || value === 0;
   };
 
+  // Tambahkan fungsi untuk mengelompokkan transaksi per kejadian
+  const groupTransactionsByEvent = (transactions: Transaction[]) => {
+    let currentEvent = {
+      date: '',
+      documentType: '',
+      description: ''
+    };
+
+    return transactions.map((transaction, index, array) => {
+      // Cek apakah ini transaksi pertama atau ada perubahan event
+      const isNewEvent = index === 0 || 
+        transaction.date !== array[index - 1].date ||
+        transaction.documentType !== array[index - 1].documentType ||
+        transaction.description !== array[index - 1].description;
+
+      if (isNewEvent) {
+        currentEvent = {
+          date: transaction.date,
+          documentType: transaction.documentType,
+          description: transaction.description
+        };
+        return transaction;
+      }
+
+      // Return transaksi tanpa data event untuk transaksi dalam event yang sama
+      return {
+        ...transaction,
+        date: '',
+        documentType: '',
+        description: ''
+      };
+    });
+  };
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        setIsLoading(true);
+        const response = await axios.get('/mahasiswa/jurnal');
+        
+        if (response.data.success) {
+          const transformedTransactions: Transaction[] = Object.entries(response.data.data)
+            .flatMap(([description, entries]: [string, unknown]) => {
+              const entriesArray = entries as any[];
+              return entriesArray.map(entry => ({
+                date: entry.tanggal,
+                documentType: entry.bukti,
+                description,
+                namaAkun: entry.akun?.nama || '',
+                kodeAkun: entry.akun?.kode?.toString() || '',
+                debit: entry.debit || 0,
+                kredit: entry.kredit || 0
+              }));
+            });
+
+          onTransactionsChange(transformedTransactions);
+        } else {
+          setError('Failed to fetch transactions');
+        }
+      } catch (err) {
+        setError('Error fetching transactions');
+        console.error('Error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [onTransactionsChange]);
+
+  // Add loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+      </div>
+    );
+  }
+
+  // Add error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
       {/* Header Section with Totals */}
@@ -537,173 +628,65 @@ export function AddTransactionTable({
             ))}
 
             {/* Existing Transactions */}
-            {currentTransactions.map((transaction, index) => (
-              <TableRow key={index}>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Input
-                      type="date"
-                      value={inlineEditData?.date}
-                      onChange={(e) => setInlineEditData({
-                        ...inlineEditData!,
-                        date: e.target.value
-                      })}
-                    />
-                  ) : transaction.date}
-                </TableCell>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Input
-                      value={inlineEditData?.documentType}
-                      onChange={(e) => setInlineEditData({
-                        ...inlineEditData!,
-                        documentType: e.target.value
-                      })}
-                    />
-                  ) : transaction.documentType}
-                </TableCell>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Input
-                      value={inlineEditData?.description}
-                      onChange={(e) => setInlineEditData({
-                        ...inlineEditData!,
-                        description: e.target.value
-                      })}
-                    />
-                  ) : transaction.description}
-                </TableCell>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Select
-                      value={inlineEditData?.kodeAkun || transaction.kodeAkun}
-                      onValueChange={(value) => {
-                          const account = getAllAccounts().find(acc => acc.kodeAkun === value);
-                          if (account) {
-                              setInlineEditData({
-                                  ...inlineEditData!,
-                                  kodeAkun: value,
-                                  namaAkun: account.namaAkun
-                              });
-                          }
-                      }}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Pilih Kode Akun">
-                                {inlineEditData?.kodeAkun || transaction.kodeAkun}
-                            </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {getAllAccounts().map((account) => (
-                                <SelectItem 
-                                    key={account.kodeAkun} 
-                                    value={account.kodeAkun}
-                                    className="hover:bg-gray-100 cursor-pointer font-normal"
-                                >
-                                    {account.kodeAkun}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                  ) : transaction.kodeAkun}
-                </TableCell>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Select
-                      value={inlineEditData?.namaAkun || transaction.namaAkun}
-                      onValueChange={(value) => {
-                          const account = getAllAccounts().find(acc => acc.namaAkun === value);
-                          if (account) {
-                              setInlineEditData({
-                                  ...inlineEditData!,
-                                  namaAkun: value,
-                                  kodeAkun: account.kodeAkun
-                              });
-                          }
-                      }}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Pilih Nama Akun">
-                                {inlineEditData?.namaAkun || transaction.namaAkun}
-                            </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {getAllAccounts().map((account) => (
-                                <SelectItem 
-                                    key={account.kodeAkun} 
-                                    value={account.namaAkun}
-                                    className="hover:bg-gray-100 cursor-pointer font-normal"
-                                >
-                                    {account.namaAkun}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                  ) : transaction.namaAkun}
-                </TableCell>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Input
-                      type="number"
-                      value={inlineEditData?.debit}
-                      onChange={(e) => setInlineEditData({
-                        ...inlineEditData!,
-                        debit: parseFloat(e.target.value) || 0,
-                        kredit: 0 // Reset kredit saat debit diisi
-                      })}
-                      className="w-32 text-right"
-                      disabled={!isEffectivelyZero(inlineEditData?.kredit)}
-                    />
-                  ) : transaction.debit.toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  {inlineEditIndex === index ? (
-                    <Input
-                      type="number"
-                      value={inlineEditData?.kredit}
-                      onChange={(e) => setInlineEditData({
-                        ...inlineEditData!,
-                        kredit: parseFloat(e.target.value) || 0,
-                        debit: 0 // Reset debit saat kredit diisi
-                      })}
-                      className="w-32 text-right"
-                      disabled={!isEffectivelyZero(inlineEditData?.debit)}
-                    />
-                  ) : transaction.kredit.toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    {inlineEditIndex === index ? (
+            {currentTransactions.map((transaction, index) => {
+              const displayTransaction = groupTransactionsByEvent(currentTransactions)[index];
+              return (
+                <TableRow key={index}>
+                  <TableCell>
+                    {displayTransaction.date || ''}
+                  </TableCell>
+                  <TableCell>
+                    {displayTransaction.documentType || ''}
+                  </TableCell>
+                  <TableCell>
+                    {displayTransaction.description || ''}
+                  </TableCell>
+                  <TableCell>
+                    {displayTransaction.kodeAkun || ''}
+                  </TableCell>
+                  <TableCell>
+                    {displayTransaction.namaAkun || ''}
+                  </TableCell>
+                  <TableCell>
+                    {displayTransaction.debit.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {displayTransaction.kredit.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      {inlineEditIndex === index ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleInlineSave(index)}
+                          className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                        >
+                          <Check className="h-4 w-4 text-primary" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleInlineEdit(index)}
+                          className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
+                        >
+                          <Pencil className="h-4 w-4 text-primary" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleInlineSave(index)}
+                        onClick={() => handleDelete(index, false)}
                         className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
                       >
-                        <Check className="h-4 w-4 text-primary" />
+                        <X className="h-4 w-4 text-destructive" />
                       </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleInlineEdit(index)}
-                        className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
-                      >
-                        <Pencil className="h-4 w-4 text-primary" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(index, false)}
-                      className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
-                    >
-                      <X className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -783,16 +766,7 @@ export function AddTransactionTable({
           <AddTransactionForm
             accounts={accounts}
             onSave={(formTransactions) => {
-              // Validasi total debit dan kredit
-              const totalDebit = formTransactions.reduce((sum, t) => sum + (t.debit || 0), 0);
-              const totalKredit = formTransactions.reduce((sum, t) => sum + (t.kredit || 0), 0);
-
-              if (totalDebit !== totalKredit) {
-                alert("Total debit dan kredit harus sama sebelum ditambahkan ke jurnal umum");
-                return;
-              }
-
-              // Jika valid, tambahkan ke jurnal umum
+              // Langsung tambahkan transaksi tanpa validasi
               onTransactionsChange([...transactions, ...formTransactions]);
               setIsFormModalOpen(false);
             }}
