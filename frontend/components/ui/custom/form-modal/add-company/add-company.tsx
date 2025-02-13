@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +21,7 @@ interface FormModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: (data: { name: string; category: string; alamat: string; tahunBerdiri: number }) => void;
+  krsId: string; // Tambahkan prop untuk krs_id
 }
 
 export const FormModal = ({
@@ -27,26 +29,86 @@ export const FormModal = ({
   isOpen,
   onOpenChange,
   onSave,
+  krsId // Terima krsId dari parent component
 }: FormModalProps) => {
   const [companyName, setCompanyName] = useState("");
-  const [category, setCategory] = useState("");
-  const [alamat, setAlamat] = useState(""); // Tambahkan state untuk alamat
-  const [tahunBerdiri, setTahunBerdiri] = useState<number | string>(""); // Tambahkan state untuk tahun berdiri
+  const [category, setCategory] = useState("");  // Kategori harus berupa string ID kategori
+  const [alamat, setAlamat] = useState("");
+  const [tahunBerdiri, setTahunBerdiri] = useState<number | string>("");
+  const [categories, setCategories] = useState<{ id: number; nama: string }[]>([]);
 
-  const handleSubmit = () => {
-    if (companyName && category && alamat && tahunBerdiri && onSave) {
-      onSave({
-        name: companyName,
-        category: category,
-        alamat: alamat,
-        tahunBerdiri: typeof tahunBerdiri === "string" ? parseInt(tahunBerdiri) : tahunBerdiri,
-      });
+  // Fetch categories ketika modal dibuka
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/api/instruktur/kategori');
+        setCategories(response.data.data); // Pastikan Anda mengakses `data` dari response
+      } catch (error) {
+        console.error('Gagal mengambil kategori:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchCategories();
     }
-    setCompanyName(""); // Reset company name
-    setCategory(""); // Reset category
-    setAlamat(""); // Reset alamat
-    setTahunBerdiri(""); // Reset tahun berdiri
-    onOpenChange(false); // Close the modal after saving
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!companyName || !category || !alamat || !tahunBerdiri) return;
+  
+    try {
+      // Mengambil token dari localStorage
+      const token = localStorage.getItem("auth_token"); // Pastikan token ada
+  
+      // Cek apakah token ada
+      if (!token) {
+        console.error("User not authenticated");
+        return;
+      }
+  
+      const payload = {
+        nama: companyName,
+        alamat: alamat,
+        tahun_berdiri: Number(tahunBerdiri),
+        kategori_id: category, // Kirimkan ID kategori yang dipilih
+        krs_id: krsId, // Kirimkan krsId
+        status: "active" // Status default
+      };
+  
+      // Mengirim data ke backend Laravel dengan menambahkan header Authorization
+      const response = await axios.post(
+        'http://localhost:8000/api/mahasiswa/perusahaan', // Pastikan URL backend Laravel benar
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`, // Menambahkan token ke header Authorization
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+  
+      if (response.data.success) {
+        // Reset form
+        setCompanyName("");
+        setCategory("");
+        setAlamat("");
+        setTahunBerdiri("");
+        onOpenChange(false); // Menutup modal setelah berhasil menambahkan perusahaan
+        
+        // Panggil callback onSave jika ada
+        if (onSave) {
+          onSave({
+            name: companyName,
+            category: category,
+            alamat: alamat,
+            tahunBerdiri: Number(tahunBerdiri),
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Gagal menyimpan perusahaan:', error);
+      // Tambahkan notifikasi error jika perlu
+    }
   };
 
   return (
@@ -71,14 +133,19 @@ export const FormModal = ({
 
           <div className="space-y-2">
             <label className="text-primary text-lg">Kategori Perusahaan</label>
-            <Select onValueChange={(value) => setCategory(value)}>
+            <Select onValueChange={(value) => setCategory(value)} value={category}>
               <SelectTrigger className="rounded-xl h-12 text-gray-500 text-base">
                 <SelectValue placeholder="Pilih Kategori" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Jasa">Jasa</SelectItem>
-                <SelectItem value="Manufaktur">Manufaktur</SelectItem>
-                <SelectItem value="Dagang">Dagang</SelectItem>
+                {categories.map((kategori) => (
+                  <SelectItem 
+                    key={kategori.id} 
+                    value={kategori.id.toString()} // Pastikan nilai kategori berupa ID
+                  >
+                    {kategori.nama}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
