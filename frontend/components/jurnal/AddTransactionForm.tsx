@@ -68,6 +68,11 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
     const [debit, setDebit] = useState<string>("");
     const [kredit, setKredit] = useState<string>("");
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [currentEvent, setCurrentEvent] = useState<{
+        date: string;
+        documentType: string;
+        description: string;
+    } | null>(null);
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
@@ -82,6 +87,7 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
         setDebit("");
         setKredit("");
         setEditingIndex(null);
+        setCurrentEvent(null);
     };
 
     const clearAllData = () => {
@@ -110,10 +116,35 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
         // Validasi data minimal yang diperlukan
         if (!date || !namaAkun || !kodeAkun || (!debit && !kredit)) return;
 
+        // Jika belum ada kejadian saat ini, buat baru
+        if (!currentEvent) {
+            setCurrentEvent({
+                date,
+                documentType,
+                description
+            });
+        }
+
         const newTransaction: Transaction = {
-            date,
-            documentType,
-            description,
+            // Gunakan data dari currentEvent jika ada dan tanggal/bukti/keterangan sama
+            date: (currentEvent && 
+                   currentEvent.date === date && 
+                   currentEvent.documentType === documentType && 
+                   currentEvent.description === description) 
+              ? "" // Kosongkan jika sama dengan kejadian saat ini
+              : date,
+            documentType: (currentEvent && 
+                          currentEvent.date === date && 
+                          currentEvent.documentType === documentType && 
+                          currentEvent.description === description)
+              ? ""
+              : documentType,
+            description: (currentEvent && 
+                         currentEvent.date === date && 
+                         currentEvent.documentType === documentType && 
+                         currentEvent.description === description)
+              ? ""
+              : description,
             namaAkun,
             kodeAkun,
             debit: parseFloat(debit) || 0,
@@ -128,8 +159,12 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
             setTransactions([...transactions, newTransaction]);
         }
 
-        // Reset form setelah menambah transaksi
-        resetForm();
+        // Reset hanya field akun dan nominal, pertahankan data kejadian
+        setNamaAkun("");
+        setKodeAkun("");
+        setDebit("");
+        setKredit("");
+        setEditingIndex(null);
     };
 
     const handleEdit = (index: number) => {
@@ -275,8 +310,16 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
                             <Input
                                 id="date"
                                 type="date"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
+                                value={currentEvent?.date || date}
+                                onChange={(e) => {
+                                    setDate(e.target.value);
+                                    if (currentEvent) {
+                                        setCurrentEvent({
+                                            ...currentEvent,
+                                            date: e.target.value
+                                        });
+                                    }
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -285,8 +328,16 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
                             <Label htmlFor="documentType">Jenis Bukti</Label>
                             <Input
                                 id="documentType"
-                                value={documentType}
-                                onChange={(e) => setDocumentType(e.target.value)}
+                                value={currentEvent?.documentType || documentType}
+                                onChange={(e) => {
+                                    setDocumentType(e.target.value);
+                                    if (currentEvent) {
+                                        setCurrentEvent({
+                                            ...currentEvent,
+                                            documentType: e.target.value
+                                        });
+                                    }
+                                }}
                                 placeholder="Masukkan jenis bukti"
                             />
                         </div>
@@ -295,8 +346,16 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
                             <Label htmlFor="description">Keterangan</Label>
                             <Input
                                 id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
+                                value={currentEvent?.description || description}
+                                onChange={(e) => {
+                                    setDescription(e.target.value);
+                                    if (currentEvent) {
+                                        setCurrentEvent({
+                                            ...currentEvent,
+                                            description: e.target.value
+                                        });
+                                    }
+                                }}
                                 placeholder="Masukkan keterangan"
                             />
                         </div>
@@ -415,9 +474,15 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
                             <TableBody>
                                 {transactions.map((transaction, index) => (
                                     <TableRow key={index}>
-                                        <TableCell>{transaction.date}</TableCell>
-                                        <TableCell>{transaction.documentType}</TableCell>
-                                        <TableCell>{transaction.description}</TableCell>
+                                        <TableCell>
+                                            {transaction.date || (index > 0 ? "" : currentEvent?.date)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {transaction.documentType || (index > 0 ? "" : currentEvent?.documentType)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {transaction.description || (index > 0 ? "" : currentEvent?.description)}
+                                        </TableCell>
                                         <TableCell>{transaction.namaAkun}</TableCell>
                                         <TableCell>{transaction.kodeAkun}</TableCell>
                                         <TableCell className="text-right">

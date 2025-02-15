@@ -22,19 +22,29 @@ export function LoginForm({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true); // Set status submitting ke true
+    setIsSubmitting(true);
 
     try {
-      const response = await axios.post("/mahasiswa/login", { nim, password }); // Kirim data login ke backend
-      console.log(response.data); // Cek respons sukses
-      localStorage.setItem("auth_token", response.data.token); // **Simpan token ke localStorage**
+      const response = await axios.post("/mahasiswa/login", { nim, password });
+      console.log('Login Response:', response.data); // Debug response
 
-      // Jika login berhasil, redirect ke halaman setelah login berhasil
-      window.location.href = "/perusahaan"; // Ganti URL tujuan setelah login berhasil
-    } catch (error) {
-      setError("Invalid credentials"); // Menangani error jika login gagal
+      // Periksa struktur response dengan lebih detail
+      if (response.data.success && response.data.data && response.data.data.token) {
+        const token = response.data.data.token;
+        localStorage.setItem('token', token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        console.log('Token saved:', token); // Debug token
+        window.location.href = "/perusahaan";
+      } else {
+        setError("Invalid response format");
+        console.error('Invalid response format:', response.data);
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.response?.data?.message || "Invalid credentials");
     } finally {
-      setIsSubmitting(false); // Set status submitting ke false setelah selesai
+      setIsSubmitting(false);
     }
   };
 
