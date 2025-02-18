@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,44 +20,72 @@ export function LoginForm({
   const [error, setError] = useState(""); // Menangani error jika login gagal
   const [passwordVisible, setPasswordVisible] = useState(false); // Menyimpan status visibility password
 
+  // LoginForm.tsx
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
+  
     try {
       const response = await axios.post("/mahasiswa/login", { nim, password });
-      console.log('Login Response:', response.data); // Debug response
-
-      // Periksa struktur response dengan lebih detail
-      if (response.data.success && response.data.data && response.data.data.token) {
-        const token = response.data.data.token;
+      
+      if (response.data?.success) {
+        const { token, user_id, fullName, nim } = response.data.data; // Pastikan backend mengirim data ini
+        
+        // Simpan data profil sementara
+        const tempProfile = {
+          fullName,
+          nim,
+          // Data lain bisa dikosongkan atau diisi default
+          gender: "",
+          birthPlace: "",
+          birthDate: "",
+          email: "",
+          address: "",
+          phone: ""
+        };
+        
         localStorage.setItem('token', token);
+        localStorage.setItem('profileData', JSON.stringify(tempProfile)); // Simpan data sementara
+        
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
-        console.log('Token saved:', token); // Debug token
+        // Ambil data lengkap (jika diperlukan)
+        await fetchProfileData(user_id);
+        
         window.location.href = "/perusahaan";
-      } else {
-        setError("Invalid response format");
-        console.error('Invalid response format:', response.data);
       }
-    } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.response?.data?.message || "Invalid credentials");
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      // ... handle error
+      console.error("Login error:", error);
     }
   };
 
-  // Fungsi untuk toggle password visibility
+
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible); // Membalikkan status passwordVisible
+  };
+
+  const fetchProfileData = async (user_id: string) => {
+    try {
+      const response = await axios.get(`/mahasiswa/profile`);
+      if (response.data && response.data.success && response.data.data) {
+        const profileData = response.data.data;
+        localStorage.setItem("profileData", JSON.stringify(profileData)); // Simpan data profil di localStorage
+      } else {
+        console.error("Profile data not found.");
+      }
+    } catch (error) {
+      console.error("Error fetching profile data:", error);
+    }
   };
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl text-center">Login to your account</CardTitle>
+          <CardTitle className="text-2xl text-center">
+            Login to your account
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>
@@ -127,7 +155,10 @@ export function LoginForm({
           {error && <div className="text-red-500 text-center">{error}</div>}
 
           <Link href="/register">
-            <Button variant="outline" className="w-full mt-4 rounded-xl border-destructive text-destructive">
+            <Button
+              variant="outline"
+              className="w-full mt-4 rounded-xl border-destructive text-destructive"
+            >
               Sign Up
             </Button>
           </Link>

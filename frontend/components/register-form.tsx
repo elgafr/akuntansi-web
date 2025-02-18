@@ -32,16 +32,32 @@ export function RegisterForm({
         nim,
         password,
       });
-      console.log(response.data);
-      // Redirect ke halaman OTP setelah berhasil
-      window.location.href = "/otp";
-    } catch (error) {
-      console.error("Error registering:", error);
+
+      if (response.data.success) {
+        // Simpan data sementara
+        const tempProfile = {
+          fullName: name,
+          nim: nim,
+          email: email,
+          gender: "-",
+          birthPlace: "-",
+          birthDate: "-",
+          address: "-",
+          phone: "-",
+        };
+        
+        localStorage.setItem('tempProfileData', JSON.stringify(tempProfile));
+        
+        // Redirect dengan membawa parameter email
+        window.location.href = `/otp?email=${encodeURIComponent(email)}`;
+      }
+    } catch (error: any) {
+      // ... error handling tetap sama
+      console.error("Register error:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
-
   // Fungsi untuk toggle visibility password
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
