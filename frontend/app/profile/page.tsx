@@ -152,6 +152,7 @@ export default function Page() {
         </div>
 
         <Krs />
+        
 
         <EditProfile
           isEditModalOpen={isEditModalOpen}
