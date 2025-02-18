@@ -19,172 +19,192 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export default function Krs() {
-  const [selectedClasses, setSelectedClasses] = useState<any>({});
-  const [classCategories, setClassCategories] = useState<any>([]);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<any>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
-  const [action, setAction] = useState<string>("");
-  const [selectedClassId, setSelectedClassId] = useState<string>("");
-  const [selectedCategory, setSelectedCategory] = useState<string>(""); // Untuk menyimpan kategori kelas yang dipilih
+interface KrsItem {
+  id: string;
+  kelas_id: string;
+  nama: string;
+  kategori: string;
+  angkatan: string;
+}
 
+interface ClassItem {
+  id: string;
+  nama: string;
+  kategori: string;
+  angkatan: string;
+}
+
+export default function Krs() {
+  const [selectedClasses, setSelectedClasses] = useState<KrsItem[]>([]);
+  const [classCategories, setClassCategories] = useState<
+    Record<string, ClassItem[]>
+  >({});
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string>("");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [action, setAction] = useState<"add" | "delete">("add");
+  const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
+
+  // Fetch initial data dari backend
   useEffect(() => {
-    const fetchUserId = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
-        if (response.data.success && response.data.data.length > 0) {
-          setUserId(response.data.data[0].user_id);
+        const [profileRes, classesRes, krsRes] = await Promise.all([
+          axios.get("/mahasiswa/profile"),
+          axios.get("/instruktur/kelas"),
+          axios.get("/mahasiswa/krs"),
+        ]);
+
+        // Set user ID
+        if (profileRes.data.success) {
+          setUserId(profileRes.data.data[0]?.user_id || "");
+        }
+
+        // Set class categories
+        if (classesRes.data.success) {
+          const categories = classesRes.data.data.reduce(
+            (acc: Record<string, ClassItem[]>, item: ClassItem) => {
+              if (!acc[item.kategori]) acc[item.kategori] = [];
+              acc[item.kategori].push(item);
+              return acc;
+            },
+            {}
+          );
+          setClassCategories(categories);
+        }
+
+        // Set selected classes dari backend
+        if (krsRes.data.success) {
+          setSelectedClasses(krsRes.data.data);
         }
       } catch (error) {
-        console.error("Error fetching user ID:", error);
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchUserId();
+    fetchData();
   }, []);
 
-  const handleClassSelection = async (
-    category: string,
-    className: string,
-    kelasId: string
-  ): Promise<void> => {
-    setSelectedClasses((prevState) => ({
-      ...prevState,
-      [category]: { nama: className, id: kelasId },
-    }));
-    setSelectedClassId(kelasId);
-    setSelectedCategory(category); // Simpan kategori yang dipilih
+  const handleClassSelection = (classItem: ClassItem) => {
+    // Cek apakah kelas sudah dipilih
+    if (selectedClasses.some((item) => item.kelas_id === classItem.id)) {
+      alert("Kelas ini sudah dipilih.");
+      return;
+    }
+
+    setSelectedClass(classItem);
     setAction("add");
     setShowConfirmDialog(true);
   };
 
-  const handleDeleteClass = (category: string) => {
-    setSelectedClassId(selectedClasses[category].id); // Set ID kelas yang akan dihapus
-    setSelectedCategory(category); // Simpan kategori yang dipilih
+  const handleDeleteClass = (krsId: string) => {
+    setSelectedClass(selectedClasses.find((c) => c.id === krsId) || null);
     setAction("delete");
     setShowConfirmDialog(true);
   };
 
-  const getTokenFromLocalStorage = () => {
-    return localStorage.getItem("token");
-  };
-
   const handleConfirmAction = async () => {
-    if (!userId || !selectedClassId) {
-      alert("Missing required data: user_id or kelas_id");
-      return;
-    }
+    const token = localStorage.getItem("token");
+    if (!token || !userId) return;
 
     try {
-      const token = getTokenFromLocalStorage();
-      if (!token) {
-        alert("Token not found. Please log in again.");
-        return;
-      }
-
-      if (action === "add") {
+      if (action === "add" && selectedClass) {
+        // POST request ke backend
         const response = await axios.post(
           "/mahasiswa/krs",
           {
             user_id: userId,
-            kelas_id: selectedClassId,
+            kelas_id: selectedClass.id,
           },
           {
             headers: {
               Authorization: `Bearer ${token}`,
-              Accept: "application/json",
+              "Content-Type": "application/json",
             },
           }
         );
 
         if (response.data.success) {
-          alert("KRS successfully added.");
-        } else {
-          alert("Failed to add KRS.");
+          // Update state dengan data dari response backend
+          setSelectedClasses((prev) => [
+            ...prev,
+            {
+              id: response.data.data.id,
+              kelas_id: selectedClass.id,
+              nama: selectedClass.nama,
+              kategori: selectedClass.kategori,
+              angkatan: selectedClass.angkatan,
+            },
+          ]);
         }
-      } else if (action === "delete") {
-        const response = await axios.delete(`/mahasiswa/krs/${selectedClassId}`, {
+      } else if (action === "delete" && selectedClass) {
+        // DELETE request ke backend
+        await axios.delete(`/mahasiswa/krs/${selectedClass.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (response.data.success) {
-          const updatedClasses = { ...selectedClasses };
-          delete updatedClasses[selectedCategory]; // Hapus kelas dari state
-          setSelectedClasses(updatedClasses);
-          alert("KRS successfully deleted.");
-        } else {
-          alert("Failed to delete KRS.");
-        }
+        // Update state dengan menghapus data
+        setSelectedClasses((prev) =>
+          prev.filter((item) => item.id !== selectedClass.id)
+        );
       }
     } catch (error) {
-      console.error("Error in handling action:", error);
-      alert("An error occurred while processing your request.");
+      console.error("Error processing request:", error);
+      alert(
+        `Gagal ${action === "add" ? "menambah" : "menghapus"} kelas: ${
+          error.response?.data?.message || "Terjadi kesalahan"
+        }`
+      );
     } finally {
       setShowConfirmDialog(false);
+      setSelectedClass(null);
     }
   };
 
-  const handleCancelAction = () => {
-    setShowConfirmDialog(false);
-  };
-
-  useEffect(() => {
-    const fetchClassData = async () => {
-      try {
-        const response = await axios.get("/instruktur/kelas");
-        if (response.data.success) {
-          const categories = response.data.data.reduce((acc: any, classItem: any) => {
-            const { kategori, nama, angkatan, id } = classItem;
-            if (!acc[kategori]) {
-              acc[kategori] = [];
-            }
-            acc[kategori].push({ id, nama, angkatan });
-            return acc;
-          }, {});
-          setClassCategories(categories);
-        }
-      } catch (error) {
-        console.error("Error fetching class data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchClassData();
-  }, []);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <div>Memuat data...</div>;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mt-6 px-10">
-        <div className="text-xl font-medium text-gray-700">Pilih Kelas</div>
-        <div className="text-xl font-medium text-gray-700 mr-[400px]">
-          Kelas yang Dipilih
-        </div>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Pilih Kelas</h1>
+        <h2 className="text-2xl font-bold">KRS Anda</h2>
       </div>
 
       <div className="flex gap-6">
-        <Card className="w-1/2 mt-4 ml-10">
-          <CardContent className="p-6">
-            <Accordion type="single" collapsible className="w-full">
+        {/* Daftar Kelas */}
+        <Card className="w-1/2">
+          <CardContent className="p-4">
+            <Accordion type="single" collapsible>
               {Object.entries(classCategories).map(([category, classes]) => (
-                <AccordionItem key={category} value={`item-${category}`}>
-                  <AccordionTrigger>{category}</AccordionTrigger>
-                  {classes.map((classItem: any) => (
+                <AccordionItem key={category} value={category}>
+                  <AccordionTrigger className="font-semibold">
+                    {category}
+                  </AccordionTrigger>
+                  {classes.map((classItem) => (
                     <AccordionContent
                       key={classItem.id}
-                      className="cursor-pointer hover:bg-gray-200 p-2 rounded-md"
-                      onClick={() =>
-                        handleClassSelection(category, classItem.nama, classItem.id)
-                      }
+                      className="p-2 hover:bg-gray-100 rounded-md cursor-pointer"
+                      onClick={() => handleClassSelection(classItem)}
                     >
-                      {classItem.nama}
-                      <p className="text-gray-500 text-sm">Angkatan {classItem.angkatan}</p>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{classItem.nama}</p>
+                          <p className="text-sm text-gray-500">
+                            Angkatan {classItem.angkatan}
+                          </p>
+                        </div>
+                        {selectedClasses.some(
+                          (c) => c.kelas_id === classItem.id
+                        ) && (
+                          <span className="text-green-500 text-sm">
+                            ✓ Terpilih
+                          </span>
+                        )}
+                      </div>
                     </AccordionContent>
                   ))}
                 </AccordionItem>
@@ -193,46 +213,69 @@ export default function Krs() {
           </CardContent>
         </Card>
 
-        <Card className="w-1/2 mt-4 mr-10">
-          <CardContent className="p-6 space-y-4">
-            {Object.entries(selectedClasses).map(([category, classItem]) => (
-              <Card key={category} className="bg-purple-50 border-purple-200">
-                <CardContent className="p-3">
-                  <p className="text-lg font-medium">{category}</p>
-                  <p className="text-gray-600">{classItem.nama}</p>
-                  <Button
-                    className="mt-2"
-                    variant="destructive"
-                    onClick={() => handleDeleteClass(category)}
-                  >
-                    Hapus Kelas
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+        {/* KRS Terpilih - Diperbaiki tampilannya */}
+        <Card className="w-1/2">
+          <CardContent className="p-4 space-y-4">
+            {selectedClasses.length > 0 ? (
+              selectedClasses.map((krsItem) => {
+                // Mencari data class berdasarkan kelas_id
+                const classItem = Object.values(classCategories)
+                  .flat()
+                  .find((item) => item.id === krsItem.kelas_id);
 
-            {Object.keys(selectedClasses).length === 0 && (
-              <p className="text-gray-500 text-center py-4">Belum ada kelas yang dipilih</p>
+                return classItem ? (
+                  <Card key={krsItem.id} className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-lg">
+                            {classItem.nama}
+                          </h3>
+                          <p className="text-gray-500 text-sm">
+                            Angkatan: {classItem.angkatan}
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClass(krsItem.id)}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null;
+              })
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                Belum ada kelas yang dipilih
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Konfirmasi Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {action === "add" ? "Apakah Anda yakin ingin menambah kelas ini?" : "Apakah Anda yakin ingin menghapus kelas ini?"}
+              {action === "add"
+                ? "Tambah Kelas ke KRS?"
+                : "Hapus Kelas dari KRS?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {action === "add"
-                ? "Klik Ya untuk menambah kelas ini ke KRS Anda."
-                : "Klik Ya untuk menghapus kelas ini dari KRS Anda."}
+                ? "Anda akan menambahkan kelas ini ke Kartu Rencana Studi"
+                : "Anda akan menghapus kelas ini dari Kartu Rencana Studi"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelAction}>Tidak</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmAction}>Ya</AlertDialogAction>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAction}>
+              {action === "add" ? "Tambahkan" : "Hapus"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
