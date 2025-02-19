@@ -1,34 +1,125 @@
 "use client";
-import { TransactionCard } from "@/components/jurnal/TransactionCard";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { AddTransactionTable } from "@/components/jurnal/AddTransactionTable";
-import { useTransactions } from "@/contexts/TransactionContext";
-import { useEffect, useState } from "react";
+import axios from "@/lib/axios";
+import { Button } from "@/components/ui/button";
+
+interface Transaction {
+  id: string;
+  date: string;
+  documentType: string;
+  description: string;
+  namaAkun: string;
+  kodeAkun: string;
+  akun_id: string;
+  debit: number;
+  kredit: number;
+  perusahaan_id: string;
+}
+
+interface Akun {
+  id: string;
+  kode: number;
+  nama: string;
+  status: string;
+}
+
+interface JurnalResponse {
+  [key: string]: JurnalEntry[];
+}
+
+interface JurnalEntry {
+  id: string;
+  tanggal: string;
+  bukti: string;
+  keterangan: string;
+  akun_id: string;
+  debit: number | null;
+  kredit: number | null;
+  perusahaan_id: string;
+  akun: {
+    id: string;
+    kode: number;
+    nama: string;
+    status: string;
+  };
+}
 
 export default function JurnalPage() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const { transactions, setTransactions } = useTransactions();
-  const [totals, setTotals] = useState({
-    totalDebit: 0,
-    totalKredit: 0,
-    unbalanced: 0
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState({ fullName: "Guest" });
 
   useEffect(() => {
-    // Calculate totals whenever transactions change
-    const newTotalDebit = transactions.reduce((sum, t) => sum + (Number(t.debit) || 0), 0);
-    const newTotalKredit = transactions.reduce((sum, t) => sum + (Number(t.kredit) || 0), 0);
-    const newUnbalanced = newTotalDebit - newTotalKredit;
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await axios.get('/mahasiswa/jurnal');
+        if (response.data.success) {
+          const jurnalData: JurnalResponse = response.data.data;
+          const formattedTransactions: Transaction[] = [];
 
-    setTotals({
-      totalDebit: newTotalDebit,
-      totalKredit: newTotalKredit,
-      unbalanced: newUnbalanced
-    });
-  }, [transactions]); // Re-run when transactions change
+          Object.entries(jurnalData).forEach(([keterangan, entries]) => {
+            entries.forEach(entry => {
+              formattedTransactions.push({
+                id: entry.id,
+                date: entry.tanggal,
+                documentType: entry.bukti,
+                description: entry.keterangan,
+                namaAkun: entry.akun.nama,
+                kodeAkun: entry.akun.kode.toString(),
+                akun_id: entry.akun_id,
+                debit: entry.debit || 0,
+                kredit: entry.kredit || 0,
+                perusahaan_id: entry.perusahaan_id
+              });
+            });
+          });
+
+          setTransactions(formattedTransactions);
+        }
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        setError('Gagal memuat data. Silakan periksa koneksi Anda.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Load profile data
+  useEffect(() => {
+    const storedProfile = localStorage.getItem("profileData");
+    if (storedProfile) {
+      setProfileData(JSON.parse(storedProfile));
+    }
+  }, []);
+
+  const handleTransactionsChange = (newTransactions: Transaction[]) => {
+    setTransactions(newTransactions);
+  };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+        <div className="text-red-500">{error}</div>
+        <Button 
+          onClick={() => window.location.reload()}
+          variant="outline"
+          size="sm"
+        >
+          Coba Lagi
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -41,10 +132,10 @@ export default function JurnalPage() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6 text-black">
-                    Dashboard
+                    Jurnal Umum
                   </h1>
                   <h2 className="text-sm ml-6">
-                    Let&apos;s check your Dashboard today
+                    Let&apos;s check your Journal today
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -58,7 +149,7 @@ export default function JurnalPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">{profileData.fullName}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -66,32 +157,11 @@ export default function JurnalPage() {
           </div>
         </header>
 
-        <section className="p-6 space-y-6">
-          {/* Transaction Cards
-          <div className="grid grid-cols-3 gap-4">
-            <TransactionCard
-              title="Total Debit"
-              value={totals.totalDebit}
-              type="debit"
-            />
-            <TransactionCard
-              title="Total Kredit"
-              value={totals.totalKredit}
-              type="credit"
-            />
-            <TransactionCard
-              title="Selisih"
-              value={Math.abs(totals.unbalanced)}
-              type="unbalanced"
-              isBalanced={totals.unbalanced === 0}
-            />
-          </div> */}
-
-          {/* Add Transaction Table */}
-          <AddTransactionTable 
-            accounts={accounts}
+        <section className="p-6">
+          <AddTransactionTable
+            accounts={[]}
             transactions={transactions}
-            onTransactionsChange={setTransactions}
+            onTransactionsChange={handleTransactionsChange}
           />
         </section>
       </SidebarInset>
