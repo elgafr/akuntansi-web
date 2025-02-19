@@ -9,7 +9,8 @@ import {
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSearchParams } from "next/navigation";
+// import { useSearchParams } from "next/navigation";
+import axios from "@/lib/axios";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { FaArrowLeft } from "react-icons/fa";
@@ -30,13 +31,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 interface Company {
-  name: string;
-  category: string;
+  nama: string;
+  kategori_id: string;
   alamat: string;
-  tahunBerdiri: number;
+  tahun_berdiri: number;
 }
 
 interface Account {
@@ -47,14 +48,7 @@ interface Account {
   isEditing: boolean;
 }
 
-interface ProfileData {
-  fullName: string;
-  // tambahkan properti lain jika diperlukan
-}
-
 export default function Page() {
-  const searchParams = useSearchParams();
-  const companyName = searchParams.get("name");
   const [company, setCompany] = useState<Company | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([
     {
@@ -79,62 +73,30 @@ export default function Page() {
       isEditing: false,
     },
   ]);
+  const { id } = useParams();
 
-  const [profileData, setProfileData] = useState<ProfileData>({
-    fullName: "Guest",
-  });
-
-  const router = useRouter();
-
+  // Fetch company data based on company ID
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
-  }, []);
+    if (id) {
+      const fetchCompanyData = async () => {
+        try {
+          const response = await axios.get(`/mahasiswa/perusahaan/${id}`);
+          if (response.data.success) {
+            setCompany(response.data.data);
+          }
+        } catch (error) {
+          console.error("Error fetching company data:", error);
+        }
 
-  useEffect(() => {
-    if (companyName) {
-      // Load detail perusahaan dari localStorage
-      const savedCompanies = localStorage.getItem("companies");
-      if (savedCompanies) {
-        const companies: Company[] = JSON.parse(savedCompanies);
-        const selectedCompany = companies.find((c) => c.name === companyName);
-        setCompany(selectedCompany || null);
-      }
+        // const accountResponse = await axios.get(`/mahasiswa/perusahaan/${id}/accounts`);
+        // if (accountResponse.data.success) {
+        //   setAccounts(accountResponse.data.data);
+        // }
+      };
 
-      // Load data akun spesifik perusahaan dari localStorage (jika ada)
-      const accountKey = `accounts_${companyName}`;
-      const savedAccounts = localStorage.getItem(accountKey);
-      if (savedAccounts) {
-        setAccounts(JSON.parse(savedAccounts));
-      }
+      fetchCompanyData();
     }
-  }, [companyName]);
-
-  useEffect(() => {
-    // Ambil data perusahaan dari localStorage
-    const storedPerusahaan = localStorage.getItem('perusahaan');
-    if (!storedPerusahaan) {
-      alert('Perusahaan tidak ditemukan');
-      router.push('/perusahaan');
-      return;
-    }
-
-    try {
-      const perusahaanData = JSON.parse(storedPerusahaan);
-      setCompany({
-        name: perusahaanData.nama,
-        category: perusahaanData.kategori.nama,
-        alamat: perusahaanData.alamat,
-        tahunBerdiri: perusahaanData.tahun_berdiri
-      });
-    } catch (error) {
-      console.error('Error parsing perusahaan data:', error);
-      alert('Error loading perusahaan data');
-      router.push('/perusahaan');
-    }
-  }, [router]);
+  }, [id]);
 
   if (!company) {
     return (
@@ -160,8 +122,8 @@ export default function Page() {
     setAccounts(updatedAccounts);
 
     // Simpan data akun ke localStorage dengan key spesifik perusahaan
-    if (companyName) {
-      const accountKey = `accounts_${companyName}`;
+    if (company) {
+      const accountKey = `accounts_${company.nama}`;
       localStorage.setItem(accountKey, JSON.stringify(updatedAccounts));
     }
   };
@@ -189,24 +151,17 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-10">Perusahaan</h1>
-                  <h2 className="text-sm ml-10">
-                    Let&apos;s check your Company today
-                  </h2>
+                  <h2 className="text-sm ml-10">Let&apos;s check your Company today</h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                  />
+                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">
-                    {profileData.fullName}
-                  </div>
+                  <div className="text-sm font-medium">Guest</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -226,27 +181,17 @@ export default function Page() {
         <div className="mt-10 ml-14 flex gap-x-6">
           <Card className="w-[700px]">
             <CardHeader>
-              <CardTitle className="text-5xl text-primary py-2 mb-4">
-                {company.name}
-              </CardTitle>
-              <CardTitle className="text-3xl text-primary">
-                {company.category}
-              </CardTitle>
-              <CardDescription className="text-lg">
-                Kelola Kredit dan debit akun perusahaan
-              </CardDescription>
+              <CardTitle className="text-5xl text-primary py-2 mb-4">{company.nama}</CardTitle>
+              <CardTitle className="text-3xl text-primary">{company.kategori_id}</CardTitle>
+              <CardDescription className="text-lg">Kelola Kredit dan debit akun perusahaan</CardDescription>
             </CardHeader>
 
             <CardContent>
               <Table className="w-full border border-gray-300 rounded-xl overflow-hidden">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
-                    <TableHead className="text-center py-2">
-                      Nama Akun
-                    </TableHead>
-                    <TableHead className="text-center py-2">
-                      Kode Akun
-                    </TableHead>
+                    <TableHead className="text-center py-2">Nama Akun</TableHead>
+                    <TableHead className="text-center py-2">Kode Akun</TableHead>
                     <TableHead className="text-center py-2">Debit</TableHead>
                     <TableHead className="text-center py-2">Kredit</TableHead>
                     <TableHead className="text-center py-2">Aksi</TableHead>
@@ -255,21 +200,15 @@ export default function Page() {
                 <TableBody>
                   {accounts.map((account, index) => (
                     <TableRow key={index}>
-                      <TableCell className="text-center py-2">
-                        {account.name}
-                      </TableCell>
-                      <TableCell className="text-center py-2">
-                        {account.kodeAkun}
-                      </TableCell>
+                      <TableCell className="text-center py-2">{account.name}</TableCell>
+                      <TableCell className="text-center py-2">{account.kodeAkun}</TableCell>
                       <TableCell className="text-center py-2">
                         {account.isEditing ? (
                           <Input
                             type="number"
                             value={account.debit || ""}
-                            onChange={(e) =>
-                              handleDebitChange(index, e.target.value)
-                            }
-                            disabled={account.kredit > 0} // Disable jika kredit sudah diisi
+                            onChange={(e) => handleDebitChange(index, e.target.value)}
+                            disabled={account.kredit > 0}
                           />
                         ) : (
                           `Rp.${account.debit.toLocaleString()}`
@@ -280,21 +219,15 @@ export default function Page() {
                           <Input
                             type="number"
                             value={account.kredit || ""}
-                            onChange={(e) =>
-                              handleKreditChange(index, e.target.value)
-                            }
-                            disabled={account.debit > 0} // Disable jika debit sudah diisi
+                            onChange={(e) => handleKreditChange(index, e.target.value)}
+                            disabled={account.debit > 0}
                           />
                         ) : (
                           `Rp.${account.kredit.toLocaleString()}`
                         )}
                       </TableCell>
                       <TableCell className="text-center py-2">
-                        <Button
-                          variant="outline"
-                          className="text-xs w-full"
-                          onClick={() => handleEditAccount(index)}
-                        >
+                        <Button variant="outline" className="text-xs w-full" onClick={() => handleEditAccount(index)}>
                           <FaEdit />
                         </Button>
                       </TableCell>
@@ -303,10 +236,7 @@ export default function Page() {
                 </TableBody>
               </Table>
               <div className="flex justify-end mt-24">
-                <Button
-                  className="rounded-xl w-32 h-10 flex items-center"
-                  onClick={handleSaveAccount}
-                >
+                <Button className="rounded-xl w-32 h-10 flex items-center" onClick={handleSaveAccount}>
                   Simpan
                 </Button>
               </div>
@@ -315,34 +245,26 @@ export default function Page() {
 
           <Card className="w-[400px]">
             <CardHeader>
-              <CardTitle className="text-primary text-3xl">
-                Detail Perusahaan
-              </CardTitle>
+              <CardTitle className="text-primary text-3xl">Detail Perusahaan</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-md w-full">
                 <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
-                  <p className="font-semibold whitespace-nowrap">
-                    Nama Perusahaan
-                  </p>
+                  <p className="font-semibold whitespace-nowrap">Nama Perusahaan</p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">{company.name}</p>
+                  <p className="text-left break-words">{company.nama}</p>
 
-                  <p className="font-semibold whitespace-nowrap">
-                    Kategori Perusahaan
-                  </p>
+                  <p className="font-semibold whitespace-nowrap">Kategori Perusahaan</p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">{company.category}</p>
+                  <p className="text-left break-words">{company.kategori_id}</p>
 
                   <p className="font-semibold whitespace-nowrap">Alamat</p>
                   <p className="text-right w-[20px]">:</p>
                   <p className="text-left break-words">{company.alamat}</p>
 
-                  <p className="font-semibold whitespace-nowrap">
-                    Tahun Berdiri
-                  </p>
+                  <p className="font-semibold whitespace-nowrap">Tahun Berdiri</p>
                   <p className="text-right w-[20px]">:</p>
-                  <p className="text-left">{company.tahunBerdiri}</p>
+                  <p className="text-left">{company.tahun_berdiri}</p>
                 </div>
               </div>
             </CardContent>

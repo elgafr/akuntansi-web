@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import axios from "@/lib/axios";
 import { Button } from "@/components/ui/button";
@@ -56,8 +58,16 @@ export const FormModal = ({
   }, [isOpen]);
 
   const handleSubmit = async () => {
-    if (!companyName || !category || !alamat || !tahunBerdiri) return;
-  
+    if (!companyName || !category || !alamat || !tahunBerdiri) {
+      alert("Harap isi semua field yang diperlukan!");
+      return;
+    }
+
+    if (!krsId) {
+      alert("KRS ID belum tersedia. Silakan refresh halaman dan coba lagi.");
+      return;
+    }
+
     try {
       const payload = {
         nama: companyName,
@@ -65,11 +75,10 @@ export const FormModal = ({
         tahun_berdiri: Number(tahunBerdiri),
         kategori_id: category,
         krs_id: krsId,
-        status: "active"
       };
-  
+
       const response = await axios.post('/mahasiswa/perusahaan', payload);
-  
+
       if (response.data.success) {
         // Reset form
         setCompanyName("");
@@ -77,7 +86,7 @@ export const FormModal = ({
         setAlamat("");
         setTahunBerdiri("");
         onOpenChange(false);
-        
+
         if (onSave) {
           onSave({
             name: companyName,
@@ -88,8 +97,12 @@ export const FormModal = ({
         }
       }
     } catch (error: any) {
-      console.error('Gagal menyimpan perusahaan:', error.response?.data?.message || error.message);
-      // Tambahkan notifikasi error jika perlu
+      console.error('Gagal menyimpan perusahaan:', error.response?.data);
+      alert(
+        `Gagal menyimpan perusahaan: ${
+          error.response?.data?.message || "Terjadi kesalahan server"
+        }`
+      );
     }
   };
 
@@ -147,7 +160,7 @@ export const FormModal = ({
             <Input
               placeholder="Input tahun berdiri perusahaan"
               className="rounded-xl h-12 text-gray-500 text-base"
-              type="string"
+              type="number"
               value={tahunBerdiri}
               onChange={(e) => setTahunBerdiri(e.target.value)}
             />

@@ -47,7 +47,9 @@ export default function Page() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [krsId, setKrsId] = useState<string>(""); // Definisikan state untuk krsId
-  const [selectedPerusahaan, setSelectedPerusahaan] = useState<Company | null>(null);
+  const [selectedPerusahaan, setSelectedPerusahaan] = useState<Company | null>(
+    null
+  );
   const router = useRouter();
 
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -62,13 +64,13 @@ export default function Page() {
     }
   }, []);
 
-  // Update useEffect untuk fetch krsId
+  // Fetch KRS ID
   useEffect(() => {
     const fetchKrsId = async () => {
       try {
-        const response = await axios.get('/mahasiswa/krs');
-        if (response.data.success) {
-          setKrsId(response.data.krsId);
+        const response = await axios.get("/mahasiswa/krs");
+        if (response.data.success && response.data.data.length > 0) {
+          setKrsId(response.data.data[0].id); // Ambil ID KRS pertama
         }
       } catch (error) {
         console.error("Gagal mengambil krsId:", error);
@@ -78,11 +80,11 @@ export default function Page() {
     fetchKrsId();
   }, []);
 
-  // Update useEffect untuk fetch companies
+  // Fetch companies
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await axios.get('/mahasiswa/perusahaan');
+        const response = await axios.get("/mahasiswa/perusahaan");
         if (response.data.success) {
           const companies = response.data.data.map((item: any) => ({
             id: item.id,
@@ -90,7 +92,7 @@ export default function Page() {
             alamat: item.alamat,
             tahun_berdiri: item.tahun_berdiri,
             status: item.status,
-            kategori: item.kategori
+            kategori: item.kategori,
           }));
           setCompanyList(companies);
           setFilteredCompanyList(companies);
@@ -104,24 +106,65 @@ export default function Page() {
   }, []);
 
   // Handle adding new company from modal
-  const handleAddCompany = (newCompany: Company) => {
-    const updatedCompanies = [...companyList, newCompany];
-    setCompanyList(updatedCompanies);
-    setFilteredCompanyList(updatedCompanies);
-    localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+  const handleAddCompany = async (data: {
+    name: string;
+    category: string;
+    alamat: string;
+    tahunBerdiri: number;
+  }) => {
+    try {
+      const payload = {
+        nama: data.name,
+        alamat: data.alamat,
+        tahun_berdiri: data.tahunBerdiri,
+        kategori_id: data.category,
+        krs_id: krsId,
+      };
+
+      const response = await axios.post("/mahasiswa/perusahaan", payload);
+
+      if (response.data.success) {
+        // Ambil ulang data perusahaan dari backend
+        const fetchResponse = await axios.get("/mahasiswa/perusahaan");
+        if (fetchResponse.data.success) {
+          const companies = fetchResponse.data.data.map((item: any) => ({
+            id: item.id,
+            nama: item.nama,
+            alamat: item.alamat,
+            tahun_berdiri: item.tahun_berdiri,
+            status: item.status,
+            kategori: item.kategori,
+          }));
+          setCompanyList(companies);
+          setFilteredCompanyList(companies);
+        }
+      }
+    } catch (error) {
+      console.error("Gagal menyimpan perusahaan:", error);
+    }
   };
 
-  const handleDeleteCompany = (companyName: string) => {
-    const updatedCompanies = companyList.filter(
-      (company) => company.nama !== companyName
-    );
-    setCompanyList(updatedCompanies);
-    setFilteredCompanyList(updatedCompanies);
-    localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-    localStorage.removeItem(`accounts_${companyName}`);
-    const selectedCompany = localStorage.getItem("selectedCompany");
-    if (selectedCompany === companyName) {
-      localStorage.removeItem("selectedCompany");
+  // Handle selecting a company
+  // Handle selecting a company
+  const handleSelectPerusahaan = (companyId: string) => {
+    router.push(`/detail-akun/${companyId}`);
+  };
+
+  // Handle deleting a company
+  const handleDeleteCompany = async (companyName: string) => {
+    try {
+      const response = await axios.delete(
+        `/mahasiswa/perusahaan/${companyName}`
+      );
+      if (response.data.success) {
+        const updatedCompanies = companyList.filter(
+          (company) => company.nama !== companyName
+        );
+        setCompanyList(updatedCompanies);
+        setFilteredCompanyList(updatedCompanies);
+      }
+    } catch (error) {
+      console.error("Gagal menghapus perusahaan:", error);
     }
   };
 
@@ -133,22 +176,6 @@ export default function Page() {
       company.nama.toLowerCase().includes(value.toLowerCase())
     );
     setFilteredCompanyList(filteredCompanies);
-  };
-
-  const handleSelectPerusahaan = async (perusahaan: Company) => {
-    try {
-      // Simpan data perusahaan ke localStorage
-      localStorage.setItem('perusahaan', JSON.stringify(perusahaan));
-      
-      // Set perusahaan yang dipilih ke state
-      setSelectedPerusahaan(perusahaan);
-      
-      // Redirect ke halaman detail
-      router.push(`/detail-akun`);
-    } catch (error) {
-      console.error('Error selecting perusahaan:', error);
-      alert('Gagal memilih perusahaan');
-    }
   };
 
   return (
@@ -235,9 +262,9 @@ export default function Page() {
                       </Button>
                     </div>
                     <div className="flex flex-col space-y-1.5">
-                      <Button 
+                      <Button
                         className="rounded-xl"
-                        onClick={() => handleSelectPerusahaan(company)}
+                        onClick={() => handleSelectPerusahaan(company.id)}
                       >
                         Detail dan Akun
                       </Button>
