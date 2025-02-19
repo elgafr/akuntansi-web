@@ -3,14 +3,14 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Calendar } from "lucide-react"; // Importing Calendar icon from lucide-react
+import { Calendar } from "lucide-react";
 
 type ProfileData = {
   name: string;
   nim: string;
   gender: string;
   birthPlace: string;
-  birthDate: string; // This will be in date format
+  birthDate: string; 
   email: string;
   address: string;
   phone: string;
@@ -20,8 +20,8 @@ interface EditProfileProps {
   isEditModalOpen: boolean;
   closeEditModal: () => void;
   profileData: ProfileData;
-  saveProfileData: (newData: ProfileData, profileId: string) => void; // Expect profileId as argument
-  profileId: string; // Add profileId prop here
+  saveProfileData: (newData: ProfileData, profileId: string) => void;
+  profileId: string;
 }
 
 export default function EditProfile({
@@ -29,12 +29,31 @@ export default function EditProfile({
   closeEditModal,
   profileData,
   saveProfileData,
-  profileId, // Receive profileId here
+  profileId, 
 }: EditProfileProps) {
-  const [newProfileData, setNewProfileData] = useState(profileData);
+
+  const [newProfileData, setNewProfileData] = useState({
+    name: profileData.name || '',
+    nim: profileData.nim || '',
+    gender: profileData.gender || '',
+    birthPlace: profileData.birthPlace || '',
+    birthDate: profileData.birthDate || '',
+    email: profileData.email || '',
+    address: profileData.address || '',
+    phone: profileData.phone || '',
+  });
 
   useEffect(() => {
-    setNewProfileData(profileData); // Re-set profile data when the modal opens
+     setNewProfileData({
+      name: profileData.name || '',
+      nim: profileData.nim || '',
+      gender: profileData.gender || '',
+      birthPlace: profileData.birthPlace || '',
+      birthDate: profileData.birthDate || '',
+      email: profileData.email || '',
+      address: profileData.address || '',
+      phone: profileData.phone || '',
+    });
   }, [profileData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +65,7 @@ export default function EditProfile({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    saveProfileData(newProfileData, profileId); // Pass profileId when saving data
+    saveProfileData(newProfileData, profileId);
   };
 
   return (
@@ -60,7 +79,7 @@ export default function EditProfile({
             <div>
               <Label className="block mb-1">Nama Lengkap</Label>
               <Input
-                name="fullName"
+                name="name"
                 value={newProfileData.name}
                 onChange={handleChange}
                 disabled

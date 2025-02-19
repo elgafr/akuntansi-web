@@ -105,66 +105,57 @@ export default function Page() {
     fetchCompanies();
   }, []);
 
-  // Handle adding new company from modal
-  const handleAddCompany = async (data: {
-    name: string;
-    category: string;
-    alamat: string;
-    tahunBerdiri: number;
-  }) => {
+
+  const refreshCompanyList = async () => {
     try {
-      const payload = {
-        nama: data.name,
-        alamat: data.alamat,
-        tahun_berdiri: data.tahunBerdiri,
-        kategori_id: data.category,
-        krs_id: krsId,
-      };
-
-      const response = await axios.post("/mahasiswa/perusahaan", payload);
-
+      const response = await axios.get("/mahasiswa/perusahaan");
       if (response.data.success) {
-        // Ambil ulang data perusahaan dari backend
-        const fetchResponse = await axios.get("/mahasiswa/perusahaan");
-        if (fetchResponse.data.success) {
-          const companies = fetchResponse.data.data.map((item: any) => ({
-            id: item.id,
-            nama: item.nama,
-            alamat: item.alamat,
-            tahun_berdiri: item.tahun_berdiri,
-            status: item.status,
-            kategori: item.kategori,
-          }));
-          setCompanyList(companies);
-          setFilteredCompanyList(companies);
-        }
+        const companies = response.data.data.map((item: any) => ({
+          id: item.id,
+          nama: item.nama,
+          alamat: item.alamat,
+          tahun_berdiri: item.tahun_berdiri,
+          status: item.status,
+          kategori: item.kategori,
+        }));
+        setCompanyList(companies);
+        setFilteredCompanyList(companies);
       }
     } catch (error) {
-      console.error("Gagal menyimpan perusahaan:", error);
+      console.error("Gagal mengambil data perusahaan:", error);
     }
   };
-
   // Handle selecting a company
   // Handle selecting a company
   const handleSelectPerusahaan = (companyId: string) => {
+    // console.log(companyId);
+    // console.log(companyList)
     router.push(`/detail-akun/${companyId}`);
   };
 
   // Handle deleting a company
-  const handleDeleteCompany = async (companyName: string) => {
+  const handleDeleteCompany = async (companyId: string) => {
     try {
-      const response = await axios.delete(
-        `/mahasiswa/perusahaan/${companyName}`
-      );
+      // Kirim request DELETE ke backend dengan companyId
+      const response = await axios.delete(`/mahasiswa/perusahaan/${companyId}`);
+
       if (response.data.success) {
+        // Hapus perusahaan dari state companyList dan filteredCompanyList
         const updatedCompanies = companyList.filter(
-          (company) => company.nama !== companyName
+          (company) => company.id !== companyId
         );
         setCompanyList(updatedCompanies);
         setFilteredCompanyList(updatedCompanies);
+
+        // Tampilkan pesan sukses (opsional)
+        alert("Perusahaan berhasil dihapus");
+      } else {
+        // Tampilkan pesan error jika penghapusan gagal
+        alert("Gagal menghapus perusahaan");
       }
     } catch (error) {
       console.error("Gagal menghapus perusahaan:", error);
+      alert("Terjadi kesalahan saat menghapus perusahaan");
     }
   };
 
@@ -256,7 +247,7 @@ export default function Page() {
                     <div className="flex flex-col space-y-1.5">
                       <Button
                         className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white"
-                        onClick={() => handleDeleteCompany(company.nama)}
+                        onClick={() => handleDeleteCompany(company.id)}
                       >
                         Hapus Perusahaan
                       </Button>
@@ -281,8 +272,8 @@ export default function Page() {
           title="Input Data Perusahaan"
           isOpen={isModalOpen}
           onOpenChange={setIsModalOpen}
-          onSave={handleAddCompany}
-          krsId={krsId} // Kirim krsId ke FormModal
+          onSave={refreshCompanyList}
+          krsId={krsId}
         />
       </SidebarInset>
     </SidebarProvider>

@@ -9,12 +9,11 @@ import {
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { useSearchParams } from "next/navigation";
 import axios from "@/lib/axios";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { FaArrowLeft } from "react-icons/fa";
-import { FaEdit } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa"; // Use FaPlus for Add Sub Account button
 import Link from "next/link";
 import {
   Card,
@@ -42,6 +41,7 @@ interface Company {
 
 interface Account {
   name: string;
+  subakun?: Account[]; // Optional subakun, an array of accounts
   kodeAkun: string;
   debit: number;
   kredit: number;
@@ -57,6 +57,22 @@ export default function Page() {
       debit: 0,
       kredit: 0,
       isEditing: false,
+      subakun: [
+        {
+          name: "Kas Kecil Sub1",
+          kodeAkun: "1111.1",
+          debit: 0,
+          kredit: 0,
+          isEditing: false,
+        },
+        {
+          name: "Kas Kecil Sub2",
+          kodeAkun: "1111.2",
+          debit: 0,
+          kredit: 0,
+          isEditing: false,
+        },
+      ],
     },
     {
       name: "Kas besar",
@@ -64,6 +80,15 @@ export default function Page() {
       debit: 0,
       kredit: 0,
       isEditing: false,
+      subakun: [
+        {
+          name: "Kas besar Sub1",
+          kodeAkun: "1112.1",
+          debit: 0,
+          kredit: 0,
+          isEditing: false,
+        },
+      ],
     },
     {
       name: "Kas bank",
@@ -83,15 +108,11 @@ export default function Page() {
           const response = await axios.get(`/mahasiswa/perusahaan/${id}`);
           if (response.data.success) {
             setCompany(response.data.data);
+            console.log("Company data:", response.data.data);
           }
         } catch (error) {
           console.error("Error fetching company data:", error);
         }
-
-        // const accountResponse = await axios.get(`/mahasiswa/perusahaan/${id}/accounts`);
-        // if (accountResponse.data.success) {
-        //   setAccounts(accountResponse.data.data);
-        // }
       };
 
       fetchCompanyData();
@@ -106,10 +127,16 @@ export default function Page() {
     );
   }
 
-  // Fungsi untuk mengaktifkan mode edit pada akun tertentu
-  const handleEditAccount = (index: number) => {
-    const updatedAccounts = [...accounts];
-    updatedAccounts[index].isEditing = true;
+  // Fungsi untuk mengaktifkan mode edit pada semua akun dan sub akun
+  const handleEditAllAccounts = () => {
+    const updatedAccounts = accounts.map((account) => ({
+      ...account,
+      isEditing: true,
+      subakun: account.subakun?.map((subAccount) => ({
+        ...subAccount,
+        isEditing: true,
+      })),
+    }));
     setAccounts(updatedAccounts);
   };
 
@@ -118,6 +145,11 @@ export default function Page() {
     const updatedAccounts = [...accounts];
     updatedAccounts.forEach((account) => {
       account.isEditing = false;
+      if (account.subakun) {
+        account.subakun.forEach((subAccount) => {
+          subAccount.isEditing = false;
+        });
+      }
     });
     setAccounts(updatedAccounts);
 
@@ -128,15 +160,40 @@ export default function Page() {
     }
   };
 
-  const handleDebitChange = (index: number, value: string) => {
+  const handleDebitChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];
-    updatedAccounts[index].debit = value ? parseInt(value) : 0;
+    if (isSubAccount) {
+      updatedAccounts[index].subakun![subIndex].debit = value ? parseInt(value) : 0;
+    } else {
+      updatedAccounts[index].debit = value ? parseInt(value) : 0;
+    }
     setAccounts(updatedAccounts);
   };
 
-  const handleKreditChange = (index: number, value: string) => {
+  const handleKreditChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];
-    updatedAccounts[index].kredit = value ? parseInt(value) : 0;
+    if (isSubAccount) {
+      updatedAccounts[index].subakun![subIndex].kredit = value ? parseInt(value) : 0;
+    } else {
+      updatedAccounts[index].kredit = value ? parseInt(value) : 0;
+    }
+    setAccounts(updatedAccounts);
+  };
+
+  const handleAddSubAccount = (index: number) => {
+    // Add new sub account to the selected account
+    const newSubAccount: Account = {
+      name: `New Sub Akun`,
+      kodeAkun: `${accounts[index].kodeAkun}.1`, // Example sub account code
+      debit: 0,
+      kredit: 0,
+      isEditing: true,
+    };
+    const updatedAccounts = [...accounts];
+    if (!updatedAccounts[index].subakun) {
+      updatedAccounts[index].subakun = [];
+    }
+    updatedAccounts[index].subakun.push(newSubAccount);
     setAccounts(updatedAccounts);
   };
 
@@ -187,10 +244,17 @@ export default function Page() {
             </CardHeader>
 
             <CardContent>
+              <div className="flex justify-end mb-4">
+                <Button variant="outline" className="w-32" onClick={handleEditAllAccounts}>
+                  Edit Semua
+                </Button>
+              </div>
+
               <Table className="w-full border border-gray-300 rounded-xl overflow-hidden">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="text-center py-2">Nama Akun</TableHead>
+                    <TableHead className="text-center py-2">Sub Akun</TableHead>
                     <TableHead className="text-center py-2">Kode Akun</TableHead>
                     <TableHead className="text-center py-2">Debit</TableHead>
                     <TableHead className="text-center py-2">Kredit</TableHead>
@@ -199,39 +263,81 @@ export default function Page() {
                 </TableHeader>
                 <TableBody>
                   {accounts.map((account, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="text-center py-2">{account.name}</TableCell>
-                      <TableCell className="text-center py-2">{account.kodeAkun}</TableCell>
-                      <TableCell className="text-center py-2">
-                        {account.isEditing ? (
-                          <Input
-                            type="number"
-                            value={account.debit || ""}
-                            onChange={(e) => handleDebitChange(index, e.target.value)}
-                            disabled={account.kredit > 0}
-                          />
-                        ) : (
-                          `Rp.${account.debit.toLocaleString()}`
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center py-2">
-                        {account.isEditing ? (
-                          <Input
-                            type="number"
-                            value={account.kredit || ""}
-                            onChange={(e) => handleKreditChange(index, e.target.value)}
-                            disabled={account.debit > 0}
-                          />
-                        ) : (
-                          `Rp.${account.kredit.toLocaleString()}`
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center py-2">
-                        <Button variant="outline" className="text-xs w-full" onClick={() => handleEditAccount(index)}>
-                          <FaEdit />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <React.Fragment key={index}>
+                      {/* Akun Utama */}
+                      <TableRow>
+                        <TableCell className="text-center py-2">{account.name}</TableCell>
+                        <TableCell className="text-center py-2"></TableCell>
+                        <TableCell className="text-center py-2">{account.kodeAkun}</TableCell>
+                        <TableCell className="text-center py-2">
+                          {account.isEditing ? (
+                            <Input
+                              type="number"
+                              value={account.debit || ""}
+                              onChange={(e) => handleDebitChange(index, e.target.value, false)}
+                              disabled={account.kredit > 0}
+                            />
+                          ) : (
+                            `Rp.${account.debit.toLocaleString()}`
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center py-2">
+                          {account.isEditing ? (
+                            <Input
+                              type="number"
+                              value={account.kredit || ""}
+                              onChange={(e) => handleKreditChange(index, e.target.value, false)}
+                              disabled={account.debit > 0}
+                            />
+                          ) : (
+                            `Rp.${account.kredit.toLocaleString()}`
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center py-2">
+                          <Button variant="outline" className="text-xs w-full" onClick={() => handleAddSubAccount(index)}>
+                            <FaPlus /> Tambah Sub Akun
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Sub Akun */}
+                      {account.subakun?.map((subAccount, subIndex) => (
+                        <TableRow key={`${index}-${subIndex}`}>
+                          <TableCell className="text-center py-2"></TableCell>
+                          <TableCell className="text-center py-2">{subAccount.name}</TableCell>
+                          <TableCell className="text-center py-2">{subAccount.kodeAkun}</TableCell>
+                          <TableCell className="text-center py-2">
+                            {subAccount.isEditing ? (
+                              <Input
+                                type="number"
+                                value={subAccount.debit || ""}
+                                onChange={(e) =>
+                                  handleDebitChange(index, e.target.value, true, subIndex)
+                                }
+                                disabled={subAccount.kredit > 0}
+                              />
+                            ) : (
+                              `Rp.${subAccount.debit.toLocaleString()}`
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center py-2">
+                            {subAccount.isEditing ? (
+                              <Input
+                                type="number"
+                                value={subAccount.kredit || ""}
+                                onChange={(e) =>
+                                  handleKreditChange(index, e.target.value, true, subIndex)
+                                }
+                                disabled={subAccount.debit > 0}
+                              />
+                            ) : (
+                              `Rp.${subAccount.kredit.toLocaleString()}`
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center py-2"></TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>

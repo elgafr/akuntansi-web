@@ -8,7 +8,11 @@ import { Card, CardTitle, CardHeader, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+} from "@/components/ui/breadcrumb";
 import EditProfile from "@/components/ui/custom/form-modal/edit-profile/edit-profile";
 import axios from "@/lib/axios";
 import Krs from "@/components/ui/custom/form-modal/krs/krs";
@@ -47,11 +51,11 @@ export default function Page() {
   // Save the updated profile data
   const saveProfileData = async (newData: any) => {
     try {
-      const userId = profileData.user.id; // Retrieve user_id from profileData (User model)
+      const userId = profileData?.id; // Safely access user.id
       const response = await axios.put(`/mahasiswa/profile/${userId}`, newData); // Use user_id in URL for the PUT request
       if (response.data.success) {
         setProfileData(response.data.data); // Update profile data state
-        closeEditModal(); // Close modal after saving
+        closeEditModal(); 
       }
     } catch (error) {
       console.error("Error saving profile data:", error.response || error);
@@ -63,7 +67,7 @@ export default function Page() {
   }
 
   if (!profileData) {
-    return <div>No profile data available</div>; // Show message if no profile data is found
+    return <div>No profile data available</div>;
   }
 
   return (
@@ -75,18 +79,27 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-6 text-black">Dashboard</h1>
-                  <h2 className="text-sm ml-6">Let&apos;s check your Dashboard today</h2>
+                  <h1 className="text-2xl font-bold ml-6 text-black">
+                    Dashboard
+                  </h1>
+                  <h2 className="text-sm ml-6">
+                    Let&apos;s check your Dashboard today
+                  </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                  <AvatarImage
+                    src="https://github.com/shadcn.png"
+                    alt="@shadcn"
+                  />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData.user.name}</div>
+                  <div className="text-sm font-medium">
+                    {profileData.user.name}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -101,11 +114,20 @@ export default function Page() {
                 <AvatarImage src="https://github.com/shadcn.png" />
               </Avatar>
               <div className="w-full text-start">
-                <h1 className="text-2xl font-semibold">{profileData.user.name}</h1>
-                <h2 className="text-xl text-gray-600">{profileData.user.nim}</h2>
-                <Button className="text-black font-bold rounded-xl mt-2">Student</Button>
+                <h1 className="text-2xl font-semibold">
+                  {profileData.user.name}
+                </h1>
+                <h2 className="text-xl text-gray-600">
+                  {profileData.user.nim}
+                </h2>
+                <Button className="text-black font-bold rounded-xl mt-2">
+                  Student
+                </Button>
               </div>
-              <Button className="text-black font-bold rounded-xl w-full" onClick={openEditModal}>
+              <Button
+                className="text-black font-bold rounded-xl w-full"
+                onClick={openEditModal}
+              >
                 Edit Profile
               </Button>
             </div>
@@ -119,27 +141,37 @@ export default function Page() {
               <div className="grid grid-cols-2 gap-6 h-full px-6 pb-6">
                 <div className="space-y-1">
                   <Label className="text-xl">Nama Lengkap</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.name}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.user.name}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Gender</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.gender}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.user.gender}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Tanggal Lahir</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.tanggal_lahir}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.user.tanggal_lahir}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Alamat Email</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.email}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.user.email}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Alamat Rumah</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.alamat}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.user.alamat}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
@@ -152,7 +184,6 @@ export default function Page() {
         </div>
 
         <Krs />
-        
 
         <EditProfile
           isEditModalOpen={isEditModalOpen}
