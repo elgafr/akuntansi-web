@@ -31,6 +31,8 @@ interface Company {
   alamat: string;
   tahun_berdiri: number;
   status: string;
+  start_priode: Date;
+  end_priode: Date;
   kategori: {
     id: string;
     nama: string;
@@ -51,6 +53,7 @@ export default function Page() {
     null
   );
   const router = useRouter();
+  const [companyData, setCompanyData] = useState<Company | null>(null);
 
   const [profileData, setProfileData] = useState<ProfileData>({
     fullName: "Guest",
@@ -70,7 +73,7 @@ export default function Page() {
       try {
         const response = await axios.get("/mahasiswa/krs");
         if (response.data.success && response.data.data.length > 0) {
-          setKrsId(response.data.data[0].id); // Ambil ID KRS pertama
+          setKrsId(response.data.data[0].id);
         }
       } catch (error) {
         console.error("Gagal mengambil krsId:", error);
@@ -92,6 +95,8 @@ export default function Page() {
             alamat: item.alamat,
             tahun_berdiri: item.tahun_berdiri,
             status: item.status,
+            start_priode: item.start_priode,
+            end_priode: item.end_priode,
             kategori: item.kategori,
           }));
           setCompanyList(companies);
@@ -116,6 +121,8 @@ export default function Page() {
           alamat: item.alamat,
           tahun_berdiri: item.tahun_berdiri,
           status: item.status,
+          start_priode: item.start_priode,
+          end_priode: item.end_priode,
           kategori: item.kategori,
         }));
         setCompanyList(companies);
@@ -125,11 +132,8 @@ export default function Page() {
       console.error("Gagal mengambil data perusahaan:", error);
     }
   };
-  // Handle selecting a company
-  // Handle selecting a company
+
   const handleSelectPerusahaan = (companyId: string) => {
-    // console.log(companyId);
-    // console.log(companyList)
     router.push(`/detail-akun/${companyId}`);
   };
 

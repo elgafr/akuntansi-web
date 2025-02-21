@@ -20,44 +20,48 @@ export function RegisterForm({
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false); // State untuk kontrol visibility password
+  const [error, setError] = useState<string>(""); // Definisikan state error
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
+  
     try {
+      // Kirim request POST ke backend dengan data registrasi
       const response = await axios.post("/mahasiswa/register", {
         name,
         email,
         nim,
         password,
       });
-
+  
       if (response.data.success) {
-        // Simpan data sementara
-        const tempProfile = {
-          fullName: name,
-          nim: nim,
-          email: email,
-          gender: "-",
-          birthPlace: "-",
-          birthDate: "-",
-          address: "-",
-          phone: "-",
-        };
-        
-        localStorage.setItem('tempProfileData', JSON.stringify(tempProfile));
-        
-        // Redirect dengan membawa parameter email
+        // Jika registrasi sukses, arahkan ke halaman OTP
         window.location.href = `/otp?email=${encodeURIComponent(email)}`;
+      } else {
+        setError("Registration failed. Please try again.");
       }
     } catch (error: any) {
-      // ... error handling tetap sama
-      console.error("Register error:", error);
+      if (error.response) {
+        // Tangani kesalahan yang dikirim oleh server
+        console.error("Server Error:", error.response.data);
+  
+        if (error.response?.data?.errors?.email) {
+          setError("The email has already been taken.");
+        } else {
+          setError(error.response?.data?.message || "An error occurred during registration.");
+        }
+      } else {
+        // Tangani kesalahan jika tidak ada response dari server
+        console.error("Network Error:", error.message);
+        setError("Network error, please try again later.");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+
   // Fungsi untuk toggle visibility password
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);

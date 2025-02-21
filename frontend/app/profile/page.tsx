@@ -28,7 +28,7 @@ export default function Page() {
       try {
         const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
-          setProfileData(response.data.data[0]); // Assuming the first item is the profile
+          setProfileData(response.data.data); // Assuming the first item is the profile
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);

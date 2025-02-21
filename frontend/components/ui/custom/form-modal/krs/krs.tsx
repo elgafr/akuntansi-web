@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import axios from "@/lib/axios";
 import {
@@ -49,33 +51,34 @@ export default function Krs() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [profileRes, classesRes, krsRes] = await Promise.all([
-          axios.get("/mahasiswa/profile"),
-          axios.get("/instruktur/kelas"),
-          axios.get("/mahasiswa/krs"),
-        ]);
-
-        // Set user ID
+        const profileRes = await axios.get("/mahasiswa/profile");
         if (profileRes.data.success) {
-          setUserId(profileRes.data.data[0]?.user_id || "");
-        }
+          const userIdFromProfile = profileRes.data.data[0]?.user_id || "";
+          setUserId(userIdFromProfile); // Set userId setelah mendapatkan data profil
 
-        // Set class categories
-        if (classesRes.data.success) {
-          const categories = classesRes.data.data.reduce(
-            (acc: Record<string, ClassItem[]>, item: ClassItem) => {
-              if (!acc[item.kategori]) acc[item.kategori] = [];
-              acc[item.kategori].push(item);
-              return acc;
-            },
-            {}
-          );
-          setClassCategories(categories);
-        }
+          // Lanjutkan dengan fetch data kelas dan KRS berdasarkan userId
+          const [classesRes, krsRes] = await Promise.all([
+            axios.get("/instruktur/kelas"),
+            axios.get(`/mahasiswa/krs/${userIdFromProfile}`), // Dapatkan KRS berdasarkan userId yang valid
+          ]);
 
-        // Set selected classes dari backend
-        if (krsRes.data.success) {
-          setSelectedClasses(krsRes.data.data);
+          // Set kelas dan kategori
+          if (classesRes.data.success) {
+            const categories = classesRes.data.data.reduce(
+              (acc: Record<string, ClassItem[]>, item: ClassItem) => {
+                if (!acc[item.kategori]) acc[item.kategori] = [];
+                acc[item.kategori].push(item);
+                return acc;
+              },
+              {}
+            );
+            setClassCategories(categories);
+          }
+
+          // Set selected classes berdasarkan user_id
+          if (krsRes.data.success) {
+            setSelectedClasses(krsRes.data.data);
+          }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -84,8 +87,11 @@ export default function Krs() {
       }
     };
 
-    fetchData();
-  }, []);
+    if (!userId) {
+      // Jangan jalankan fetchData jika userId belum ada
+      fetchData();
+    }
+  }, [userId]); // Fetch data hanya ketika userId sudah ada
 
   const handleClassSelection = (classItem: ClassItem) => {
     // Cek apakah kelas sudah dipilih
@@ -107,16 +113,21 @@ export default function Krs() {
 
   const handleConfirmAction = async () => {
     const token = localStorage.getItem("token");
-    if (!token || !userId) return;
-
+    // if (!token || !userId || !selectedClass) return;
+  
+    console.log("Mengirim data ke backend:", {
+      user_id: userId,
+      kelas_id: selectedClass?.id??"",
+    });
+  
     try {
       if (action === "add" && selectedClass) {
-        // POST request ke backend
+        // POST request ke backend untuk menambahkan kelas ke KRS
         const response = await axios.post(
           "/mahasiswa/krs",
           {
-            user_id: userId,
-            kelas_id: selectedClass.id,
+            user_id: userId, // Menyertakan user_id yang sudah diambil dari profile
+            kelas_id: selectedClass.id, // Mengirimkan kelas yang dipilih
           },
           {
             headers: {
@@ -125,7 +136,9 @@ export default function Krs() {
             },
           }
         );
-
+  
+        console.log("Response dari server:", response); // Cek response dari server
+  
         if (response.data.success) {
           // Update state dengan data dari response backend
           setSelectedClasses((prev) => [
@@ -139,18 +152,6 @@ export default function Krs() {
             },
           ]);
         }
-      } else if (action === "delete" && selectedClass) {
-        // DELETE request ke backend
-        await axios.delete(`/mahasiswa/krs/${selectedClass.id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        // Update state dengan menghapus data
-        setSelectedClasses((prev) =>
-          prev.filter((item) => item.id !== selectedClass.id)
-        );
       }
     } catch (error) {
       console.error("Error processing request:", error);
@@ -164,6 +165,7 @@ export default function Krs() {
       setSelectedClass(null);
     }
   };
+  
 
   if (loading) return <div>Memuat data...</div>;
 
@@ -273,7 +275,7 @@ export default function Krs() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmAction}>
+            <AlertDialogAction onClick = {() => handleConfirmAction()}>
               {action === "add" ? "Tambahkan" : "Hapus"}
             </AlertDialogAction>
           </AlertDialogFooter>

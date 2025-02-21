@@ -13,7 +13,7 @@ import axios from "@/lib/axios";
 import React, { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { FaArrowLeft } from "react-icons/fa";
-import { FaPlus } from "react-icons/fa"; // Use FaPlus for Add Sub Account button
+import { FaPlus } from "react-icons/fa";
 import Link from "next/link";
 import {
   Card,
@@ -39,9 +39,14 @@ interface Company {
   tahun_berdiri: number;
 }
 
+interface Category {
+  id: string;
+  nama: string;
+}
+
 interface Account {
   name: string;
-  subakun?: Account[]; // Optional subakun, an array of accounts
+  subakun?: Account[];
   kodeAkun: string;
   debit: number;
   kredit: number;
@@ -50,6 +55,7 @@ interface Account {
 
 export default function Page() {
   const [company, setCompany] = useState<Company | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([
     {
       name: "Kas Kecil",
@@ -100,7 +106,6 @@ export default function Page() {
   ]);
   const { id } = useParams();
 
-  // Fetch company data based on company ID
   useEffect(() => {
     if (id) {
       const fetchCompanyData = async () => {
@@ -108,26 +113,34 @@ export default function Page() {
           const response = await axios.get(`/mahasiswa/perusahaan/${id}`);
           if (response.data.success) {
             setCompany(response.data.data);
-            console.log("Company data:", response.data.data);
           }
         } catch (error) {
           console.error("Error fetching company data:", error);
         }
       };
-
       fetchCompanyData();
     }
   }, [id]);
 
-  if (!company) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get('/instruktur/kategori');
+        if (response.data.success) {
+          setCategories(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
-  // Fungsi untuk mengaktifkan mode edit pada semua akun dan sub akun
+  const getCategoryNameById = (kategoriId: string) => {
+    const category = categories.find((cat) => cat.id === kategoriId);
+    return category ? category.nama : "Unknown Category";
+  };
+
   const handleEditAllAccounts = () => {
     const updatedAccounts = accounts.map((account) => ({
       ...account,
@@ -140,20 +153,17 @@ export default function Page() {
     setAccounts(updatedAccounts);
   };
 
-  // Fungsi untuk menyimpan perubahan data akun (debit/kredit)
   const handleSaveAccount = () => {
-    const updatedAccounts = [...accounts];
-    updatedAccounts.forEach((account) => {
-      account.isEditing = false;
-      if (account.subakun) {
-        account.subakun.forEach((subAccount) => {
-          subAccount.isEditing = false;
-        });
-      }
-    });
+    const updatedAccounts = accounts.map(account => ({
+      ...account,
+      isEditing: false,
+      subakun: account.subakun?.map(subAccount => ({
+        ...subAccount,
+        isEditing: false,
+      })),
+    }));
     setAccounts(updatedAccounts);
 
-    // Simpan data akun ke localStorage dengan key spesifik perusahaan
     if (company) {
       const accountKey = `accounts_${company.nama}`;
       localStorage.setItem(accountKey, JSON.stringify(updatedAccounts));
@@ -163,9 +173,9 @@ export default function Page() {
   const handleDebitChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];
     if (isSubAccount) {
-      updatedAccounts[index].subakun![subIndex].debit = value ? parseInt(value) : 0;
+      updatedAccounts[index].subakun![subIndex].debit = Number(value) || 0;
     } else {
-      updatedAccounts[index].debit = value ? parseInt(value) : 0;
+      updatedAccounts[index].debit = Number(value) || 0;
     }
     setAccounts(updatedAccounts);
   };
@@ -173,35 +183,56 @@ export default function Page() {
   const handleKreditChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];
     if (isSubAccount) {
-      updatedAccounts[index].subakun![subIndex].kredit = value ? parseInt(value) : 0;
+      updatedAccounts[index].subakun![subIndex].kredit = Number(value) || 0;
     } else {
-      updatedAccounts[index].kredit = value ? parseInt(value) : 0;
+      updatedAccounts[index].kredit = Number(value) || 0;
     }
     setAccounts(updatedAccounts);
   };
 
   const handleAddSubAccount = (index: number) => {
-    // Add new sub account to the selected account
+    const parentAccount = accounts[index];
+    const subCount = parentAccount.subakun?.length || 0;
+    const newKode = `${parentAccount.kodeAkun}.${subCount + 1}`;
+
     const newSubAccount: Account = {
-      name: `New Sub Akun`,
-      kodeAkun: `${accounts[index].kodeAkun}.1`, // Example sub account code
+      name: "",
+      kodeAkun: newKode,
       debit: 0,
       kredit: 0,
       isEditing: true,
     };
+
     const updatedAccounts = [...accounts];
     if (!updatedAccounts[index].subakun) {
       updatedAccounts[index].subakun = [];
     }
-    updatedAccounts[index].subakun.push(newSubAccount);
+    updatedAccounts[index].subakun!.push(newSubAccount);
     setAccounts(updatedAccounts);
   };
+
+  const handleSubAccountNameChange = (
+    accountIndex: number,
+    subIndex: number,
+    newName: string
+  ) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[accountIndex].subakun![subIndex].name = newName;
+    setAccounts(updatedAccounts);
+  };
+
+  if (!company) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        {/* Header Section */}
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4 w-full justify-between">
             <Breadcrumb>
@@ -238,15 +269,24 @@ export default function Page() {
         <div className="mt-10 ml-14 flex gap-x-6">
           <Card className="w-[700px]">
             <CardHeader>
-              <CardTitle className="text-5xl text-primary py-2 mb-4">{company.nama}</CardTitle>
-              <CardTitle className="text-3xl text-primary">{company.kategori_id}</CardTitle>
-              <CardDescription className="text-lg">Kelola Kredit dan debit akun perusahaan</CardDescription>
+              <CardTitle className="text-5xl text-primary py-2 mb-4">
+                {company.nama}
+              </CardTitle>
+              <CardTitle className="text-3xl text-primary">
+                {getCategoryNameById(company.kategori_id)}
+              </CardTitle>
+              <CardDescription className="text-lg">
+                Kelola Kredit dan debit akun perusahaan
+              </CardDescription>
             </CardHeader>
 
             <CardContent>
-              <div className="flex justify-end mb-4">
-                <Button variant="outline" className="w-32" onClick={handleEditAllAccounts}>
+              <div className="flex justify-end mb-4 gap-2">
+                <Button variant="outline" className="w-32 rounded-xl h-10" onClick={handleEditAllAccounts}>
                   Edit Semua
+                </Button>
+                <Button className="rounded-xl w-32 h-10" onClick={handleSaveAccount}>
+                  Simpan
                 </Button>
               </div>
 
@@ -264,11 +304,14 @@ export default function Page() {
                 <TableBody>
                   {accounts.map((account, index) => (
                     <React.Fragment key={index}>
-                      {/* Akun Utama */}
                       <TableRow>
-                        <TableCell className="text-center py-2">{account.name}</TableCell>
+                        <TableCell className="text-center py-2">
+                          {account.name}
+                        </TableCell>
                         <TableCell className="text-center py-2"></TableCell>
-                        <TableCell className="text-center py-2">{account.kodeAkun}</TableCell>
+                        <TableCell className="text-center py-2">
+                          {account.kodeAkun}
+                        </TableCell>
                         <TableCell className="text-center py-2">
                           {account.isEditing ? (
                             <Input
@@ -294,18 +337,39 @@ export default function Page() {
                           )}
                         </TableCell>
                         <TableCell className="text-center py-2">
-                          <Button variant="outline" className="text-xs w-full" onClick={() => handleAddSubAccount(index)}>
-                            <FaPlus /> Tambah Sub Akun
+                          <Button
+                            variant="outline"
+                            className="text-xs w-full"
+                            onClick={() => handleAddSubAccount(index)}
+                          >
+                            <FaPlus className="mr-1" /> Tambah Sub
                           </Button>
                         </TableCell>
                       </TableRow>
 
-                      {/* Sub Akun */}
                       {account.subakun?.map((subAccount, subIndex) => (
                         <TableRow key={`${index}-${subIndex}`}>
                           <TableCell className="text-center py-2"></TableCell>
-                          <TableCell className="text-center py-2">{subAccount.name}</TableCell>
-                          <TableCell className="text-center py-2">{subAccount.kodeAkun}</TableCell>
+                          <TableCell className="text-center py-2">
+                            {subAccount.isEditing ? (
+                              <Input
+                                value={subAccount.name}
+                                onChange={(e) =>
+                                  handleSubAccountNameChange(
+                                    index,
+                                    subIndex,
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Masukkan nama sub akun"
+                              />
+                            ) : (
+                              subAccount.name
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center py-2">
+                            {subAccount.kodeAkun}
+                          </TableCell>
                           <TableCell className="text-center py-2">
                             {subAccount.isEditing ? (
                               <Input
@@ -341,36 +405,33 @@ export default function Page() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="flex justify-end mt-24">
-                <Button className="rounded-xl w-32 h-10 flex items-center" onClick={handleSaveAccount}>
-                  Simpan
-                </Button>
-              </div>
             </CardContent>
           </Card>
 
           <Card className="w-[400px]">
             <CardHeader>
-              <CardTitle className="text-primary text-3xl">Detail Perusahaan</CardTitle>
+              <CardTitle className="text-primary text-3xl">
+                Detail Perusahaan
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-md w-full">
                 <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
                   <p className="font-semibold whitespace-nowrap">Nama Perusahaan</p>
-                  <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">{company.nama}</p>
+                  <p>:</p>
+                  <p>{company.nama}</p>
 
                   <p className="font-semibold whitespace-nowrap">Kategori Perusahaan</p>
-                  <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">{company.kategori_id}</p>
+                  <p>:</p>
+                  <p>{getCategoryNameById(company.kategori_id)}</p>
 
                   <p className="font-semibold whitespace-nowrap">Alamat</p>
-                  <p className="text-right w-[20px]">:</p>
-                  <p className="text-left break-words">{company.alamat}</p>
+                  <p>:</p>
+                  <p>{company.alamat}</p>
 
                   <p className="font-semibold whitespace-nowrap">Tahun Berdiri</p>
-                  <p className="text-right w-[20px]">:</p>
-                  <p className="text-left">{company.tahun_berdiri}</p>
+                  <p>:</p>
+                  <p>{company.tahun_berdiri}</p>
                 </div>
               </div>
             </CardContent>
