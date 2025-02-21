@@ -20,8 +20,7 @@ interface JurnalFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (transaction: Transaction) => void;
-  akunList: Akun[];
-  subAkunList: SubAkun[];
+  editingTransactions?: Transaction[];
 }
 
 interface Transaction {
@@ -54,6 +53,9 @@ interface SubAkun {
     kode: number;
     nama: string;
   };
+  akun_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Add new interface for temporary transactions
@@ -68,7 +70,16 @@ interface TempTransaction {
   kredit: number;
 }
 
-export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }: JurnalFormProps) {
+// Update interface untuk response API
+interface AkunResponse {
+  id: string;
+  kode: number;
+  nama: string;
+  status: string;
+  kategori_id: string;
+}
+
+export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = [] }: JurnalFormProps) {
   const [formData, setFormData] = useState<Transaction>({
     id: "",
     date: "",
@@ -90,6 +101,12 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
 
   // Tambahkan state untuk mode edit kejadian
   const [isEditingEvent, setIsEditingEvent] = useState(false);
+
+  // Tambahkan state untuk akun dan sub akun
+  const [akunList, setAkunList] = useState<AkunResponse[]>([]);
+  const [subAkunList, setSubAkunList] = useState<SubAkun[]>([]);
+  const [isLoadingAkun, setIsLoadingAkun] = useState(true);
+  const [errorAkun, setErrorAkun] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchActivePerusahaan = async () => {
@@ -113,6 +130,76 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
     fetchActivePerusahaan();
   }, []);
 
+  // Fetch data akun dan sub akun
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoadingAkun(true);
+      try {
+        // Fetch akun dan sub akun secara parallel
+        const [akunResponse, subAkunResponse] = await Promise.all([
+          axios.get('/instruktur/akun'),
+          axios.get('/mahasiswa/subakun')
+        ]);
+
+        if (akunResponse.data.success) {
+          setAkunList(akunResponse.data.data);
+        }
+
+        if (subAkunResponse.data.success) {
+          // Pastikan data sub akun diformat dengan benar
+          const formattedSubAkun = subAkunResponse.data.data.map((subAkun: any) => ({
+            id: subAkun.id,
+            kode: subAkun.kode,
+            nama: subAkun.nama,
+            akun: subAkun.akun,
+            akun_id: subAkun.akun_id,
+            created_at: subAkun.created_at,
+            updated_at: subAkun.updated_at
+          }));
+          setSubAkunList(formattedSubAkun);
+        }
+
+        console.log('Sub Akun Data:', subAkunResponse.data); // Debug log
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setErrorAkun('Gagal memuat data akun');
+      } finally {
+        setIsLoadingAkun(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchData();
+    }
+  }, [isOpen]);
+
+  // Update useEffect untuk mengisi form data saat editing
+  useEffect(() => {
+    if (editingTransactions.length > 0) {
+      const firstTransaction = editingTransactions[0];
+      
+      // Set form data dengan data kejadian (dari transaksi pertama)
+      setFormData({
+        ...formData,
+        date: firstTransaction.date,
+        documentType: firstTransaction.documentType,
+        description: firstTransaction.description
+      });
+
+      // Set temporary transactions dengan semua transaksi dalam kejadian
+      setTempTransactions(editingTransactions.map(t => ({
+        date: t.date,
+        documentType: t.documentType,
+        description: t.description,
+        namaAkun: t.namaAkun,
+        kodeAkun: t.kodeAkun,
+        akun_id: t.akun_id,
+        debit: t.debit,
+        kredit: t.kredit
+      })));
+    }
+  }, [editingTransactions, isOpen]);
+
   // Add function to calculate totals
   const calculateTotals = () => {
     return tempTransactions.reduce(
@@ -124,7 +211,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
     );
   };
 
-  // Modify handleSubmit to handle multiple transactions
+  // Tambahkan fungsi handleSubmit untuk menangani submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -139,29 +226,36 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
         return;
       }
 
-      // Jika ini transaksi pertama, simpan informasi kejadian
-      if (tempTransactions.length === 0) {
-        setFormData({
-          ...formData,
+      // Jika sedang edit, update transaksi yang ada
+      if (editingTransactions.length > 0) {
+        // Update existing transactions
+        const updatedTransactions = [...tempTransactions];
+        updatedTransactions.push({
           date: formData.date,
           documentType: formData.documentType,
           description: formData.description,
+          namaAkun: formData.namaAkun,
+          kodeAkun: formData.kodeAkun,
+          akun_id: formData.akun_id,
+          debit: formData.debit,
+          kredit: formData.kredit
         });
+        setTempTransactions(updatedTransactions);
+      } else {
+        // Add new transaction
+        setTempTransactions([...tempTransactions, {
+          date: tempTransactions.length === 0 ? formData.date : tempTransactions[0].date,
+          documentType: tempTransactions.length === 0 ? formData.documentType : tempTransactions[0].documentType,
+          description: tempTransactions.length === 0 ? formData.description : tempTransactions[0].description,
+          namaAkun: formData.namaAkun,
+          kodeAkun: formData.kodeAkun,
+          akun_id: formData.akun_id,
+          debit: formData.debit,
+          kredit: formData.kredit,
+        }]);
       }
 
-      // Add current transaction to temporary list
-      setTempTransactions([...tempTransactions, {
-        date: tempTransactions.length === 0 ? formData.date : tempTransactions[0].date,
-        documentType: tempTransactions.length === 0 ? formData.documentType : tempTransactions[0].documentType,
-        description: tempTransactions.length === 0 ? formData.description : tempTransactions[0].description,
-        namaAkun: formData.namaAkun,
-        kodeAkun: formData.kodeAkun,
-        akun_id: formData.akun_id,
-        debit: formData.debit,
-        kredit: formData.kredit,
-      }]);
-
-      // Clear form except for date, documentType, and description if there are existing transactions
+      // Clear form except for date, documentType, and description
       setFormData({
         ...formData,
         namaAkun: "",
@@ -170,49 +264,9 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
         debit: 0,
         kredit: 0,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding transaction:', error);
       alert('Gagal menambahkan transaksi');
-    }
-  };
-
-  // Add function to submit all transactions
-  const handleSubmitAll = async () => {
-    const { totalDebit, totalKredit } = calculateTotals();
-    
-    if (totalDebit !== totalKredit) {
-      alert('Total debit dan kredit harus seimbang');
-      return;
-    }
-
-    if (!perusahaanId) {
-      alert('Perusahaan online tidak ditemukan');
-      return;
-    }
-
-    try {
-      // Submit all transactions
-      for (const transaction of tempTransactions) {
-        const payload = {
-          tanggal: transaction.date,
-          bukti: transaction.documentType,
-          keterangan: transaction.description,
-          akun_id: transaction.akun_id,
-          sub_akun_id: transaction.sub_akun_id,
-          debit: transaction.debit || null,
-          kredit: transaction.kredit || null,
-          perusahaan_id: perusahaanId
-        };
-
-        await axios.post('/mahasiswa/jurnal', payload);
-      }
-
-      alert('Semua transaksi berhasil disimpan');
-      onClose();
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Error submitting transactions:', error);
-      alert('Gagal menyimpan transaksi');
     }
   };
 
@@ -294,11 +348,83 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
     });
   };
 
+  // Tambahkan fungsi handleSubmitAll untuk menyimpan semua transaksi
+  const handleSubmitAll = async () => {
+    if (!perusahaanId) {
+      alert('Perusahaan online tidak ditemukan');
+      return;
+    }
+
+    try {
+      // Jika sedang edit, update transaksi yang ada
+      if (editingTransactions.length > 0) {
+        // Delete transaksi lama
+        await Promise.all(
+          editingTransactions.map(t => axios.delete(`/mahasiswa/jurnal/${t.id}`))
+        );
+
+        // Create transaksi baru dengan data yang sudah diupdate
+        await Promise.all(
+          tempTransactions.map(transaction => 
+            axios.post('/mahasiswa/jurnal', {
+              tanggal: transaction.date,
+              bukti: transaction.documentType,
+              keterangan: transaction.description,
+              akun_id: transaction.akun_id,
+              debit: transaction.debit || null,
+              kredit: transaction.kredit || null,
+              perusahaan_id: perusahaanId
+            })
+          )
+        );
+      } else {
+        // Jika bukan edit, create transaksi baru
+        await Promise.all(
+          tempTransactions.map(transaction => 
+            axios.post('/mahasiswa/jurnal', {
+              tanggal: transaction.date,
+              bukti: transaction.documentType,
+              keterangan: transaction.description,
+              akun_id: transaction.akun_id,
+              debit: transaction.debit || null,
+              kredit: transaction.kredit || null,
+              perusahaan_id: perusahaanId
+            })
+          )
+        );
+      }
+
+      // Reset form dan tutup modal
+      setFormData({
+        id: "",
+        date: "",
+        documentType: "",
+        description: "",
+        namaAkun: "",
+        kodeAkun: "",
+        akun_id: "",
+        sub_akun_id: null,
+        debit: 0,
+        kredit: 0,
+        perusahaan_id: ""
+      });
+      setTempTransactions([]);
+      onSubmit(formData);
+      onClose();
+      alert(editingTransactions.length > 0 ? 'Data berhasil diupdate' : 'Data berhasil disimpan');
+    } catch (error) {
+      console.error('Error saving transactions:', error);
+      alert('Gagal menyimpan data');
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Tambah Transaksi Baru</DialogTitle>
+          <DialogTitle>
+            {editingTransactions.length > 0 ? 'Edit Transaksi' : 'Tambah Transaksi'}
+          </DialogTitle>
         </DialogHeader>
         <div className="flex gap-6">
           {/* Left side - Form */}
@@ -339,7 +465,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
                 <label>Kode Akun</label>
                 <Select
                   value={formData.kodeAkun}
-                  onValueChange={async (value) => {
+                  onValueChange={(value) => {
                     const selectedAkun = akunList.find(a => a.kode.toString() === value);
                     const selectedSubAkun = subAkunList.find(s => s.kode.toString() === value);
                     
@@ -352,30 +478,18 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
                         sub_akun_id: null
                       });
                     } else if (selectedSubAkun) {
-                      try {
-                        // Fetch data jurnal dengan sub akun
-                        const response = await axios.post('/mahasiswa/jurnal/subakun', {
-                          akun_id: selectedSubAkun.akun.id,
-                          sub_akun_id: selectedSubAkun.id
-                        });
-
-                        if (response.data.success) {
-                          setFormData({
-                            ...formData,
-                            kodeAkun: selectedSubAkun.kode.toString(),
-                            namaAkun: selectedSubAkun.nama,
-                            akun_id: selectedSubAkun.akun.id,
-                            sub_akun_id: selectedSubAkun.id
-                          });
-                        }
-                      } catch (error) {
-                        console.error('Error fetching sub akun data:', error);
-                      }
+                      setFormData({
+                        ...formData,
+                        kodeAkun: selectedSubAkun.kode.toString(),
+                        namaAkun: selectedSubAkun.nama,
+                        akun_id: selectedSubAkun.akun.id,
+                        sub_akun_id: selectedSubAkun.id
+                      });
                     }
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih Kode Akun" />
+                    <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Kode Akun"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -386,14 +500,16 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
                         </SelectItem>
                       ))}
                     </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel>Sub Akun</SelectLabel>
-                      {subAkunList.map((subAkun) => (
-                        <SelectItem key={subAkun.id} value={subAkun.kode.toString()}>
-                          {subAkun.kode}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
+                    {subAkunList.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Sub Akun</SelectLabel>
+                        {subAkunList.map((subAkun) => (
+                          <SelectItem key={subAkun.id} value={subAkun.kode.toString()}>
+                            {subAkun.kode}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -411,20 +527,22 @@ export function JurnalForm({ isOpen, onClose, onSubmit, akunList, subAkunList }:
                         ...formData,
                         kodeAkun: selectedAkun.kode.toString(),
                         namaAkun: selectedAkun.nama,
-                        akun_id: selectedAkun.id
+                        akun_id: selectedAkun.id,
+                        sub_akun_id: null
                       });
                     } else if (selectedSubAkun) {
                       setFormData({
                         ...formData,
                         kodeAkun: selectedSubAkun.kode.toString(),
                         namaAkun: selectedSubAkun.nama,
-                        akun_id: selectedSubAkun.akun.id
+                        akun_id: selectedSubAkun.akun.id,
+                        sub_akun_id: selectedSubAkun.id
                       });
                     }
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih Nama Akun" />
+                    <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Nama Akun"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
