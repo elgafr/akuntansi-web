@@ -180,8 +180,8 @@ export function AddTransactionTable({
 
     accountsData.forEach(account => {
       if (account.kodeAkun && account.namaAkun) {
-        allAccounts.push({
-          kodeAkun: account.kodeAkun,
+      allAccounts.push({
+        kodeAkun: account.kodeAkun,
           namaAkun: account.namaAkun
         });
       }
@@ -194,7 +194,7 @@ export function AddTransactionTable({
             namaAkun: subAccount.namaSubAkun
           });
         }
-      });
+        });
     });
 
     return allAccounts;
@@ -420,44 +420,57 @@ export function AddTransactionTable({
     return Object.values(groups);
   };
 
-  // Fungsi untuk handle edit kejadian
-  const handleEditEvent = (transactions: Transaction[]) => {
-    setEditingTransactions(transactions);
+  // Update fungsi handleEditEvent
+  const handleEditEvent = async (transactions: Transaction[]) => {
+    if (!transactions || transactions.length === 0) return;
+
+    // Ambil transaksi pertama untuk data kejadian
+    const firstTransaction = transactions[0];
+    
+    // Filter semua transaksi dengan keterangan yang sama
+    const eventTransactions = transactions.filter(
+      t => t.description === firstTransaction.description
+    );
+
+    // Set editing transactions untuk dikirim ke JurnalForm
+    setEditingTransactions(eventTransactions);
+    
+    // Buka modal JurnalForm
     setIsJurnalFormOpen(true);
   };
 
-  // Update handleDeleteEvent untuk refresh data setelah delete
-  const handleDeleteEvent = async (eventTransactions: Transaction[]) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus seluruh transaksi dalam kejadian ini?')) {
-      return;
-    }
+  // Update fungsi handleDeleteEvent
+  const handleDeleteEvent = async (transactions: Transaction[]) => {
+    if (!transactions || transactions.length === 0) return;
 
-    try {
-      for (const transaction of eventTransactions) {
-        await axios.delete(`/mahasiswa/jurnal/${transaction.id}`);
-      }
+    const keterangan = transactions[0].description; // Ambil keterangan dari transaksi pertama
+    
+    if (window.confirm(`Hapus semua transaksi dengan keterangan "${keterangan}"?`)) {
+      try {
+        // Ambil semua ID transaksi dengan keterangan yang sama
+        const transactionIds = transactions
+          .filter(t => t.description === keterangan)
+          .map(t => t.id);
 
-      // Fetch ulang data setelah delete
-      const response = await axios.get('/mahasiswa/jurnal');
-      if (response.data.success) {
-        const formattedTransactions = response.data.data.map((item: any) => ({
-          id: item.id,
-          date: item.tanggal,
-          documentType: item.bukti,
-          description: item.keterangan,
-          namaAkun: item.akun.nama,
-          kodeAkun: item.akun.kode.toString(),
-          akun_id: item.akun_id,
-          debit: item.debit || 0,
-          kredit: item.kredit || 0,
-          perusahaan_id: item.perusahaan_id
-        }));
-        onTransactionsChange(formattedTransactions);
+        // Delete semua transaksi dengan keterangan yang sama
+        await Promise.all(
+          transactionIds.map(id => 
+            axios.delete(`/mahasiswa/jurnal/${id}`)
+          )
+        );
+
+        // Update state dengan menghapus semua transaksi yang memiliki keterangan yang sama
+        const updatedTransactions = transactions.filter(
+          t => t.description !== keterangan
+        );
+
+        // Update state dengan data yang sudah dikelompokkan
+        onTransactionsChange(updatedTransactions);
+        alert('Data berhasil dihapus');
+      } catch (error) {
+        console.error('Error deleting transactions:', error);
+        alert('Gagal menghapus data');
       }
-      alert('Data berhasil dihapus');
-    } catch (error) {
-      console.error('Error deleting transactions:', error);
-      alert('Gagal menghapus transaksi');
     }
   };
 
@@ -543,29 +556,16 @@ export function AddTransactionTable({
     return Object.values(groups);
   }, [transactions]);
 
-  // Update renderTableRow untuk menampilkan data dengan benar
+  // Update renderTableRow untuk mengelompokkan transaksi berdasarkan keterangan
   const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
-    const isFirstInGroup = index === 0 || (
-      transaction.description !== array[index - 1].description ||
-      transaction.date !== array[index - 1].date ||
-      transaction.documentType !== array[index - 1].documentType
-    );
+    // Cek apakah ini transaksi pertama atau memiliki keterangan berbeda dari sebelumnya
+    const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
+    
+    // Cek apakah transaksi ini bagian dari grup yang sama
+    const isPartOfGroup = index > 0 && transaction.description === array[index - 1].description;
 
-    const isPartOfGroup = index > 0 && (
-      transaction.description === array[index - 1].description &&
-      transaction.date === array[index - 1].date &&
-      transaction.documentType === array[index - 1].documentType
-    );
-
-    // Get all transactions in the same group
-    const groupTransactions = array.filter((t, i) => {
-      if (i < index) return false;
-      return (
-        t.description === transaction.description &&
-        t.date === transaction.date &&
-        t.documentType === transaction.documentType
-      );
-    });
+    // Dapatkan semua transaksi dalam grup yang sama
+    const groupTransactions = array.filter(t => t.description === transaction.description);
 
     return (
       <TableRow 
@@ -721,25 +721,25 @@ export function AddTransactionTable({
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tanggal</TableHead>
-              <TableHead>Bukti</TableHead>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Tanggal</TableHead>
+            <TableHead>Bukti</TableHead>
               <TableHead>Keterangan</TableHead>
               <TableHead>Kode Akun</TableHead>
-              <TableHead>Nama Akun</TableHead>
+            <TableHead>Nama Akun</TableHead>
               <TableHead className="text-right">Debit</TableHead>
               <TableHead className="text-right">Kredit</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
             {transactions.map((transaction, index, array) => 
               renderTableRow(transaction, index, array)
             )}
-          </TableBody>
-        </Table>
+        </TableBody>
+      </Table>
       </div>
 
       <JurnalForm
@@ -749,8 +749,6 @@ export function AddTransactionTable({
           setEditingTransactions([]);
         }}
         onSubmit={handleJurnalFormSubmit}
-        akunList={akunList}
-        subAkunList={subAkunList}
         editingTransactions={editingTransactions}
       />
     </div>
