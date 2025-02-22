@@ -1,12 +1,15 @@
 "use client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { NeracaLajurTable } from "@/components/neraca-lajur/NeracaLajurTable";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { LabaRugiSection } from "@/components/laporan/LabaRugiSection";
+import { PosisiKeuanganSection } from "@/components/laporan/PosisiKeuanganSection";
+import { ArusKasSection } from "@/components/laporan/ArusKasSection";
+import { PerubahanEkuitasSection } from "@/components/laporan/PerubahanEkuitasSection";
 
-export default function NeracaLajurPage() {
+export default function LaporanPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -18,10 +21,10 @@ export default function NeracaLajurPage() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6 text-black">
-                    Neraca Lajur
+                    Laporan Keuangan
                   </h1>
                   <h2 className="text-sm ml-6">
-                    Let&apos;s check your Neraca Lajur today
+                    Let&apos;s check your Financial Reports
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -43,25 +46,32 @@ export default function NeracaLajurPage() {
           </div>
         </header>
 
+        {/* Content Section */}
         <section className="p-6">
-          
-          
-          <Tabs defaultValue="before" className="w-full">
-            <TabsList className="w-full justify-between bg-muted/50">
-              <TabsTrigger value="before" className="flex-1">
-                Neraca Saldo Sebelum di Penyesuaian
-              </TabsTrigger>
-              <TabsTrigger value="after" className="flex-1">
-                Neraca Saldo Setelah di Penyesuaian
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="before">
-              <NeracaLajurTable type="before" />
+          <Tabs defaultValue="posisi-keuangan" className="w-full">
+            <div className="flex justify-between items-center mb-6">
+              <TabsList className="w-full justify-between bg-muted/50">
+                <TabsTrigger value="laba-rugi" className="flex-1">Laporan Laba Rugi</TabsTrigger>
+                <TabsTrigger value="perubahan-ekuitas" className="flex-1">Laporan Perubahan Ekuitas</TabsTrigger>
+                <TabsTrigger value="posisi-keuangan" className="flex-1">Laporan Posisi Keuangan</TabsTrigger>
+                <TabsTrigger value="arus-kas" className="flex-1">Laporan Arus Kas</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="laba-rugi">
+              <LabaRugiSection />
             </TabsContent>
-            
-            <TabsContent value="after">
-              <NeracaLajurTable type="after" />
+
+            <TabsContent value="posisi-keuangan">
+              <PosisiKeuanganSection />
+            </TabsContent>
+
+            <TabsContent value="perubahan-ekuitas">
+              <PerubahanEkuitasSection />
+            </TabsContent>
+
+            <TabsContent value="arus-kas">
+              <ArusKasSection />
             </TabsContent>
           </Tabs>
         </section>

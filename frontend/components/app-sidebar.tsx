@@ -32,7 +32,7 @@ const data = {
     },
     {
       title: "Jurnal",
-      url: "/jurnal2",
+      url: "/jurnal",
       icon: FileTextIcon,
     },
     {
@@ -47,7 +47,7 @@ const data = {
     },
     {
       title: "Laporan",
-      url: "#",
+      url: "/laporan",
       icon: BarChart2,
     },
     {

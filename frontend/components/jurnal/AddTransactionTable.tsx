@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Save, Trash2, Plus, Pencil, X, Download, Upload, Moon, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Save, Trash2, Plus, Pencil, X, Download, Upload, Moon, Check, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useAccounts } from "@/contexts/AccountContext";
 import {
   Select,
@@ -21,40 +21,19 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import axios from "@/lib/axios";
 import { JurnalForm } from "./JurnalForm";
-
-interface Transaction {
-  id: string;
-  date: string;
-  documentType: string;
-  description: string;
-  namaAkun: string;
-  kodeAkun: string;
-  akun_id: string;
-  debit: number;
-  kredit: number;
-  perusahaan_id: string;
-}
-
-interface Account {
-  kodeAkun: string;
-  namaAkun: string;
-  debit: number;
-  kredit: number;
-  subAccounts?: {
-    namaSubAkun: string;
-    kodeAkunInduk: string;
-    kodeSubAkun: string;
-    debit: number;
-    kredit: number;
-  }[];
-}
-
-interface Akun {
-  id: string;
-  kode: number;
-  nama: string;
-  status: string;
-}
+import { Account, SubAccount } from "@/types/account";
+import { Transaction } from "@/types/transaction";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SubAkun {
   id: string;
@@ -103,6 +82,31 @@ interface AddTransactionTableProps {
   onTransactionsChange: (transactions: Transaction[]) => void;
 }
 
+// Add this function near the top of the file
+const formatJurnalResponse = (jurnalData: JurnalData): Transaction[] => {
+  const formattedTransactions: Transaction[] = [];
+  
+  Object.entries(jurnalData).forEach(([keterangan, entries]) => {
+    entries.forEach(entry => {
+      formattedTransactions.push({
+        id: entry.id,
+        date: entry.tanggal,
+        documentType: entry.bukti,
+        description: entry.keterangan,
+        namaAkun: entry.akun.nama,
+        kodeAkun: entry.akun.kode.toString(),
+        akun_id: entry.akun_id,
+        debit: entry.debit || 0,
+        kredit: entry.kredit || 0,
+        perusahaan_id: entry.perusahaan_id,
+        sub_akun_id: entry.sub_akun_id
+      });
+    });
+  });
+
+  return formattedTransactions;
+};
+
 export function AddTransactionTable({ 
   accounts = [], 
   transactions = [], 
@@ -121,7 +125,7 @@ export function AddTransactionTable({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [akunList, setAkunList] = useState<Akun[]>([]);
+  const [akunList, setAkunList] = useState<Account[]>([]);
   const [subAkunList, setSubAkunList] = useState<SubAkun[]>([]);
   const [currentEvent, setCurrentEvent] = useState<{
     date: string;
@@ -130,6 +134,10 @@ export function AddTransactionTable({
   } | null>(null);
   const [isJurnalFormOpen, setIsJurnalFormOpen] = useState(false);
   const [editingTransactions, setEditingTransactions] = useState<Transaction[]>([]);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const { toast } = useToast();
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction[]>([]);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -143,6 +151,7 @@ export function AddTransactionTable({
     debit: 0,
     kredit: 0,
     perusahaan_id: "",
+    sub_akun_id: null,
   };
 
   const handleAddNewRow = () => {
@@ -186,15 +195,18 @@ export function AddTransactionTable({
         });
       }
 
-      account.subAccounts?.forEach(subAccount => {
-        if (subAccount.kodeAkunInduk && subAccount.kodeSubAkun && subAccount.namaSubAkun) {
-          const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
-          allAccounts.push({
-            kodeAkun: fullKodeAkun,
-            namaAkun: subAccount.namaSubAkun
-          });
-        }
+      // Check if account has subAccounts property
+      if ('subAccounts' in account && Array.isArray(account.subAccounts)) {
+        account.subAccounts.forEach((subAccount: SubAccount) => {
+          if (subAccount.kodeAkunInduk && subAccount.kodeSubAkun && subAccount.namaSubAkun) {
+            const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
+            allAccounts.push({
+              kodeAkun: fullKodeAkun,
+              namaAkun: subAccount.namaSubAkun
+            });
+          }
         });
+      }
     });
 
     return allAccounts;
@@ -242,40 +254,7 @@ export function AddTransactionTable({
     try {
       const response = await axios.delete(`/mahasiswa/jurnal/${transaction.id}`);
       if (response.data.success) {
-        // Hapus transaksi dari state
-        const updatedTransactions = transactions.filter(t => t.id !== transaction.id);
-        
-        // Kelompokkan ulang transaksi berdasarkan kejadian
-        const groupedTransactions = [];
-        let currentGroup = null;
-        
-        updatedTransactions.forEach((t, idx) => {
-          if (idx === 0 || 
-              t.date !== updatedTransactions[idx - 1].date ||
-              t.documentType !== updatedTransactions[idx - 1].documentType ||
-              t.description !== updatedTransactions[idx - 1].description) {
-            // Ini adalah transaksi pertama dalam grup baru
-            currentGroup = {
-              date: t.date,
-              documentType: t.documentType,
-              description: t.description
-            };
-            // Simpan data lengkap untuk baris pertama
-            groupedTransactions.push(t);
-    } else {
-            // Ini adalah transaksi lanjutan dalam grup yang sama
-            groupedTransactions.push({
-              ...t,
-              date: "",
-              documentType: "",
-              description: ""
-            });
-          }
-        });
-
-        // Update state dengan data yang sudah dikelompokkan
-        onTransactionsChange(groupedTransactions);
-        alert('Data berhasil dihapus');
+        window.location.href = '/jurnal';
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
@@ -344,36 +323,6 @@ export function AddTransactionTable({
     document.body.removeChild(link);
   };
 
-  // Update fungsi handleImportCSV
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        const importedTransactions: Transaction[] = [];
-        
-        // Process CSV data and create transactions with required fields
-        // ... process CSV logic ...
-
-        // Add akun_id and perusahaan_id to imported transactions
-        const processedTransactions = importedTransactions.map(t => ({
-          ...t,
-          akun_id: '', // Get this from your akun list based on kodeAkun
-          perusahaan_id: '', // Get this from your active perusahaan
-        }));
-
-        onTransactionsChange([...transactions, ...processedTransactions]);
-      };
-      reader.readAsText(file);
-    } catch (error) {
-      console.error('Error importing CSV:', error);
-      alert('Error importing CSV file');
-    }
-  };
-
   // Tambahkan fungsi untuk menangani inline edit
   const handleInlineEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -440,58 +389,48 @@ export function AddTransactionTable({
   };
 
   // Update fungsi handleDeleteEvent
-  const handleDeleteEvent = async (transactions: Transaction[]) => {
-    if (!transactions || transactions.length === 0) return;
-
-    const keterangan = transactions[0].description; // Ambil keterangan dari transaksi pertama
-    
-    if (window.confirm(`Hapus semua transaksi dengan keterangan "${keterangan}"?`)) {
-      try {
-        // Ambil semua ID transaksi dengan keterangan yang sama
-        const transactionIds = transactions
-          .filter(t => t.description === keterangan)
-          .map(t => t.id);
-
-        // Delete semua transaksi dengan keterangan yang sama
-        await Promise.all(
-          transactionIds.map(id => 
-            axios.delete(`/mahasiswa/jurnal/${id}`)
-          )
-        );
-
-        // Update state dengan menghapus semua transaksi yang memiliki keterangan yang sama
-        const updatedTransactions = transactions.filter(
-          t => t.description !== keterangan
-        );
-
-        // Update state dengan data yang sudah dikelompokkan
-        onTransactionsChange(updatedTransactions);
-        alert('Data berhasil dihapus');
-      } catch (error) {
-        console.error('Error deleting transactions:', error);
-        alert('Gagal menghapus data');
-      }
-    }
+  const handleDeleteEvent = (transactions: Transaction[]) => {
+    setTransactionToDelete(transactions);
+    setShowDeleteAlert(true);
   };
 
-  // Update handleJurnalFormSubmit untuk refresh data setelah submit
-  const handleJurnalFormSubmit = async (newTransaction: Transaction) => {
+  const confirmDelete = async () => {
     try {
-      // Refresh data setelah submit
+      const transactionIds = transactionToDelete
+        .filter(t => t.description === transactionToDelete[0].description)
+        .map(t => t.id);
+
+      await Promise.all(
+        transactionIds.map(id => axios.delete(`/mahasiswa/jurnal/${id}`))
+      );
+
+      toast({
+        title: "Berhasil",
+        description: "Data berhasil dihapus"
+      });
+      
+      // Refresh after 2 seconds
+      setTimeout(() => {
+        window.location.href = '/jurnal';
+      }, 2000);
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Gagal menghapus data"
+      });
+    }
+    setShowDeleteAlert(false);
+  };
+
+  // Update handleJurnalFormSubmit
+  const handleJurnalFormSubmit = async (newTransaction: Transaction) => {
+    // Refresh data without page reload
+    try {
       const response = await axios.get('/mahasiswa/jurnal');
       if (response.data.success) {
-        const formattedTransactions = response.data.data.map((item: any) => ({
-          id: item.id,
-          date: item.tanggal,
-          documentType: item.bukti,
-          description: item.keterangan,
-          namaAkun: item.akun.nama,
-          kodeAkun: item.akun.kode.toString(),
-          akun_id: item.akun_id,
-          debit: item.debit || 0,
-          kredit: item.kredit || 0,
-          perusahaan_id: item.perusahaan_id
-        }));
+        const formattedTransactions = formatJurnalResponse(response.data.data);
         onTransactionsChange(formattedTransactions);
       }
     } catch (error) {
@@ -499,18 +438,16 @@ export function AddTransactionTable({
     }
   };
 
-  // Fetch jurnal data
+  // Update useEffect untuk fetch jurnal data
   useEffect(() => {
     const fetchJurnal = async () => {
       setIsLoading(true);
       try {
         const response = await axios.get('/mahasiswa/jurnal');
         if (response.data.success) {
-          // Transform data dari API ke format yang dibutuhkan
           const jurnalData: JurnalData = response.data.data;
           const formattedTransactions: Transaction[] = [];
 
-          // Flatten data dari struktur grouped
           Object.entries(jurnalData).forEach(([keterangan, entries]) => {
             entries.forEach(entry => {
               formattedTransactions.push({
@@ -523,11 +460,13 @@ export function AddTransactionTable({
                 akun_id: entry.akun_id,
                 debit: entry.debit || 0,
                 kredit: entry.kredit || 0,
-                perusahaan_id: entry.perusahaan_id
+                perusahaan_id: entry.perusahaan_id,
+                sub_akun_id: entry.sub_akun_id
               });
             });
           });
 
+          // Tidak perlu sorting di sini, langsung gunakan data dari API
           onTransactionsChange(formattedTransactions);
         }
       } catch (error) {
@@ -539,12 +478,13 @@ export function AddTransactionTable({
     };
 
     fetchJurnal();
-  }, []); // Empty dependency array untuk fetch sekali saat mount
+  }, []);
 
-  // Group transactions by event
+  // Update groupedTransactions untuk menggunakan data tanpa sorting
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {};
     
+    // Langsung gunakan transactions tanpa sorting
     transactions.forEach(transaction => {
       const eventKey = `${transaction.date}_${transaction.documentType}_${transaction.description}`;
       if (!groups[eventKey]) {
@@ -556,15 +496,36 @@ export function AddTransactionTable({
     return Object.values(groups);
   }, [transactions]);
 
-  // Update renderTableRow untuk mengelompokkan transaksi berdasarkan keterangan
-  const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
-    // Cek apakah ini transaksi pertama atau memiliki keterangan berbeda dari sebelumnya
-    const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
+  // Update handleSort untuk menangani sorting
+  const handleSort = () => {
+    const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortDirection(newDirection);
     
-    // Cek apakah transaksi ini bagian dari grup yang sama
-    const isPartOfGroup = index > 0 && transaction.description === array[index - 1].description;
+    const sortedTransactions = [...transactions].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return newDirection === 'asc' 
+        ? dateA - dateB  // Ascending (terlama ke terbaru)
+        : dateB - dateA; // Descending (terbaru ke terlama)
+    });
 
-    // Dapatkan semua transaksi dalam grup yang sama
+    onTransactionsChange(sortedTransactions);
+  };
+
+  // Tambahkan fungsi format tanggal
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/-/g, '/');
+  };
+
+  // Update renderTableRow untuk menggunakan format tanggal
+  const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
+    const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
+    const isPartOfGroup = index > 0 && transaction.description === array[index - 1].description;
     const groupTransactions = array.filter(t => t.description === transaction.description);
 
     return (
@@ -572,7 +533,7 @@ export function AddTransactionTable({
         key={transaction.id}
         className={isPartOfGroup ? 'bg-gray-50/50' : ''}
       >
-        <TableCell>{isFirstInGroup ? transaction.date : ''}</TableCell>
+        <TableCell>{isFirstInGroup ? formatDate(transaction.date) : ''}</TableCell>
         <TableCell>{isFirstInGroup ? transaction.documentType : ''}</TableCell>
         <TableCell>{isFirstInGroup ? transaction.description : ''}</TableCell>
         <TableCell>{transaction.kodeAkun}</TableCell>
@@ -683,22 +644,6 @@ export function AddTransactionTable({
           />
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleImportCSV}
-            className="hidden"
-            id="csvInput"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => document.getElementById('csvInput')?.click()}
-            className="flex items-center gap-2 rounded-lg border-gray-200"
-          >
-            <Upload className="h-4 w-4" />
-            Import CSV
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -721,11 +666,23 @@ export function AddTransactionTable({
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Tanggal</TableHead>
-            <TableHead>Bukti</TableHead>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                <div 
+                  className="flex items-center gap-2 cursor-pointer hover:text-gray-700"
+                  onClick={handleSort}
+                >
+                  Tanggal
+                  {sortDirection === 'asc' ? (
+                    <ArrowUp className="h-4 w-4" />
+                  ) : (
+                    <ArrowDown className="h-4 w-4" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead>Bukti</TableHead>
               <TableHead>Keterangan</TableHead>
               <TableHead>Kode Akun</TableHead>
             <TableHead>Nama Akun</TableHead>
@@ -751,6 +708,21 @@ export function AddTransactionTable({
         onSubmit={handleJurnalFormSubmit}
         editingTransactions={editingTransactions}
       />
+
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Hapus</AlertDialogTitle>
+            <AlertDialogDescription>
+              Anda yakin ingin menghapus transaksi ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Hapus</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 

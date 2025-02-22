@@ -15,11 +15,20 @@ import {
 } from "@/components/ui/select";
 import axios from "@/lib/axios";
 import { Pencil, Trash2, Check } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/use-toast";
 
 interface JurnalFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (transaction: Transaction) => void;
+  onSubmit: (data: Transaction) => void;
   editingTransactions?: Transaction[];
 }
 
@@ -31,7 +40,7 @@ interface Transaction {
   namaAkun: string;
   kodeAkun: string;
   akun_id: string;
-  sub_akun_id: string | null;
+  sub_akun_id: string | null | undefined;
   debit: number;
   kredit: number;
   perusahaan_id: string;
@@ -58,14 +67,17 @@ interface SubAkun {
   updated_at: string;
 }
 
-// Add new interface for temporary transactions
+// Update TempTransaction interface
 interface TempTransaction {
+  id?: string;
   date: string;
   documentType: string;
   description: string;
   namaAkun: string;
   kodeAkun: string;
   akun_id: string;
+  sub_akun_id?: string | null;
+  perusahaan_id?: string;
   debit: number;
   kredit: number;
 }
@@ -88,9 +100,9 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     namaAkun: "",
     kodeAkun: "",
     akun_id: "",
-    sub_akun_id: null,
     debit: 0,
     kredit: 0,
+    sub_akun_id: null,
     perusahaan_id: ""
   });
 
@@ -107,6 +119,17 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
   const [subAkunList, setSubAkunList] = useState<SubAkun[]>([]);
   const [isLoadingAkun, setIsLoadingAkun] = useState(true);
   const [errorAkun, setErrorAkun] = useState<string | null>(null);
+
+  // Tambahkan state untuk tracking transaksi yang sedang diedit
+  const [editingTransactionIndex, setEditingTransactionIndex] = useState<number | null>(null);
+
+  // Tambahkan state untuk track mode
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchActivePerusahaan = async () => {
@@ -173,21 +196,28 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     }
   }, [isOpen]);
 
-  // Update useEffect untuk mengisi form data saat editing
+  // Update useEffect for handling editingTransactions
   useEffect(() => {
     if (editingTransactions.length > 0) {
+      setIsEditMode(true);
       const firstTransaction = editingTransactions[0];
       
-      // Set form data dengan data kejadian (dari transaksi pertama)
       setFormData({
-        ...formData,
+        id: "",
         date: firstTransaction.date,
         documentType: firstTransaction.documentType,
-        description: firstTransaction.description
+        description: firstTransaction.description,
+        namaAkun: "",
+        kodeAkun: "",
+        akun_id: "",
+        debit: 0,
+        kredit: 0,
+        sub_akun_id: null,
+        perusahaan_id: ""
       });
 
-      // Set temporary transactions dengan semua transaksi dalam kejadian
       setTempTransactions(editingTransactions.map(t => ({
+        id: t.id,
         date: t.date,
         documentType: t.documentType,
         description: t.description,
@@ -195,10 +225,32 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
         kodeAkun: t.kodeAkun,
         akun_id: t.akun_id,
         debit: t.debit,
-        kredit: t.kredit
+        kredit: t.kredit,
+        sub_akun_id: t.sub_akun_id,
+        perusahaan_id: t.perusahaan_id
       })));
+    } else {
+      // Clear everything when opening new transaction
+      resetAllState();
     }
-  }, [editingTransactions, isOpen]);
+  }, [editingTransactions]);
+
+  // Tambahkan fungsi reset form
+  const resetFormData = () => {
+    setFormData({
+      id: "",
+      date: "",
+      documentType: "",
+      description: "",
+      namaAkun: "",
+      kodeAkun: "",
+      akun_id: "",
+      debit: 0,
+      kredit: 0,
+      sub_akun_id: null,
+      perusahaan_id: ""
+    });
+  };
 
   // Add function to calculate totals
   const calculateTotals = () => {
@@ -226,46 +278,45 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
         return;
       }
 
-      // Jika sedang edit, update transaksi yang ada
-      if (editingTransactions.length > 0) {
-        // Update existing transactions
+      // Jika sedang edit transaksi
+      if (editingTransactionIndex !== null) {
         const updatedTransactions = [...tempTransactions];
-        updatedTransactions.push({
-          date: formData.date,
-          documentType: formData.documentType,
-          description: formData.description,
-          namaAkun: formData.namaAkun,
-          kodeAkun: formData.kodeAkun,
-          akun_id: formData.akun_id,
-          debit: formData.debit,
-          kredit: formData.kredit
-        });
+        updatedTransactions[editingTransactionIndex] = {
+          ...formData
+        };
         setTempTransactions(updatedTransactions);
+        setEditingTransactionIndex(null); // Reset editing state
       } else {
-        // Add new transaction
-        setTempTransactions([...tempTransactions, {
-          date: tempTransactions.length === 0 ? formData.date : tempTransactions[0].date,
-          documentType: tempTransactions.length === 0 ? formData.documentType : tempTransactions[0].documentType,
-          description: tempTransactions.length === 0 ? formData.description : tempTransactions[0].description,
-          namaAkun: formData.namaAkun,
-          kodeAkun: formData.kodeAkun,
-          akun_id: formData.akun_id,
-          debit: formData.debit,
-          kredit: formData.kredit,
-        }]);
+        // Tambah transaksi baru
+        setTempTransactions([...tempTransactions, { ...formData }]);
       }
 
-      // Clear form except for date, documentType, and description
+      // Reset form tapi pertahankan data kejadian jika sudah ada transaksi
+      const eventData = tempTransactions.length > 0 ? {
+        date: tempTransactions[0].date,
+        documentType: tempTransactions[0].documentType,
+        description: tempTransactions[0].description,
+      } : {
+        date: formData.date,
+        documentType: formData.documentType,
+        description: formData.description,
+      };
+
       setFormData({
-        ...formData,
+        id: "",
+        date: eventData.date,
+        documentType: eventData.documentType,
+        description: eventData.description,
         namaAkun: "",
         kodeAkun: "",
         akun_id: "",
         debit: 0,
         kredit: 0,
+        sub_akun_id: null,
+        perusahaan_id: ""
       });
     } catch (error) {
-      console.error('Error adding transaction:', error);
+      console.error('Error:', error);
       alert('Gagal menambahkan transaksi');
     }
   };
@@ -300,479 +351,534 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     setIsEditingEvent(false);
   };
 
-  // Update fungsi handleEditTransaction
-  const handleEditTransaction = (transaction: TempTransaction, index: number) => {
-    // Set form data dengan nilai transaksi yang akan diedit
+  // Tambahkan fungsi untuk handle edit transaksi
+  const handleEditTransaction = (index: number) => {
+    const transactionToEdit = tempTransactions[index];
     setFormData({
-      ...formData,
-      namaAkun: transaction.namaAkun,
-      kodeAkun: transaction.kodeAkun,
-      akun_id: transaction.akun_id,
-      debit: transaction.debit,
-      kredit: transaction.kredit,
-    });
-  };
-
-  // Update fungsi handleUpdateTransaction
-  const handleUpdateTransaction = (index: number) => {
-    // Validasi form sebelum update
-    if (!formData.namaAkun || !formData.kodeAkun || !formData.akun_id) {
-      alert('Pilih akun terlebih dahulu');
-      return;
-    }
-
-    if (formData.debit === 0 && formData.kredit === 0) {
-      alert('Masukkan nilai debit atau kredit');
-      return;
-    }
-
-    const updatedTransactions = [...tempTransactions];
-    updatedTransactions[index] = {
-      ...tempTransactions[index], // Pertahankan data lama
-      namaAkun: formData.namaAkun,
-      kodeAkun: formData.kodeAkun,
-      akun_id: formData.akun_id,
-      debit: formData.debit,
-      kredit: formData.kredit,
-    };
-    setTempTransactions(updatedTransactions);
-    
-    // Reset form
-    setFormData({
-      ...formData,
-      namaAkun: "",
-      kodeAkun: "",
-      akun_id: "",
-      debit: 0,
-      kredit: 0,
-    });
+      ...transactionToEdit,
+      id: transactionToEdit.id || "",
+      sub_akun_id: transactionToEdit.sub_akun_id || "",
+      perusahaan_id: transactionToEdit.perusahaan_id || ""
+    } as Transaction); // Add type assertion here
+    setEditingTransactionIndex(index);
   };
 
   // Tambahkan fungsi handleSubmitAll untuk menyimpan semua transaksi
   const handleSubmitAll = async () => {
-    if (!perusahaanId) {
-      alert('Perusahaan online tidak ditemukan');
-      return;
-    }
-
     try {
-      // Jika sedang edit, update transaksi yang ada
       if (editingTransactions.length > 0) {
-        // Delete transaksi lama
         await Promise.all(
-          editingTransactions.map(t => axios.delete(`/mahasiswa/jurnal/${t.id}`))
+          tempTransactions.map(async (transaction, index) => {
+            const originalTransaction = editingTransactions[index];
+            if (originalTransaction?.id) {
+              await axios.put(`/mahasiswa/jurnal/${originalTransaction.id}`, {
+                tanggal: transaction.date,
+                bukti: transaction.documentType,
+                keterangan: transaction.description,
+                akun_id: transaction.akun_id,
+                debit: transaction.debit || 0,
+                kredit: transaction.kredit || 0,
+                perusahaan_id: perusahaanId,
+                sub_akun_id: transaction.sub_akun_id
+              });
+            }
+          })
         );
-
-        // Create transaksi baru dengan data yang sudah diupdate
-        await Promise.all(
-          tempTransactions.map(transaction => 
-            axios.post('/mahasiswa/jurnal', {
-              tanggal: transaction.date,
-              bukti: transaction.documentType,
-              keterangan: transaction.description,
-              akun_id: transaction.akun_id,
-              debit: transaction.debit || null,
-              kredit: transaction.kredit || null,
-              perusahaan_id: perusahaanId
-            })
-          )
-        );
+        
+        toast({
+          title: "Berhasil",
+          description: "Data berhasil diupdate"
+        });
       } else {
-        // Jika bukan edit, create transaksi baru
-        await Promise.all(
-          tempTransactions.map(transaction => 
-            axios.post('/mahasiswa/jurnal', {
-              tanggal: transaction.date,
-              bukti: transaction.documentType,
-              keterangan: transaction.description,
-              akun_id: transaction.akun_id,
-              debit: transaction.debit || null,
-              kredit: transaction.kredit || null,
-              perusahaan_id: perusahaanId
-            })
-          )
-        );
+        await axios.post('/mahasiswa/jurnal', {
+          transactions: tempTransactions.map(t => ({
+            tanggal: t.date,
+            bukti: t.documentType,
+            keterangan: t.description,
+            akun_id: t.akun_id,
+            debit: t.debit || 0,
+            kredit: t.kredit || 0,
+            perusahaan_id: perusahaanId,
+            sub_akun_id: t.sub_akun_id
+          }))
+        });
+
+        toast({
+          title: "Berhasil",
+          description: "Data berhasil disimpan"
+        });
       }
 
-      // Reset form dan tutup modal
-      setFormData({
-        id: "",
-        date: "",
-        documentType: "",
-        description: "",
-        namaAkun: "",
-        kodeAkun: "",
-        akun_id: "",
-        sub_akun_id: null,
-        debit: 0,
-        kredit: 0,
-        perusahaan_id: ""
-      });
-      setTempTransactions([]);
-      onSubmit(formData);
-      onClose();
-      alert(editingTransactions.length > 0 ? 'Data berhasil diupdate' : 'Data berhasil disimpan');
+      // Refresh after 2 seconds
+      setTimeout(() => {
+        window.location.href = '/jurnal';
+      }, 2000);
+
     } catch (error) {
-      console.error('Error saving transactions:', error);
-      alert('Gagal menyimpan data');
+      toast({
+        variant: "destructive", 
+        title: "Error",
+        description: "Gagal menyimpan data"
+      });
     }
   };
 
+  // Tambahkan fungsi format tanggal
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/-/g, '/');
+  };
+
+  // Add state reset function
+  const resetAllState = () => {
+    resetFormData();
+    setTempTransactions([]);
+    setIsEditMode(false);
+    setEditingTransactionIndex(null);
+    setIsEditingEvent(false);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {editingTransactions.length > 0 ? 'Edit Transaksi' : 'Tambah Transaksi'}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex gap-6">
-          {/* Left side - Form */}
-          <form onSubmit={handleSubmit} className="space-y-4 w-[400px]">
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <label>Tanggal</label>
-                <Input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  disabled={tempTransactions.length > 0}
-                  required
-                />
-              </div>
-              
-              <div className="grid gap-2">
-                <label>Bukti</label>
-                <Input
-                  value={formData.documentType}
-                  onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
-                  disabled={tempTransactions.length > 0}
-                  required
-                />
-              </div>
+    <>
+      <Dialog 
+        open={isOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            resetAllState(); // Use new reset function
+            onClose();
+          }
+        }}
+      >
+        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTransactions.length > 0 ? 'Edit Transaksi' : 'Tambah Transaksi'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-6">
+            {/* Left side - Form */}
+            <form onSubmit={handleSubmit} className="space-y-4 w-[400px]">
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <label>Tanggal</label>
+                  <Input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    disabled={tempTransactions.length > 0}
+                    required
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <label>Bukti</label>
+                  <Input
+                    value={formData.documentType}
+                    onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
+                    disabled={tempTransactions.length > 0}
+                    required
+                  />
+                </div>
 
-              <div className="grid gap-2">
-                <label>Keterangan</label>
-                <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  disabled={tempTransactions.length > 0}
-                  required
-                />
-              </div>
+                <div className="grid gap-2">
+                  <label>Keterangan</label>
+                  <Input
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    disabled={tempTransactions.length > 0}
+                    required
+                  />
+                </div>
 
-              <div className="grid gap-2">
-                <label>Kode Akun</label>
-                <Select
-                  value={formData.kodeAkun}
-                  onValueChange={(value) => {
-                    const selectedAkun = akunList.find(a => a.kode.toString() === value);
-                    const selectedSubAkun = subAkunList.find(s => s.kode.toString() === value);
-                    
-                    if (selectedAkun) {
-                      setFormData({
-                        ...formData,
-                        kodeAkun: selectedAkun.kode.toString(),
-                        namaAkun: selectedAkun.nama,
-                        akun_id: selectedAkun.id,
-                        sub_akun_id: null
-                      });
-                    } else if (selectedSubAkun) {
-                      setFormData({
-                        ...formData,
-                        kodeAkun: selectedSubAkun.kode.toString(),
-                        namaAkun: selectedSubAkun.nama,
-                        akun_id: selectedSubAkun.akun.id,
-                        sub_akun_id: selectedSubAkun.id
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Kode Akun"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Akun</SelectLabel>
-                      {akunList.map((akun) => (
-                        <SelectItem key={akun.id} value={akun.kode.toString()}>
-                          {akun.kode}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    {subAkunList.length > 0 && (
+                <div className="grid gap-2">
+                  <label>Kode Akun</label>
+                  <Select
+                    value={formData.kodeAkun}
+                    onValueChange={(value) => {
+                      const selectedAkun = akunList.find(a => a.kode.toString() === value);
+                      const selectedSubAkun = subAkunList.find(s => s.kode.toString() === value);
+                      
+                      if (selectedAkun) {
+                        setFormData({
+                          ...formData,
+                          kodeAkun: selectedAkun.kode.toString(),
+                          namaAkun: selectedAkun.nama,
+                          akun_id: selectedAkun.id,
+                          sub_akun_id: null
+                        });
+                      } else if (selectedSubAkun) {
+                        setFormData({
+                          ...formData,
+                          kodeAkun: selectedSubAkun.kode.toString(),
+                          namaAkun: selectedSubAkun.nama,
+                          akun_id: selectedSubAkun.akun.id,
+                          sub_akun_id: selectedSubAkun.id
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Kode Akun"} />
+                    </SelectTrigger>
+                    <SelectContent>
                       <SelectGroup>
-                        <SelectLabel>Sub Akun</SelectLabel>
-                        {subAkunList.map((subAkun) => (
-                          <SelectItem key={subAkun.id} value={subAkun.kode.toString()}>
-                            {subAkun.kode}
+                        <SelectLabel>Akun</SelectLabel>
+                        {akunList.map((akun) => (
+                          <SelectItem 
+                            key={`main-${akun.id}`}
+                            value={akun.kode.toString()}
+                          >
+                            {`${akun.kode} - ${akun.nama}`}
                           </SelectItem>
                         ))}
                       </SelectGroup>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <label>Nama Akun</label>
-                <Select
-                  value={formData.namaAkun}
-                  onValueChange={(value) => {
-                    const selectedAkun = akunList.find(a => a.nama === value);
-                    const selectedSubAkun = subAkunList.find(s => s.nama === value);
-                    
-                    if (selectedAkun) {
-                      setFormData({
-                        ...formData,
-                        kodeAkun: selectedAkun.kode.toString(),
-                        namaAkun: selectedAkun.nama,
-                        akun_id: selectedAkun.id,
-                        sub_akun_id: null
-                      });
-                    } else if (selectedSubAkun) {
-                      setFormData({
-                        ...formData,
-                        kodeAkun: selectedSubAkun.kode.toString(),
-                        namaAkun: selectedSubAkun.nama,
-                        akun_id: selectedSubAkun.akun.id,
-                        sub_akun_id: selectedSubAkun.id
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Nama Akun"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Akun</SelectLabel>
-                      {akunList.map((akun) => (
-                        <SelectItem key={akun.id} value={akun.nama}>
-                          {akun.nama}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel>Sub Akun</SelectLabel>
-                      {subAkunList.map((subAkun) => (
-                        <SelectItem key={subAkun.id} value={subAkun.nama}>
-                          {subAkun.nama}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <label>Debit</label>
-                <Input
-                  type="number"
-                  value={formData.debit}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    debit: Number(e.target.value),
-                    kredit: 0
-                  })}
-                  disabled={formData.kredit > 0}
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <label>Kredit</label>
-                <Input
-                  type="number"
-                  value={formData.kredit}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    kredit: Number(e.target.value),
-                    debit: 0
-                  })}
-                  disabled={formData.debit > 0}
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Batal
-              </Button>
-              <Button type="submit">Tambah ke Ringkasan</Button>
-            </div>
-          </form>
-
-          {/* Right side - Summary Card */}
-          <div className="flex-1 border rounded-lg p-4 space-y-4 min-w-[600px]">
-            <h3 className="font-semibold text-lg">Ringkasan Transaksi</h3>
-            
-            {/* Header info untuk transaksi pertama */}
-            {tempTransactions.length > 0 && (
-              <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-medium text-gray-700">Informasi Kejadian</h4>
-                  {!isEditingEvent ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleEditEvent}
-                      className="h-8 px-2 hover:bg-gray-100"
-                    >
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Edit Kejadian
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleUpdateEvent}
-                      className="h-8 px-2 hover:bg-gray-100 text-green-600"
-                    >
-                      Update Kejadian
-                    </Button>
-                  )}
+                      <SelectGroup>
+                        <SelectLabel>Sub Akun</SelectLabel>
+                        {subAkunList.map((subAkun) => (
+                          <SelectItem 
+                            key={`sub-${subAkun.id}`}
+                            value={subAkun.kode.toString()}
+                          >
+                            {`${subAkun.kode} - ${subAkun.nama}`}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="grid grid-cols-3 gap-6">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Tanggal</p>
-                    {isEditingEvent ? (
-                      <Input
-                        type="date"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base font-medium mt-1">{tempTransactions[0].date}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Bukti</p>
-                    {isEditingEvent ? (
-                      <Input
-                        value={formData.documentType}
-                        onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base font-medium mt-1">{tempTransactions[0].documentType}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Keterangan</p>
-                    {isEditingEvent ? (
-                      <Input
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-base font-medium mt-1">{tempTransactions[0].description}</p>
-                    )}
-                  </div>
+
+                <div className="grid gap-2">
+                  <label>Nama Akun</label>
+                  <Select
+                    value={formData.namaAkun}
+                    onValueChange={(value) => {
+                      const selectedAkun = akunList.find(a => a.nama === value);
+                      const selectedSubAkun = subAkunList.find(s => s.nama === value);
+                      
+                      if (selectedAkun) {
+                        setFormData({
+                          ...formData,
+                          kodeAkun: selectedAkun.kode.toString(),
+                          namaAkun: selectedAkun.nama,
+                          akun_id: selectedAkun.id,
+                          sub_akun_id: null
+                        });
+                      } else if (selectedSubAkun) {
+                        setFormData({
+                          ...formData,
+                          kodeAkun: selectedSubAkun.kode.toString(),
+                          namaAkun: selectedSubAkun.nama,
+                          akun_id: selectedSubAkun.akun.id,
+                          sub_akun_id: selectedSubAkun.id
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Nama Akun"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Akun</SelectLabel>
+                        {akunList.map((akun) => (
+                          <SelectItem 
+                            key={`main-nama-${akun.id}`}
+                            value={akun.nama}
+                          >
+                            {`${akun.nama} (${akun.kode})`}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Sub Akun</SelectLabel>
+                        {subAkunList.map((subAkun) => (
+                          <SelectItem 
+                            key={`sub-nama-${subAkun.id}`}
+                            value={subAkun.nama}
+                          >
+                            {`${subAkun.nama} (${subAkun.kode})`}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <label>Debit</label>
+                  <Input
+                    type="number"
+                    value={formData.debit}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      debit: Number(e.target.value),
+                      kredit: 0
+                    })}
+                    disabled={formData.kredit > 0}
+                    min="0"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label>Kredit</label>
+                  <Input
+                    type="number"
+                    value={formData.kredit}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      kredit: Number(e.target.value),
+                      debit: 0
+                    })}
+                    disabled={formData.debit > 0}
+                    min="0"
+                  />
                 </div>
               </div>
-            )}
 
-            {/* Table untuk transaksi */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="max-h-[400px] overflow-y-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Kode Akun</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Nama Akun</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-gray-600">Debit</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-gray-600">Kredit</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-gray-600">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tempTransactions.map((transaction, index) => (
-                      <tr key={index} className="border-t hover:bg-gray-50">
-                        <td className="px-4 py-2">{transaction.kodeAkun}</td>
-                        <td className="px-4 py-2">{transaction.namaAkun}</td>
-                        <td className="px-4 py-2 text-right">
-                          {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {transaction.kredit ? `Rp ${transaction.kredit.toLocaleString()}` : '-'}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditTransaction(transaction, index)}
-                              className="h-8 w-8 p-0 hover:bg-gray-100"
-                            >
-                              <Pencil className="h-4 w-4 text-gray-500" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleUpdateTransaction(index)}
-                              className="h-8 w-8 p-0 hover:bg-gray-100"
-                            >
-                              <Check className="h-4 w-4 text-green-500" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteTransaction(index)}
-                              className="h-8 w-8 p-0 hover:bg-gray-100"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50 font-medium">
-                    <tr>
-                      <td colSpan={3} className="px-4 py-2 text-right">Total:</td>
-                      <td className="px-4 py-2 text-right">
-                        Rp {calculateTotals().totalDebit.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        Rp {calculateTotals().totalKredit.toLocaleString()}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            {/* Status keseimbangan dan tombol submit */}
-            {tempTransactions.length > 0 && (
-              <>
-                <div className="text-center py-2">
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    calculateTotals().totalDebit === calculateTotals().totalKredit
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {calculateTotals().totalDebit === calculateTotals().totalKredit
-                      ? "✓ Seimbang"
-                      : "× Tidak seimbang"}
-                  </span>
-                </div>
-                <Button
-                  type="button"
-                  className="w-full"
-                  onClick={handleSubmitAll}
-                  disabled={calculateTotals().totalDebit !== calculateTotals().totalKredit}
-                >
-                  Simpan ke Jurnal
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Batal
                 </Button>
-              </>
-            )}
+                <Button type="submit">
+                  {editingTransactionIndex !== null ? 'Update Transaksi' : 'Tambah ke Ringkasan'}
+                </Button>
+              </div>
+            </form>
+
+            {/* Right side - Summary Card */}
+            <div className="flex-1 border rounded-lg p-4 space-y-4 min-w-[600px]">
+              <h3 className="font-semibold text-lg">Ringkasan Transaksi</h3>
+              
+              {/* Header info untuk transaksi pertama */}
+              {tempTransactions.length > 0 && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium text-gray-700">Informasi Kejadian</h4>
+                    {!isEditingEvent ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleEditEvent}
+                        className="h-8 px-2 hover:bg-gray-100"
+                      >
+                        <Pencil className="h-4 w-4 mr-1" />
+                        Edit Kejadian
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleUpdateEvent}
+                        className="h-8 px-2 hover:bg-gray-100 text-green-600"
+                      >
+                        Update Kejadian
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Tanggal</p>
+                      {isEditingEvent ? (
+                        <Input
+                          type="date"
+                          value={formData.date}
+                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p className="text-base font-medium mt-1">{formatDate(tempTransactions[0].date)}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Bukti</p>
+                      {isEditingEvent ? (
+                        <Input
+                          value={formData.documentType}
+                          onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p className="text-base font-medium mt-1">{tempTransactions[0].documentType}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Keterangan</p>
+                      {isEditingEvent ? (
+                        <Input
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p className="text-base font-medium mt-1">{tempTransactions[0].description}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Table untuk transaksi */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-[400px] overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Kode Akun</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Nama Akun</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-600">Debit</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-600">Kredit</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-600">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tempTransactions.map((transaction, index) => (
+                        <tr 
+                          key={index} 
+                          className={`border-t hover:bg-gray-50 ${
+                            editingTransactionIndex === index ? 'bg-yellow-50' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-2">{transaction.kodeAkun}</td>
+                          <td className="px-4 py-2">{transaction.namaAkun}</td>
+                          <td className="px-4 py-2 text-right">
+                            {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            {transaction.kredit ? `Rp ${transaction.kredit.toLocaleString()}` : '-'}
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditTransaction(index)}
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                              >
+                                <Pencil className="h-4 w-4 text-gray-500" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteTransaction(index)}
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50 font-medium">
+                      <tr>
+                        <td colSpan={2} className="px-4 py-2 text-right">
+                          Total
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {tempTransactions.reduce((sum, t) => sum + (t.debit || 0), 0).toLocaleString('id-ID', {
+                            style: 'currency',
+                            currency: 'IDR',
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0
+                          })}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {tempTransactions.reduce((sum, t) => sum + (t.kredit || 0), 0).toLocaleString('id-ID', {
+                            style: 'currency',
+                            currency: 'IDR',
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0
+                          })}
+                        </td>
+                        <td className="px-4 py-2"></td>
+                      </tr>
+                      {tempTransactions.length > 0 && (
+                        <tr>
+                          <td colSpan={2} className="px-4 py-2 text-right">
+                            Status
+                          </td>
+                          <td colSpan={2} className="px-4 py-2 text-right">
+                            {(() => {
+                              const totalDebit = tempTransactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+                              const totalKredit = tempTransactions.reduce((sum, t) => sum + (t.kredit || 0), 0);
+                              const difference = Math.abs(totalDebit - totalKredit);
+                              
+                              return (
+                                <div className={`flex flex-col items-end ${
+                                  difference === 0 ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                  <span>{difference === 0 ? 'Seimbang' : 'Tidak Seimbang'}</span>
+                                  {difference !== 0 && (
+                                    <span className="text-sm">
+                                      (Selisih: {difference.toLocaleString('id-ID', {
+                                        style: 'currency',
+                                        currency: 'IDR',
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 0
+                                      })})
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-4 py-2"></td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Status keseimbangan dan tombol submit */}
+              {tempTransactions.length > 0 && (
+                <>
+                  <div className="text-center py-2">
+                    <span className={`px-3 py-1 rounded-full text-sm ${
+                      calculateTotals().totalDebit === calculateTotals().totalKredit
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {calculateTotals().totalDebit === calculateTotals().totalKredit
+                        ? "✓ Seimbang"
+                        : "× Tidak seimbang"}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={handleSubmitAll}
+                    disabled={calculateTotals().totalDebit !== calculateTotals().totalKredit}
+                  >
+                    {editingTransactions.length > 0 ? 'Update Jurnal' : 'Simpan ke Jurnal'}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showSuccessAlert} onOpenChange={setShowSuccessAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Notifikasi</AlertDialogTitle>
+            <AlertDialogDescription>{successMessage}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button onClick={() => {
+              setShowSuccessAlert(false);
+              onClose();
+            }}>
+              OK
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 } 
