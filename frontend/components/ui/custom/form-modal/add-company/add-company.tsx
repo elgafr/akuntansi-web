@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from "react";
 import axios from "@/lib/axios";
 import { Button } from "@/components/ui/button";
@@ -20,7 +22,7 @@ interface FormModalProps {
   title?: string;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: { name: string; category: string; alamat: string; tahunBerdiri: number }) => void;
+  onSave?: (data: { name: string; category: string; alamat: string; tahunBerdiri: number; start_priode: Date; end_priode: Date }) => void;
   krsId: string; // Tambahkan prop untuk krs_id
 }
 
@@ -36,6 +38,8 @@ export const FormModal = ({
   const [alamat, setAlamat] = useState("");
   const [tahunBerdiri, setTahunBerdiri] = useState<number | string>("");
   const [categories, setCategories] = useState<{ id: number; nama: string }[]>([]);
+  const [startPriode, setStartPriode] = useState(new Date());
+  const [endPriode, setEndPriode] = useState(new Date());
 
   // Fetch categories ketika modal dibuka
   useEffect(() => {
@@ -56,42 +60,64 @@ export const FormModal = ({
   }, [isOpen]);
 
   const handleSubmit = async () => {
-    if (!companyName || !category || !alamat || !tahunBerdiri) return;
-  
+    if (!companyName || !category || !alamat || !tahunBerdiri || !startPriode || !endPriode) {
+      alert("Harap isi semua field yang diperlukan!");
+      return;
+    }
+
+    if (!krsId) {
+      alert("KRS ID belum tersedia. Silakan refresh halaman dan coba lagi.");
+      return;
+    }
+
     try {
+      // Format tanggal menjadi YYYY-MM-DD
+      const startPriodeFormatted = startPriode.toISOString().split('T')[0];
+      const endPriodeFormatted = endPriode.toISOString().split('T')[0];
+
       const payload = {
         nama: companyName,
         alamat: alamat,
         tahun_berdiri: Number(tahunBerdiri),
         kategori_id: category,
         krs_id: krsId,
-        status: "active"
+        start_priode: startPriodeFormatted,  // Kirim dalam format YYYY-MM-DD
+        end_priode: endPriodeFormatted,      // Kirim dalam format YYYY-MM-DD
       };
-  
+
       const response = await axios.post('/mahasiswa/perusahaan', payload);
-  
+
       if (response.data.success) {
         // Reset form
         setCompanyName("");
         setCategory("");
         setAlamat("");
         setTahunBerdiri("");
+        setStartPriode(new Date());
+        setEndPriode(new Date());
         onOpenChange(false);
-        
+
         if (onSave) {
           onSave({
             name: companyName,
             category: category,
             alamat: alamat,
             tahunBerdiri: Number(tahunBerdiri),
+            start_priode: startPriodeFormatted, // Kirim dalam format YYYY-MM-DD
+            end_priode: endPriodeFormatted,     // Kirim dalam format YYYY-MM-DD
           });
         }
       }
     } catch (error: any) {
-      console.error('Gagal menyimpan perusahaan:', error.response?.data?.message || error.message);
-      // Tambahkan notifikasi error jika perlu
+      console.error('Gagal menyimpan perusahaan:', error.response?.data);
+      alert(
+        `Gagal menyimpan perusahaan: ${
+          error.response?.data?.message || "Terjadi kesalahan server"
+        }`
+      );
     }
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -102,7 +128,7 @@ export const FormModal = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="p-8 space-y-6">
+        <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
           <div className="space-y-2">
             <label className="text-primary text-lg">Nama Perusahaan</label>
             <Input
@@ -123,7 +149,7 @@ export const FormModal = ({
                 {categories.map((kategori) => (
                   <SelectItem 
                     key={kategori.id} 
-                    value={kategori.id.toString()} // Pastikan nilai kategori berupa ID
+                    value={kategori.id.toString()}
                   >
                     {kategori.nama}
                   </SelectItem>
@@ -143,11 +169,33 @@ export const FormModal = ({
           </div>
 
           <div className="space-y-2">
+            <label className="text-primary text-lg">Start Priode</label>
+            <Input
+              placeholder="Input alamat perusahaan"
+              className="rounded-xl h-12 text-gray-500 text-base"
+              // value={startPriode.toISOString()}
+              type="date"
+              onChange={(e) => setStartPriode(new Date(e.target.value))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-primary text-lg">End Priode</label>
+            <Input
+              placeholder="Input alamat perusahaan"
+              className="rounded-xl h-12 text-gray-500 text-base"
+              // value={endPriode.toISOString()}
+              type="date"
+              onChange={(e) => setEndPriode(new Date(e.target.value))}
+            />
+          </div>
+
+          <div className="space-y-2">
             <label className="text-primary text-lg">Tahun Berdiri</label>
             <Input
               placeholder="Input tahun berdiri perusahaan"
               className="rounded-xl h-12 text-gray-500 text-base"
-              type="string"
+              type="number"
               value={tahunBerdiri}
               onChange={(e) => setTahunBerdiri(e.target.value)}
             />
@@ -157,13 +205,13 @@ export const FormModal = ({
             <Button
               variant="secondary"
               className="h-12 rounded-xl bg-red-200 hover:bg-red-300 text-base font-normal"
-              onClick={() => onOpenChange(false)} // Close the modal on Cancel
+              onClick={() => onOpenChange(false)}
             >
               Batal
             </Button>
             <Button
               className="h-12 rounded-xl bg-primary hover:bg-primary/90 text-base font-normal"
-              onClick={handleSubmit} // Save data and close modal
+              onClick={handleSubmit}
             >
               Simpan data
             </Button>
