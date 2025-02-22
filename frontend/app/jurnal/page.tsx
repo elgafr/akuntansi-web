@@ -1,52 +1,128 @@
 "use client";
-import { useState } from "react";
-import { TransactionCard } from "@/components/jurnal/TransactionCard";
-
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
-import type { Transactions } from "@/components/ui/custom/form-modal/account.config";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { AddTransactionTable } from "@/components/jurnal/AddTransactionTable";
-import { AddAccountTable } from "@/components/jurnal/AddAccountTable";
+import axios from "@/lib/axios";
+import { Button } from "@/components/ui/button";
 
 interface Transaction {
+  id: string;
   date: string;
   documentType: string;
   description: string;
   namaAkun: string;
   kodeAkun: string;
+  akun_id: string;
   debit: number;
   kredit: number;
+  perusahaan_id: string;
+  sub_akun_id: string | null | undefined;
 }
 
-interface Account {
-  kodeAkun: string;
-  namaAkun: string;
-  debit: number;
-  kredit: number;
-  subAccounts?: {
-    namaSubAkun: string;
-    kodeAkunInduk: string;
-    kodeSubAkun: string;
-    debit: string | number;
-    kredit: string | number;
-  }[];
+interface Akun {
+  id: string;
+  kode: number;
+  nama: string;
+  status: string;
+}
+
+interface JurnalResponse {
+  [key: string]: JurnalEntry[];
+}
+
+interface JurnalEntry {
+  id: string;
+  tanggal: string;
+  bukti: string;
+  keterangan: string;
+  akun_id: string;
+  debit: number | null;
+  kredit: number | null;
+  perusahaan_id: string;
+  sub_akun_id?: string | null;
+  akun: {
+    id: string;
+    kode: number;
+    nama: string;
+    status: string;
+  };
 }
 
 export default function JurnalPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState({ fullName: "Guest" });
 
-  // Menghitung total untuk cards
-  const totalDebit = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
-  const totalKredit = transactions.reduce((sum, t) => sum + (t.kredit || 0), 0);
-  const unbalanced = totalDebit - totalKredit;
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await axios.get('/mahasiswa/jurnal');
+        if (response.data.success) {
+          const jurnalData: JurnalResponse = response.data.data;
+          const formattedTransactions: Transaction[] = [];
 
-  // Handler untuk menambah transaksi baru
-  const handleAddTransaction = (newTransaction: Transaction) => {
-    setTransactions(prev => [...prev, newTransaction]);
+          Object.entries(jurnalData).forEach(([keterangan, entries]) => {
+            entries.forEach(entry => {
+              formattedTransactions.push({
+                id: entry.id,
+                date: entry.tanggal,
+                documentType: entry.bukti,
+                description: entry.keterangan,
+                namaAkun: entry.akun.nama,
+                kodeAkun: entry.akun.kode.toString(),
+                akun_id: entry.akun_id,
+                debit: entry.debit || 0,
+                kredit: entry.kredit || 0,
+                perusahaan_id: entry.perusahaan_id,
+                sub_akun_id: entry.sub_akun_id || null,
+              });
+            });
+          });
+
+          setTransactions(formattedTransactions);
+        }
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        setError('Gagal memuat data. Silakan periksa koneksi Anda.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Load profile data
+  useEffect(() => {
+    const storedProfile = localStorage.getItem("profileData");
+    if (storedProfile) {
+      setProfileData(JSON.parse(storedProfile));
+    }
+  }, []);
+
+  const handleTransactionsChange = (newTransactions: Transaction[]) => {
+    setTransactions(newTransactions);
   };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+        <div className="text-red-500">{error}</div>
+        <Button 
+          onClick={() => window.location.reload()}
+          variant="outline"
+          size="sm"
+        >
+          Coba Lagi
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -59,10 +135,10 @@ export default function JurnalPage() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6 text-black">
-                    Dashboard
+                    Jurnal Umum
                   </h1>
                   <h2 className="text-sm ml-6">
-                    Let&apos;s check your Dashboard today
+                    Let&apos;s check your Journal today
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -76,7 +152,7 @@ export default function JurnalPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">{profileData.fullName}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -84,37 +160,11 @@ export default function JurnalPage() {
           </div>
         </header>
 
-        <section className="p-6 space-y-6">
-          {/* Transaction Cards */}
-          <div className="grid grid-cols-3 gap-4">
-            <TransactionCard
-              title="Total Debit"
-              value={`Rp ${totalDebit.toLocaleString()}`}
-              type="debit"
-            />
-            <TransactionCard
-              title="Total Credit"
-              value={`Rp ${totalKredit.toLocaleString()}`}
-              type="credit"
-            />
-            <TransactionCard
-              title="Unbalanced"
-              value={`Rp ${Math.abs(unbalanced).toLocaleString()}`}
-              type="unbalanced"
-            />
-          </div>
-
-          {/* Transaction Table */}
-          
-          
-          <AddAccountTable 
-            accounts={accounts} 
-            onAccountsChange={setAccounts} 
-          />
-          <AddTransactionTable 
-            accounts={accounts || []}
+        <section className="p-6">
+          <AddTransactionTable
+            accounts={[]}
             transactions={transactions}
-            onTransactionsChange={setTransactions}
+            onTransactionsChange={handleTransactionsChange}
           />
         </section>
       </SidebarInset>

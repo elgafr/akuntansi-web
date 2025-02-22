@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Save, Trash2, Plus, Pencil, X, Download, Upload, Moon, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Save, Trash2, Plus, Pencil, X, Download, Upload, Moon, Check, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useAccounts } from "@/contexts/AccountContext";
 import {
   Select,
@@ -21,40 +21,19 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import axios from "@/lib/axios";
 import { JurnalForm } from "./JurnalForm";
-
-interface Transaction {
-  id: string;
-  date: string;
-  documentType: string;
-  description: string;
-  namaAkun: string;
-  kodeAkun: string;
-  akun_id: string;
-  debit: number;
-  kredit: number;
-  perusahaan_id: string;
-}
-
-interface Account {
-  kodeAkun: string;
-  namaAkun: string;
-  debit: number;
-  kredit: number;
-  subAccounts?: {
-    namaSubAkun: string;
-    kodeAkunInduk: string;
-    kodeSubAkun: string;
-    debit: number;
-    kredit: number;
-  }[];
-}
-
-interface Akun {
-  id: string;
-  kode: number;
-  nama: string;
-  status: string;
-}
+import { Account, SubAccount } from "@/types/account";
+import { Transaction } from "@/types/transaction";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SubAkun {
   id: string;
@@ -67,11 +46,66 @@ interface SubAkun {
   };
 }
 
+interface JurnalData {
+  [key: string]: JurnalEntry[];
+}
+
+interface JurnalEntry {
+  id: string;
+  tanggal: string;
+  bukti: string;
+  keterangan: string;
+  akun_id: string;
+  debit: number | null;
+  kredit: number | null;
+  perusahaan_id: string;
+  sub_akun_id: string | null;
+  akun: {
+    id: string;
+    kode: number;
+    nama: string;
+    status: string;
+  };
+  sub_akun: any | null;
+  perusahaan: {
+    id: string;
+    nama: string;
+    alamat: string;
+    tahun_berdiri: number;
+    status: string;
+  };
+}
+
 interface AddTransactionTableProps {
   accounts: Account[];
   transactions: Transaction[];
   onTransactionsChange: (transactions: Transaction[]) => void;
 }
+
+// Add this function near the top of the file
+const formatJurnalResponse = (jurnalData: JurnalData): Transaction[] => {
+  const formattedTransactions: Transaction[] = [];
+  
+  Object.entries(jurnalData).forEach(([keterangan, entries]) => {
+    entries.forEach(entry => {
+      formattedTransactions.push({
+        id: entry.id,
+        date: entry.tanggal,
+        documentType: entry.bukti,
+        description: entry.keterangan,
+        namaAkun: entry.akun.nama,
+        kodeAkun: entry.akun.kode.toString(),
+        akun_id: entry.akun_id,
+        debit: entry.debit || 0,
+        kredit: entry.kredit || 0,
+        perusahaan_id: entry.perusahaan_id,
+        sub_akun_id: entry.sub_akun_id
+      });
+    });
+  });
+
+  return formattedTransactions;
+};
 
 export function AddTransactionTable({ 
   accounts = [], 
@@ -91,7 +125,7 @@ export function AddTransactionTable({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [akunList, setAkunList] = useState<Akun[]>([]);
+  const [akunList, setAkunList] = useState<Account[]>([]);
   const [subAkunList, setSubAkunList] = useState<SubAkun[]>([]);
   const [currentEvent, setCurrentEvent] = useState<{
     date: string;
@@ -99,6 +133,11 @@ export function AddTransactionTable({
     description: string;
   } | null>(null);
   const [isJurnalFormOpen, setIsJurnalFormOpen] = useState(false);
+  const [editingTransactions, setEditingTransactions] = useState<Transaction[]>([]);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const { toast } = useToast();
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction[]>([]);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -112,6 +151,7 @@ export function AddTransactionTable({
     debit: 0,
     kredit: 0,
     perusahaan_id: "",
+    sub_akun_id: null,
   };
 
   const handleAddNewRow = () => {
@@ -145,28 +185,26 @@ export function AddTransactionTable({
   // Update fungsi getAllAccounts untuk menggunakan contextAccounts
   const getAllAccounts = () => {
     const accountsData = contextAccounts || accounts;
-    console.log("Using accounts data:", accountsData);
-
-    if (!accountsData || accountsData.length === 0) {
-        console.warn("No accounts data available");
-        return [];
-    }
-
     const allAccounts: { kodeAkun: string; namaAkun: string }[] = [];
 
     accountsData.forEach(account => {
+      if (account.kodeAkun && account.namaAkun) {
       allAccounts.push({
         kodeAkun: account.kodeAkun,
-            namaAkun: account.namaAkun
+          namaAkun: account.namaAkun
         });
+      }
 
-        if (account.subAccounts?.length) {
-            account.subAccounts.forEach(subAccount => {
-                const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
-          allAccounts.push({
-            kodeAkun: fullKodeAkun,
-                    namaAkun: subAccount.namaSubAkun
-          });
+      // Check if account has subAccounts property
+      if ('subAccounts' in account && Array.isArray(account.subAccounts)) {
+        account.subAccounts.forEach((subAccount: SubAccount) => {
+          if (subAccount.kodeAkunInduk && subAccount.kodeSubAkun && subAccount.namaSubAkun) {
+            const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
+            allAccounts.push({
+              kodeAkun: fullKodeAkun,
+              namaAkun: subAccount.namaSubAkun
+            });
+          }
         });
       }
     });
@@ -216,40 +254,7 @@ export function AddTransactionTable({
     try {
       const response = await axios.delete(`/mahasiswa/jurnal/${transaction.id}`);
       if (response.data.success) {
-        // Hapus transaksi dari state
-        const updatedTransactions = transactions.filter(t => t.id !== transaction.id);
-        
-        // Kelompokkan ulang transaksi berdasarkan kejadian
-        const groupedTransactions = [];
-        let currentGroup = null;
-        
-        updatedTransactions.forEach((t, idx) => {
-          if (idx === 0 || 
-              t.date !== updatedTransactions[idx - 1].date ||
-              t.documentType !== updatedTransactions[idx - 1].documentType ||
-              t.description !== updatedTransactions[idx - 1].description) {
-            // Ini adalah transaksi pertama dalam grup baru
-            currentGroup = {
-              date: t.date,
-              documentType: t.documentType,
-              description: t.description
-            };
-            // Simpan data lengkap untuk baris pertama
-            groupedTransactions.push(t);
-    } else {
-            // Ini adalah transaksi lanjutan dalam grup yang sama
-            groupedTransactions.push({
-              ...t,
-              date: "",
-              documentType: "",
-              description: ""
-            });
-          }
-        });
-
-        // Update state dengan data yang sudah dikelompokkan
-        onTransactionsChange(groupedTransactions);
-        alert('Data berhasil dihapus');
+        window.location.href = '/jurnal';
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
@@ -318,51 +323,6 @@ export function AddTransactionTable({
     document.body.removeChild(link);
   };
 
-  // Update fungsi handleImportCSV
-  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      Papa.parse(file, {
-        complete: (results) => {
-          const importedTransactions = results.data
-            .filter((row: any) => row.Tanggal || row.Date) // Filter baris kosong
-            .map((row: any) => ({
-              id: "",
-              date: row.Tanggal || row.Date || "",
-              documentType: row.Bukti || row['Document Type'] || "",
-              description: row.Keterangan || row.Description || "",
-              kodeAkun: row['Kode Akun'] || row['Account Code'] || "",
-              namaAkun: row['Nama Akun'] || row['Account Name'] || "",
-              debit: parseFloat(row.Debit) || 0,
-              kredit: parseFloat(row.Kredit || row.Credit) || 0
-            }));
-
-          if (importedTransactions.length > 0) {
-            // Tambahkan transaksi baru ke state
-            const updatedTransactions = [...transactions, ...importedTransactions];
-            onTransactionsChange(updatedTransactions);
-            
-            // Reset file input
-            if (event.target) {
-              event.target.value = '';
-            }
-            
-            // Tampilkan notifikasi sukses
-            alert(`Berhasil mengimpor ${importedTransactions.length} transaksi`);
-          } else {
-            alert("Tidak ada data valid yang dapat diimpor");
-          }
-        },
-        header: true,
-        skipEmptyLines: true,
-        error: (error) => {
-          console.error('Error parsing CSV:', error);
-          alert("Gagal mengimpor file. Pastikan format file sesuai.");
-        }
-      });
-    }
-  };
-
   // Tambahkan fungsi untuk menangani inline edit
   const handleInlineEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -386,19 +346,6 @@ export function AddTransactionTable({
     return transactions.reduce((total, transaction) => total + transaction.kredit, 0);
   };
 
-  // Update data yang ditampilkan
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentTransactions = filteredTransactions.slice(startIndex, endIndex);
-
-  // Update total pages berdasarkan data yang difilter
-  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
-
-  // Reset currentPage saat ada perubahan data
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [transactions.length, search]);
-
   // Tambahkan helper function untuk mengecek nilai
   const isEffectivelyZero = (value: string | number | undefined | null) => {
     if (typeof value === 'string') {
@@ -407,646 +354,220 @@ export function AddTransactionTable({
     return !value || value === 0;
   };
 
-  // Tambahkan fungsi untuk mengelompokkan transaksi per kejadian
+  // Tambahkan fungsi untuk mengelompokkan transaksi berdasarkan kejadian
   const groupTransactionsByEvent = (transactions: Transaction[]) => {
-    let currentEvent = {
-      date: '',
-      documentType: '',
-      description: ''
-    };
-
-    return transactions.map((transaction, index, array) => {
-      // Cek apakah ini transaksi pertama atau ada perubahan event
-      const isNewEvent = index === 0 || 
-        transaction.date !== array[index - 1].date ||
-        transaction.documentType !== array[index - 1].documentType ||
-        transaction.description !== array[index - 1].description;
-
-      if (isNewEvent) {
-        currentEvent = {
-          date: transaction.date,
-          documentType: transaction.documentType,
-          description: transaction.description
-        };
-        return transaction;
+    const groups: { [key: string]: Transaction[] } = {};
+    
+    transactions.forEach(transaction => {
+      const eventKey = `${transaction.date}_${transaction.documentType}_${transaction.description}`;
+      if (!groups[eventKey]) {
+        groups[eventKey] = [];
       }
-
-      // Return transaksi tanpa data event untuk transaksi dalam event yang sama
-      return {
-        ...transaction,
-        date: '',
-        documentType: '',
-        description: ''
-      };
+      groups[eventKey].push(transaction);
     });
+
+    return Object.values(groups);
   };
 
+  // Update fungsi handleEditEvent
+  const handleEditEvent = async (transactions: Transaction[]) => {
+    if (!transactions || transactions.length === 0) return;
+
+    // Ambil transaksi pertama untuk data kejadian
+    const firstTransaction = transactions[0];
+    
+    // Filter semua transaksi dengan keterangan yang sama
+    const eventTransactions = transactions.filter(
+      t => t.description === firstTransaction.description
+    );
+
+    // Set editing transactions untuk dikirim ke JurnalForm
+    setEditingTransactions(eventTransactions);
+    
+    // Buka modal JurnalForm
+    setIsJurnalFormOpen(true);
+  };
+
+  // Update fungsi handleDeleteEvent
+  const handleDeleteEvent = (transactions: Transaction[]) => {
+    setTransactionToDelete(transactions);
+    setShowDeleteAlert(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      const transactionIds = transactionToDelete
+        .filter(t => t.description === transactionToDelete[0].description)
+        .map(t => t.id);
+
+      await Promise.all(
+        transactionIds.map(id => axios.delete(`/mahasiswa/jurnal/${id}`))
+      );
+
+      toast({
+        title: "Berhasil",
+        description: "Data berhasil dihapus"
+      });
+      
+      // Refresh after 2 seconds
+      setTimeout(() => {
+        window.location.href = '/jurnal';
+      }, 2000);
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Gagal menghapus data"
+      });
+    }
+    setShowDeleteAlert(false);
+  };
+
+  // Update handleJurnalFormSubmit
+  const handleJurnalFormSubmit = async (newTransaction: Transaction) => {
+    // Refresh data without page reload
+    try {
+      const response = await axios.get('/mahasiswa/jurnal');
+      if (response.data.success) {
+        const formattedTransactions = formatJurnalResponse(response.data.data);
+        onTransactionsChange(formattedTransactions);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  };
+
+  // Update useEffect untuk fetch jurnal data
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchJurnal = async () => {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
         const response = await axios.get('/mahasiswa/jurnal');
-        
         if (response.data.success) {
-          const transformedTransactions: Transaction[] = Object.entries(response.data.data)
-            .flatMap(([description, entries]: [string, unknown]) => {
-              const entriesArray = entries as any[];
-              return entriesArray.map(entry => ({
+          const jurnalData: JurnalData = response.data.data;
+          const formattedTransactions: Transaction[] = [];
+
+          Object.entries(jurnalData).forEach(([keterangan, entries]) => {
+            entries.forEach(entry => {
+              formattedTransactions.push({
                 id: entry.id,
                 date: entry.tanggal,
                 documentType: entry.bukti,
-                description,
-                namaAkun: entry.akun?.nama || '',
-                kodeAkun: entry.akun?.kode?.toString() || '',
-                akun_id: entry.akun?.id || '',
+                description: entry.keterangan,
+                namaAkun: entry.akun.nama,
+                kodeAkun: entry.akun.kode.toString(),
+                akun_id: entry.akun_id,
                 debit: entry.debit || 0,
                 kredit: entry.kredit || 0,
-                perusahaan_id: entry.perusahaan_id
-              }));
+                perusahaan_id: entry.perusahaan_id,
+                sub_akun_id: entry.sub_akun_id
+              });
             });
+          });
 
-          onTransactionsChange(transformedTransactions);
-    } else {
-          setError('Failed to fetch transactions');
+          // Tidak perlu sorting di sini, langsung gunakan data dari API
+          onTransactionsChange(formattedTransactions);
         }
-      } catch (err) {
-        setError('Error fetching transactions');
-        console.error('Error:', err);
+      } catch (error) {
+        console.error('Error fetching jurnal:', error);
+        setError('Gagal memuat data jurnal');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTransactions();
-  }, [onTransactionsChange]);
+    fetchJurnal();
+  }, []);
 
-  // Update fungsi handleSaveNewTransaction
-  const handleSaveNewTransaction = async (transaction: Transaction) => {
-    try {
-      // Validasi sebelum menyimpan
-      if (!transaction.akun_id) {
-        alert('Pilih akun terlebih dahulu');
-        return;
-      }
-      if (transaction.debit === 0 && transaction.kredit === 0) {
-        alert('Masukkan nilai debit atau kredit');
-        return;
-      }
-
-      const payload = {
-        tanggal: transaction.date,
-        bukti: transaction.documentType,
-        keterangan: transaction.description,
-        akun_id: transaction.akun_id,
-        debit: transaction.debit || null,
-        kredit: transaction.kredit || null,
-        perusahaan_id: transaction.perusahaan_id,
-        sub_akun_id: null
-      };
-
-      const response = await axios.post('/mahasiswa/jurnal', payload);
-      
-      // Hapus transaksi yang sedang diedit dari daftar
-      const filteredTransactions = transactions.filter(t => t !== transaction);
-      
-      // Tambahkan transaksi baru dari response
-      const newTransaction = {
-        id: response.data.data.id,
-        date: response.data.data.tanggal,
-        documentType: response.data.data.bukti,
-        description: response.data.data.keterangan,
-        kodeAkun: response.data.data.akun?.kode?.toString() || '',
-        akun_id: response.data.data.akun?.id || '',
-        namaAkun: response.data.data.akun?.nama || '',
-        debit: response.data.data.debit || 0,
-        kredit: response.data.data.kredit || 0,
-        perusahaan_id: response.data.data.perusahaan_id
-      };
-
-      // Update state dengan transaksi yang baru
-      onTransactionsChange([...filteredTransactions, newTransaction]);
-      
-      // Reset editing state
-      setEditingTransaction(null);
-      
-      alert('Data berhasil disimpan');
-      
-      // Refresh data dari server
-      const refreshResponse = await axios.get('/mahasiswa/jurnal');
-      if (refreshResponse.data.success) {
-        const transformedTransactions = Object.entries(refreshResponse.data.data)
-          .flatMap(([description, entries]: [string, unknown]) => {
-            const entriesArray = entries as any[];
-            return entriesArray.map(entry => ({
-              id: entry.id,
-              date: entry.tanggal,
-              documentType: entry.bukti,
-              description,
-              namaAkun: entry.akun?.nama || '',
-              kodeAkun: entry.akun?.kode?.toString() || '',
-              akun_id: entry.akun?.id || '',
-              debit: entry.debit || 0,
-              kredit: entry.kredit || 0,
-              perusahaan_id: entry.perusahaan_id
-            }));
-          });
-        onTransactionsChange(transformedTransactions);
-      }
-
-    } catch (error: any) {
-      console.error('Error saving transaction:', error.response || error);
-      // Tetap refresh data meskipun ada error
-      try {
-        const refreshResponse = await axios.get('/mahasiswa/jurnal');
-        if (refreshResponse.data.success) {
-          const transformedTransactions = Object.entries(refreshResponse.data.data)
-            .flatMap(([description, entries]: [string, unknown]) => {
-              const entriesArray = entries as any[];
-              return entriesArray.map(entry => ({
-                id: entry.id,
-                date: entry.tanggal,
-                documentType: entry.bukti,
-                description,
-                namaAkun: entry.akun?.nama || '',
-                kodeAkun: entry.akun?.kode?.toString() || '',
-                akun_id: entry.akun?.id || '',
-                debit: entry.debit || 0,
-                kredit: entry.kredit || 0,
-                perusahaan_id: entry.perusahaan_id
-              }));
-            });
-          onTransactionsChange(transformedTransactions);
-        }
-      } catch (refreshError) {
-        console.error('Error refreshing data:', refreshError);
-      }
-      alert('Data berhasil disimpan, menyegarkan data...');
-    }
-  };
-
-  // Update fungsi handleAddRowSameEvent
-  const handleAddRowSameEvent = (transaction: Transaction) => {
-    if (!transaction.perusahaan_id) {
-      alert('Error: perusahaan_id tidak ditemukan');
-      return;
-    }
-
-    const newTransaction: Transaction = {
-      id: "",
-      date: transaction.date,
-      documentType: transaction.documentType,
-      description: transaction.description,
-      namaAkun: "",
-      kodeAkun: "",
-      akun_id: "",
-      debit: 0,
-      kredit: 0,
-      perusahaan_id: transaction.perusahaan_id
-    };
-
-    // Tambahkan transaksi baru ke array yang sudah ada
-    const updatedTransactions = [...transactions];
+  // Update groupedTransactions untuk menggunakan data tanpa sorting
+  const groupedTransactions = useMemo(() => {
+    const groups: { [key: string]: Transaction[] } = {};
     
-    // Cari indeks terakhir dari grup transaksi yang sama
-    const lastIndexOfGroup = updatedTransactions.reduce((lastIndex, curr, index) => {
-      if (
-        curr.date === transaction.date && 
-        curr.documentType === transaction.documentType && 
-        curr.description === transaction.description
-      ) {
-        return index;
+    // Langsung gunakan transactions tanpa sorting
+    transactions.forEach(transaction => {
+      const eventKey = `${transaction.date}_${transaction.documentType}_${transaction.description}`;
+      if (!groups[eventKey]) {
+        groups[eventKey] = [];
       }
-      return lastIndex;
-    }, -1);
+      groups[eventKey].push(transaction);
+    });
 
-    // Sisipkan transaksi baru setelah indeks terakhir
-    updatedTransactions.splice(lastIndexOfGroup + 1, 0, newTransaction);
+    return Object.values(groups);
+  }, [transactions]);
+
+  // Update handleSort untuk menangani sorting
+  const handleSort = () => {
+    const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortDirection(newDirection);
     
-    // Update state transactions
-    onTransactionsChange(updatedTransactions);
+    const sortedTransactions = [...transactions].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return newDirection === 'asc' 
+        ? dateA - dateB  // Ascending (terlama ke terbaru)
+        : dateB - dateA; // Descending (terbaru ke terlama)
+    });
 
-    // Langsung masuk ke mode edit untuk transaksi baru
-    setEditingTransaction(newTransaction);
+    onTransactionsChange(sortedTransactions);
   };
 
-  // Tambahkan useEffect untuk fetch data akun dan sub akun
-  useEffect(() => {
-    const fetchAkunData = async () => {
-      try {
-        const [akunResponse, subAkunResponse] = await Promise.all([
-          axios.get('/instruktur/akun'),
-          axios.get('/mahasiswa/subakun')
-        ]);
-
-        if (akunResponse.data.success) {
-          setAkunList(akunResponse.data.data);
-        }
-        if (subAkunResponse.data.success) {
-          setSubAkunList(subAkunResponse.data.data);
-        }
-      } catch (error) {
-        console.error('Error fetching akun data:', error);
-      }
-    };
-
-    fetchAkunData();
-  }, []); // Fetch saat komponen mount
-
-  // Update fungsi handleSaveEdit
-  const handleSaveEdit = async (transaction: Transaction) => {
-    try {
-      // Validasi data sebelum update
-      if (!transaction?.id) {
-        console.error('No transaction ID found');
-        return;
-      }
-
-      if (!transaction.akun_id) {
-        alert('Pilih akun terlebih dahulu');
-        return;
-      }
-
-      // Dapatkan semua transaksi dalam grup yang sama
-      const sameGroupTransactions = transactions.filter(t => 
-        t.documentType === transaction.documentType &&
-        t.description === transaction.description &&
-        (t.date === transaction.date || t.date === "")
-      );
-
-      // Update semua transaksi dalam grup yang sama
-      try {
-        for (const t of sameGroupTransactions) {
-          const payload = {
-            tanggal: transaction.date, // Gunakan tanggal baru untuk semua transaksi dalam grup
-            bukti: transaction.documentType,
-            keterangan: transaction.description,
-            akun_id: t.akun_id,
-            debit: t.debit || null,
-            kredit: t.kredit || null,
-            perusahaan_id: t.perusahaan_id
-          };
-
-          await axios.put(`/mahasiswa/jurnal/${t.id}`, payload);
-        }
-
-        // Update state lokal
-        const updatedTransactions = transactions.map(t => {
-          if (sameGroupTransactions.some(gt => gt.id === t.id)) {
-            return {
-              ...t,
-              date: transaction.date,
-              documentType: transaction.documentType,
-              description: transaction.description
-            };
-          }
-          return t;
-        });
-
-        onTransactionsChange(updatedTransactions);
-        setEditingTransaction(null);
-        alert('Data berhasil diupdate');
-
-      } catch (error) {
-        console.error('Error updating transactions:', error);
-        alert('Gagal mengupdate beberapa transaksi. Silakan coba lagi.');
-      }
-
-    } catch (error: any) {
-      console.error('Error updating transaction:', error.response || error);
-      alert(error.response?.data?.message || 'Gagal mengupdate transaksi. Silakan coba lagi.');
-    }
+  // Tambahkan fungsi format tanggal
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/-/g, '/');
   };
 
-  // Update renderTableRow untuk menangani tampilan dan penyimpanan dengan benar
+  // Update renderTableRow untuk menggunakan format tanggal
   const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
-    const isEditing = editingTransaction?.id === transaction.id || editingTransaction === transaction;
-    const isFirstInGroup = index === 0 || 
-      (array[index - 1]?.date !== transaction.date ||
-       array[index - 1]?.documentType !== transaction.documentType ||
-       array[index - 1]?.description !== transaction.description);
+    const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
+    const isPartOfGroup = index > 0 && transaction.description === array[index - 1].description;
+    const groupTransactions = array.filter(t => t.description === transaction.description);
 
-    if (isEditing) {
-  return (
-        <TableRow key={transaction.id || index}>
-          {isFirstInGroup ? (
-            <>
-              <TableCell>
-          <Input
-                  type="date"
-                  value={editingTransaction.date}
-                  onChange={(e) => {
-                    const newDate = e.target.value;
-                    setEditingTransaction({
-                      ...editingTransaction,
-                      date: newDate
-                    });
-
-                    // Update semua transaksi dalam grup yang sama
-                    const updatedTransactions = transactions.map((t) => {
-                      if (
-                        t.documentType === transaction.documentType &&
-                        t.description === transaction.description &&
-                        (t.date === transaction.date || t.date === "")
-                      ) {
-                        return {
-                          ...t,
-                          date: newDate
-                        };
-                      }
-                      return t;
-                    });
-                    onTransactionsChange(updatedTransactions);
-                  }}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={editingTransaction.documentType}
-                  onChange={(e) => {
-                    const newDocType = e.target.value;
-                    setEditingTransaction({
-                      ...editingTransaction,
-                      documentType: newDocType
-                    });
-
-                    // Update semua transaksi dalam grup yang sama
-                    const updatedTransactions = transactions.map((t) => {
-                      if (
-                        t.date === transaction.date &&
-                        t.description === transaction.description &&
-                        (t.documentType === transaction.documentType || t.documentType === "")
-                      ) {
-                        return {
-                          ...t,
-                          documentType: newDocType
-                        };
-                      }
-                      return t;
-                    });
-                    onTransactionsChange(updatedTransactions);
-                  }}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={editingTransaction.description}
-                  onChange={(e) => {
-                    const newDesc = e.target.value;
-                    setEditingTransaction({
-                      ...editingTransaction,
-                      description: newDesc
-                    });
-
-                    // Update semua transaksi dalam grup yang sama
-                    const updatedTransactions = transactions.map((t) => {
-                      if (
-                        t.date === transaction.date &&
-                        t.documentType === transaction.documentType &&
-                        (t.description === transaction.description || t.description === "")
-                      ) {
-                        return {
-                          ...t,
-                          description: newDesc
-                        };
-                      }
-                      return t;
-                    });
-                    onTransactionsChange(updatedTransactions);
-                  }}
-                />
-              </TableCell>
-            </>
-          ) : (
-            <>
-              <TableCell></TableCell>
-              <TableCell></TableCell>
-              <TableCell></TableCell>
-            </>
-          )}
-          <TableCell>
-          <Select
-              value={editingTransaction.kodeAkun}
-              onValueChange={(value) => {
-                const selectedAkun = akunList.find(a => a.kode.toString() === value);
-                const selectedSubAkun = subAkunList.find(s => s.kode.toString() === value);
-                
-                if (selectedAkun) {
-                  setEditingTransaction({
-                    ...editingTransaction,
-                    kodeAkun: selectedAkun.kode.toString(),
-                    namaAkun: selectedAkun.nama,
-                    akun_id: selectedAkun.id
-                  });
-                } else if (selectedSubAkun) {
-                  setEditingTransaction({
-                    ...editingTransaction,
-                    kodeAkun: selectedSubAkun.kode.toString(),
-                    namaAkun: selectedSubAkun.nama,
-                    akun_id: selectedSubAkun.akun.id
-                  });
-                }
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Pilih Kode" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Kode Akun</SelectLabel>
-                  {akunList.map((akun) => (
-                    <SelectItem key={akun.id} value={akun.kode.toString()}>
-                      {akun.kode}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel>Kode Sub Akun</SelectLabel>
-                  {subAkunList.map((subAkun) => (
-                    <SelectItem key={subAkun.id} value={subAkun.kode.toString()}>
-                      {subAkun.kode}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-            </SelectContent>
-          </Select>
-          </TableCell>
-          <TableCell>
-            <Select
-              value={editingTransaction.namaAkun}
-              onValueChange={(value) => {
-                const selectedAkun = akunList.find(a => a.nama === value);
-                const selectedSubAkun = subAkunList.find(s => s.nama === value);
-                
-                if (selectedAkun) {
-                  setEditingTransaction({
-                    ...editingTransaction,
-                    kodeAkun: selectedAkun.kode.toString(),
-                    namaAkun: selectedAkun.nama,
-                    akun_id: selectedAkun.id
-                  });
-                } else if (selectedSubAkun) {
-                  setEditingTransaction({
-                    ...editingTransaction,
-                    kodeAkun: selectedSubAkun.kode.toString(),
-                    namaAkun: selectedSubAkun.nama,
-                    akun_id: selectedSubAkun.akun.id
-                  });
-                }
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Pilih Nama" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Nama Akun</SelectLabel>
-                  {akunList.map((akun) => (
-                    <SelectItem key={akun.id} value={akun.nama}>
-                      {akun.nama}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel>Nama Sub Akun</SelectLabel>
-                  {subAkunList.map((subAkun) => (
-                    <SelectItem key={subAkun.id} value={subAkun.nama}>
-                      {subAkun.nama}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </TableCell>
-          <TableCell>
-            <Input
-              type="number"
-              value={editingTransaction.debit}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                setEditingTransaction({
-                  ...editingTransaction,
-                  debit: value,
-                  kredit: 0 // Reset kredit saat debit diisi
-                });
-              }}
-              className="w-[150px]"
-              disabled={editingTransaction.kredit > 0} // Disable jika kredit sudah diisi
-              min="0"
-            />
-          </TableCell>
-          <TableCell>
-            <Input
-              type="number"
-              value={editingTransaction.kredit}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                setEditingTransaction({
-                  ...editingTransaction,
-                  kredit: value,
-                  debit: 0 // Reset debit saat kredit diisi
-                });
-              }}
-              className="w-[150px]"
-              disabled={editingTransaction.debit > 0} // Disable jika debit sudah diisi
-              min="0"
-            />
-          </TableCell>
-          <TableCell>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  if (!editingTransaction) return;
-                  
-                  // Untuk transaksi baru, gunakan handleSaveNewTransaction
-                  if (!transaction.id) {
-                    handleSaveNewTransaction(editingTransaction);
-                  } else {
-                    handleSaveEdit(editingTransaction);
-                  }
-                }}
-              >
-                <Check className="h-4 w-4 text-green-500" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setEditingTransaction(null);
-                  if (!transaction.id) {
-                    const updatedTransactions = transactions.filter(t => t !== transaction);
-                    onTransactionsChange(updatedTransactions);
-                  }
-                }}
-              >
-                <X className="h-4 w-4 text-red-500" />
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
-      );
-    }
-
-    // Tampilan normal (tidak dalam mode edit)
     return (
-      <TableRow key={transaction.id}>
-        {isFirstInGroup ? (
-          <>
-            <TableCell>{transaction.date}</TableCell>
-            <TableCell>{transaction.documentType}</TableCell>
-            <TableCell className="relative">
-              {transaction.description}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                onClick={() => handleAddRowSameEvent(transaction)}
-              >
-                <Plus className="h-4 w-4 text-primary" />
-              </Button>
-            </TableCell>
-          </>
-        ) : (
-          <>
-            <TableCell></TableCell>
-            <TableCell></TableCell>
-            <TableCell></TableCell>
-          </>
-        )}
+      <TableRow 
+        key={transaction.id}
+        className={isPartOfGroup ? 'bg-gray-50/50' : ''}
+      >
+        <TableCell>{isFirstInGroup ? formatDate(transaction.date) : ''}</TableCell>
+        <TableCell>{isFirstInGroup ? transaction.documentType : ''}</TableCell>
+        <TableCell>{isFirstInGroup ? transaction.description : ''}</TableCell>
         <TableCell>{transaction.kodeAkun}</TableCell>
         <TableCell>{transaction.namaAkun}</TableCell>
         <TableCell className="text-right">
-          {transaction.debit > 0 ? transaction.debit.toLocaleString() : '0'}
+          {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
         </TableCell>
         <TableCell className="text-right">
-          {transaction.kredit > 0 ? transaction.kredit.toLocaleString() : '0'}
+          {transaction.kredit ? `Rp ${transaction.kredit.toLocaleString()}` : '-'}
         </TableCell>
         <TableCell>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setEditingTransaction(transaction)}
-            >
-              <Pencil className="h-4 w-4 text-primary" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleDelete(transaction)}
-            >
-              <X className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
+          {isFirstInGroup && (
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEditEvent(groupTransactions)}
+                className="h-8 w-8 p-0 hover:bg-gray-100"
+              >
+                <Pencil className="h-4 w-4 text-gray-500" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteEvent(groupTransactions)}
+                className="h-8 w-8 p-0 hover:bg-gray-100"
+              >
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
+            </div>
+          )}
         </TableCell>
       </TableRow>
     );
-  };
-
-  // Tambahkan handler untuk form submission
-  const handleJurnalFormSubmit = (newTransaction: Transaction) => {
-    onTransactionsChange([...transactions, newTransaction]);
   };
 
   // Add loading state
@@ -1058,11 +579,18 @@ export function AddTransactionTable({
     );
   }
 
-  // Add error state
+  // Update tampilan error
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <div className="text-red-500">{error}</div>
+        <Button 
+          onClick={() => window.location.reload()}
+          variant="outline"
+          size="sm"
+        >
+          Coba Lagi
+        </Button>
       </div>
     );
   }
@@ -1116,22 +644,6 @@ export function AddTransactionTable({
           />
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleImportCSV}
-            className="hidden"
-            id="csvInput"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => document.getElementById('csvInput')?.click()}
-            className="flex items-center gap-2 rounded-lg border-gray-200"
-          >
-            <Upload className="h-4 w-4" />
-            Import CSV
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -1153,260 +665,64 @@ export function AddTransactionTable({
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200">
-      <Table>
-          <TableHeader className="bg-gray-50 border-b border-gray-200">
-          <TableRow>
-              <TableHead className="text-gray-600">Tanggal</TableHead>
-              <TableHead className="text-gray-600">Bukti</TableHead>
-              <TableHead className="text-gray-600">Keterangan</TableHead>
-              <TableHead className="text-gray-600">Kode akun</TableHead>
-              <TableHead className="text-gray-600">Nama Akun</TableHead>
-              <TableHead className="text-gray-600 text-right">Debit</TableHead>
-              <TableHead className="text-gray-600 text-right">Kredit</TableHead>
-              <TableHead className="text-gray-600 w-[100px]">Aksi</TableHead>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                <div 
+                  className="flex items-center gap-2 cursor-pointer hover:text-gray-700"
+                  onClick={handleSort}
+                >
+                  Tanggal
+                  {sortDirection === 'asc' ? (
+                    <ArrowUp className="h-4 w-4" />
+                  ) : (
+                    <ArrowDown className="h-4 w-4" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead>Bukti</TableHead>
+              <TableHead>Keterangan</TableHead>
+              <TableHead>Kode Akun</TableHead>
+            <TableHead>Nama Akun</TableHead>
+              <TableHead className="text-right">Debit</TableHead>
+              <TableHead className="text-right">Kredit</TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {/* New Transactions */}
-          {newTransactions.map((transaction, index) => (
-            <TableRow key={`new-${index}`}>
-              <TableCell>
-                <Input
-                  type="date"
-                  value={transaction.date}
-                  onChange={(e) => handleNewTransactionChange(index, "date", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={transaction.documentType}
-                  onChange={(e) => handleNewTransactionChange(index, "documentType", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={transaction.description}
-                  onChange={(e) => handleNewTransactionChange(index, "description", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Select
-                    value={transaction.kodeAkun}
-                    onValueChange={(value) => {
-                      const selectedAkun = akunList.find(a => a.kode.toString() === value);
-                      const selectedSubAkun = subAkunList.find(s => s.kode.toString() === value);
-                      
-                      const updatedTransactions = [...transactions];
-                      if (selectedAkun) {
-                        updatedTransactions[index] = {
-                          ...transaction,
-                          kodeAkun: selectedAkun.kode.toString(),
-                          namaAkun: selectedAkun.nama,
-                          akun_id: selectedAkun.id
-                        };
-                      } else if (selectedSubAkun) {
-                        updatedTransactions[index] = {
-                          ...transaction,
-                          kodeAkun: selectedSubAkun.kode.toString(),
-                          namaAkun: selectedSubAkun.nama,
-                          akun_id: selectedSubAkun.akun.id
-                        };
-                      }
-                      onTransactionsChange(updatedTransactions);
-                    }}
-                  >
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Pilih Kode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Kode Akun</SelectLabel>
-                        {akunList.map((akun) => (
-                          <SelectItem key={akun.id} value={akun.kode.toString()}>
-                            {akun.kode}
-                      </SelectItem>
-                    ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Kode Sub Akun</SelectLabel>
-                        {subAkunList.map((subAkun) => (
-                          <SelectItem key={subAkun.id} value={subAkun.kode.toString()}>
-                            {subAkun.kode}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Select
-                    value={transaction.namaAkun}
-                    onValueChange={(value) => {
-                      const selectedAkun = akunList.find(a => a.nama === value);
-                      const selectedSubAkun = subAkunList.find(s => s.nama === value);
-                      
-                      const updatedTransactions = [...transactions];
-                      if (selectedAkun) {
-                        updatedTransactions[index] = {
-                          ...transaction,
-                          kodeAkun: selectedAkun.kode.toString(),
-                          namaAkun: selectedAkun.nama,
-                          akun_id: selectedAkun.id
-                        };
-                      } else if (selectedSubAkun) {
-                        updatedTransactions[index] = {
-                          ...transaction,
-                          kodeAkun: selectedSubAkun.kode.toString(),
-                          namaAkun: selectedSubAkun.nama,
-                          akun_id: selectedSubAkun.akun.id
-                        };
-                      }
-                      onTransactionsChange(updatedTransactions);
-                    }}
-                  >
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Pilih Nama" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Nama Akun</SelectLabel>
-                        {akunList.map((akun) => (
-                          <SelectItem key={akun.id} value={akun.nama}>
-                            {akun.nama}
-                      </SelectItem>
-                    ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Nama Sub Akun</SelectLabel>
-                        {subAkunList.map((subAkun) => (
-                          <SelectItem key={subAkun.id} value={subAkun.nama}>
-                            {subAkun.nama}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={transaction.debit}
-                  onChange={(e) => handleNewTransactionChange(index, "debit", Number(e.target.value))}
-                  disabled={transaction.kredit > 0}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={transaction.kredit}
-                  onChange={(e) => handleNewTransactionChange(index, "kredit", Number(e.target.value))}
-                  disabled={transaction.debit > 0}
-                />
-              </TableCell>
-              <TableCell>
-                <div className="flex space-x-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleSave(index)}
-                      className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
-                    >
-                      <Save className="h-4 w-4 text-primary" />
-                  </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleDelete(transaction)}
-                      className="h-8 w-8 border border-gray-200 rounded-full hover:bg-gray-100"
-                    >
-                      <X className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-
-          {/* Existing Transactions */}
-            {currentTransactions.map((transaction, index, array) => renderTableRow(transaction, index, array))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between py-4">
-        <p className="text-sm text-gray-500">
-          Page {currentPage} of {totalPages}
-        </p>
-        <div className="flex items-center gap-2">
-                    <Button 
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="rounded-lg border-gray-200 px-2"
-          >
-            <ChevronLeft className="h-4 w-4" />
-                    </Button>
-          {/* Page Numbers */}
-          <div className="flex gap-1">
-            {[...Array(totalPages)].map((_, index) => {
-              const pageNumber = index + 1;
-              // Show first page, current page, last page, and pages around current
-              if (
-                pageNumber === 1 ||
-                pageNumber === totalPages ||
-                (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
-              ) {
-                return (
-                    <Button 
-                    key={pageNumber}
-                    variant={currentPage === pageNumber ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNumber)}
-                    className={`rounded-lg min-w-[40px] ${
-                      currentPage === pageNumber 
-                        ? "bg-red-500 text-white hover:bg-red-600" 
-                        : "border-gray-200"
-                    }`}
-                  >
-                    {pageNumber}
-                    </Button>
-                );
-              }
-              // Show ellipsis for gaps
-              if (
-                pageNumber === currentPage - 2 ||
-                pageNumber === currentPage + 2
-              ) {
-                return (
-                  <span key={pageNumber} className="px-2 py-2 text-gray-500">
-                    ...
-                  </span>
-                );
-              }
-              return null;
-            })}
-          </div>
-                  <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="rounded-lg border-gray-200 px-2"
-          >
-            <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+            {transactions.map((transaction, index, array) => 
+              renderTableRow(transaction, index, array)
+            )}
+        </TableBody>
+      </Table>
       </div>
 
       <JurnalForm
         isOpen={isJurnalFormOpen}
-        onClose={() => setIsJurnalFormOpen(false)}
+        onClose={() => {
+          setIsJurnalFormOpen(false);
+          setEditingTransactions([]);
+        }}
         onSubmit={handleJurnalFormSubmit}
-        akunList={akunList}
-        subAkunList={subAkunList}
+        editingTransactions={editingTransactions}
       />
+
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Hapus</AlertDialogTitle>
+            <AlertDialogDescription>
+              Anda yakin ingin menghapus transaksi ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Hapus</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 
