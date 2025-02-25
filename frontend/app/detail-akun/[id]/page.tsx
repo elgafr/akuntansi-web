@@ -57,17 +57,26 @@ interface Account {
   subakun?: Account[];
 }
 
+interface Transaction {
+  akun_id: string;
+  perusahaan_id: string;
+  debit: number;
+  kredit: number;
+  tanggal: string;
+  sub_akun_id?: string;
+}
+
 export default function Page() {
   const [company, setCompany] = useState<Company | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const { id } = useParams();
 
-  // Fungsi untuk mengambil data akun berdasarkan kategori_id
   const fetchAccounts = async (kategoriId: string) => {
     try {
-      const response = await axios.get("/instruktur/akun"); // Ambil semua akun
+      const response = await axios.get("/instruktur/akun");
       const filteredAccounts = response.data.data.filter(
         (account: any) =>
           account.kategori_id === kategoriId && account.status === "open"
@@ -93,7 +102,6 @@ export default function Page() {
           })) || [],
       }));
 
-      // Merge dengan local storage
       if (company) {
         const localData = localStorage.getItem(`accounts_${company.id}`);
         if (localData) {
@@ -120,8 +128,6 @@ export default function Page() {
 
         if (companyRes.data.success) {
           setCompany(companyRes.data.data);
-
-          // Ambil data akun berdasarkan kategori_id perusahaan
           await fetchAccounts(companyRes.data.data.kategori_id);
         }
 
@@ -144,102 +150,183 @@ export default function Page() {
     return category ? category.nama : "Kategori Tidak Diketahui";
   };
 
+  // 1. Handler untuk mengaktifkan mode edit semua
   const handleEditAllAccounts = () => {
     const updatedAccounts = accounts.map((account) => ({
       ...account,
-      isEditing: true,
+      isEditing: true, // Aktifkan edit untuk akun utama
       subakun:
-        account.subakun?.map((subAccount) => ({
-          ...subAccount,
-          isEditing: true,
+        account.subakun?.map((sub) => ({
+          ...sub,
+          isEditing: true, // Aktifkan edit untuk sub akun
         })) || [],
     }));
     setAccounts(updatedAccounts);
   };
+  // 2. Handler untuk menambah sub akun baru
+  const handleAddSubAccount = (index: number) => {
+    const updatedAccounts = [...accounts];
+    const parentAccount = updatedAccounts[index];
+
+    // Generate kode sub akun unik
+    const subCount = parentAccount.subakun?.length || 0;
+    const newKode = `${parentAccount.kodeAkun}.${subCount + 1}`;
+
+    // Buat sub akun temporary
+    const newSubAccount: Account = {
+      id: `temp-${Date.now()}`, // ID temporary unik
+      name: "",
+      kodeAkun: newKode,
+      debit: 0,
+      kredit: 0,
+      isEditing: true, // Langsung aktifkan edit mode
+      perusahaan_id: company?.id || "",
+    };
+
+    // Tambahkan ke array subakun
+    if (!updatedAccounts[index].subakun) {
+      updatedAccounts[index].subakun = [];
+    }
+    updatedAccounts[index].subakun!.push(newSubAccount);
+
+    setAccounts(updatedAccounts);
+  };
+
+  // 3. Handler utama untuk menyimpan data
   const handleSaveAccount = async () => {
     try {
       if (!company) {
         toast.error("Perusahaan tidak ditemukan");
         return;
       }
-  
-      // 1. Simpan sub akun baru
-      const subAkunPromises = accounts.flatMap((account) =>
-        account.subakun
-          ?.filter((sub) => sub.id.startsWith("temp-"))
-          .map(async (sub) => {
-            try {
-              // Validasi data sub akun
-              if (!sub.name.trim()) {
-                toast.error("Nama sub akun harus diisi");
-                return null;
-              }
-  
-              const kodeParts = sub.kodeAkun.split(".");
-              if (kodeParts.length < 2) {
-                toast.error("Format kode sub akun tidak valid");
-                return null;
-              }
-  
-              const response = await axios.post("/mahasiswa/subakun", {
-                kode: kodeParts[1],
-                nama: sub.name,
-                akun_id: account.id,
-                perusahaan_id: company.id, // Pastikan company sudah ada
-              });
-  
-              // Sesuaikan dengan struktur response API
-              return { 
-                tempId: sub.id, 
-                newId: response.data.id // Asumsi response: { id: "123" }
-              };
-            } catch (error) {
-              console.error("Gagal membuat sub akun:", error);
-              toast.error(`Gagal membuat sub akun ${sub.kodeAkun}`);
-              return null;
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Token tidak ditemukan, silakan login terlebih dahulu");
+        return;
+      }
+
+      // Salin data lokal untuk manipulasi
+      let localAccounts = JSON.parse(JSON.stringify(accounts));
+      const transactions: Transaction[] = [];
+      const subAkunUpdates: Promise<void>[] = [];
+
+      // Proses pembuatan sub akun baru
+      localAccounts.forEach((account: Account) => {
+        account.subakun?.forEach(async (sub, subIndex) => {
+          if (sub.id.startsWith("temp-")) {
+            // Validasi data sub akun
+            if (!sub.name.trim()) {
+              toast.error("Nama sub akun harus diisi");
+              return;
             }
-          }) || []
-      );
-  
-      // 2. Filter hasil yang gagal
-      const subAkunResults = await Promise.all(subAkunPromises.flat());
-      const subAkunMapping = subAkunResults.filter((result): result is NonNullable<typeof result> => !!result);
-  
-      // 3. Update accounts dengan ID baru
-      const updatedAccounts = accounts.map((account) => ({
-        ...account,
-        subakun: account.subakun?.map((sub) => {
-          const mapping = subAkunMapping.find((m) => m.tempId === sub.id);
-          return mapping ? { ...sub, id: mapping.newId } : sub;
-        }),
-      }));
-  
-      // 4. Simpan transaksi keuangan
-      await axios.post("/mahasiswa/keuangan", {
-        transactions: updatedAccounts.flatMap((account) => [
-          {
-            akun_id: account.id,
-            sub_akun_id: null,
-            perusahaan_id: company.id, // Pastikan company ada
-            debit: account.debit,
-            kredit: account.kredit,
-          },
-          ...(account.subakun?.map((sub) => ({
+
+            const kodeParts = sub.kodeAkun.split(".");
+            if (kodeParts.length < 2) {
+              toast.error("Format kode sub akun tidak valid");
+              return;
+            }
+
+            // Buat sub akun ke database
+            subAkunUpdates.push(
+              axios
+                .post(
+                  "/mahasiswa/subakun",
+                  {
+                    kode: kodeParts[1],
+                    nama: sub.name,
+                    akun_id: account.id,
+                    perusahaan_id: company.id,
+                  },
+                  {
+                    headers: { Authorization: `Bearer ${token}` },
+                  }
+                )
+                .then((response) => {
+                  // Update ID temporary dengan ID dari database
+                  localAccounts = localAccounts.map((acc) => {
+                    if (acc.id === account.id) {
+                      return {
+                        ...acc,
+                        subakun: acc.subakun?.map((s) =>
+                          s.id === sub.id ? { ...s, id: response.data.id } : s
+                        ),
+                      };
+                    }
+                    return acc;
+                  });
+                })
+                .catch((error) => {
+                  console.error("Gagal membuat sub akun:", error);
+                  toast.error(`Gagal membuat sub akun ${sub.kodeAkun}`);
+                })
+            );
+          }
+        });
+      });
+
+      // Tunggu semua sub akun selesai dibuat
+      await Promise.all(subAkunUpdates);
+
+      // Bangun transaksi setelah semua ID diupdate
+      localAccounts.forEach((account: Account) => {
+        // Transaksi untuk akun utama
+        transactions.push({
+          akun_id: account.id,
+          sub_akun_id: null,
+          perusahaan_id: company.id,
+          debit: account.debit,
+          kredit: account.kredit,
+          tanggal: new Date().toISOString(),
+        });
+
+        // Transaksi untuk sub akun
+        account.subakun?.forEach((sub) => {
+          transactions.push({
             akun_id: account.id,
             sub_akun_id: sub.id,
             perusahaan_id: company.id,
             debit: sub.debit,
             kredit: sub.kredit,
-          })) || []),
-        ]),
+            tanggal: new Date().toISOString(),
+          });
+        });
       });
-  
+
+      // Kirim semua transaksi ke backend
+      await axios.post(
+        "/mahasiswa/keuangan",
+        { transactions },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update state akhir
+      const finalAccounts = localAccounts.map((account) => ({
+        ...account,
+        isEditing: false,
+        subakun:
+          account.subakun?.map((sub) => ({
+            ...sub,
+            isEditing: false,
+          })) || [],
+      }));
+
+      setAccounts(finalAccounts);
+      localStorage.setItem(
+        `accounts_${company.id}`,
+        JSON.stringify(finalAccounts)
+      );
+
       toast.success("Data berhasil disimpan!");
     } catch (error) {
       console.error("Gagal menyimpan data:", error);
-      toast.error("Gagal menyimpan data: " + (error as Error).message);
+      toast.error(
+        "Gagal menyimpan data: " +
+          (error.response?.data?.message || error.message)
+      );
     }
   };
+
 
   const handleDebitChange = (
     index: number,
@@ -268,31 +355,6 @@ export default function Page() {
     } else {
       updatedAccounts[index].kredit = Number(value) || 0;
     }
-    setAccounts(updatedAccounts);
-  };
-
-  const handleAddSubAccount = (index: number) => {
-    const parentAccount = accounts[index];
-    const subCount = parentAccount.subakun?.length || 0;
-    const newKode = `${parentAccount.kodeAkun}.${subCount + 1}`;
-
-    // Tambahkan sub akun baru dalam mode editing
-    const newSubAccount: Account = {
-      id: `temp-${Date.now()}`, // ID sementara
-      name: "",
-      kodeAkun: newKode,
-      debit: 0,
-      kredit: 0,
-      isEditing: true, // Mode editing aktif
-      perusahaan_id: company?.id || "",
-    };
-
-    // Update state
-    const updatedAccounts = [...accounts];
-    if (!updatedAccounts[index].subakun) {
-      updatedAccounts[index].subakun = [];
-    }
-    updatedAccounts[index].subakun!.push(newSubAccount);
     setAccounts(updatedAccounts);
   };
 
@@ -413,16 +475,14 @@ export default function Page() {
                 <TableBody>
                   {accounts.map((account, index) => (
                     <React.Fragment key={account.id}>
-                      {/* Baris utama akun */}
+                      {/* Baris untuk akun utama */}
                       <TableRow>
-                        <TableCell className="text-center py-2">
-                          {account.name}
-                        </TableCell>
-                        <TableCell className="text-center py-2"></TableCell>
-                        <TableCell className="text-center py-2">
-                          {account.kodeAkun}
-                        </TableCell>
-                        <TableCell className="text-center py-2">
+                        <TableCell>{account.name}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell>{account.kodeAkun}</TableCell>
+
+                        {/* Input Debit untuk akun utama */}
+                        <TableCell>
                           <Input
                             type="number"
                             value={account.debit || ""}
@@ -432,7 +492,9 @@ export default function Page() {
                             disabled={account.kredit > 0}
                           />
                         </TableCell>
-                        <TableCell className="text-center py-2">
+
+                        {/* Input Kredit untuk akun utama */}
+                        <TableCell>
                           <Input
                             type="number"
                             value={account.kredit || ""}
@@ -442,22 +504,22 @@ export default function Page() {
                             disabled={account.debit > 0}
                           />
                         </TableCell>
-                        <TableCell className="text-center py-2">
-                          <Button
-                            variant="outline"
-                            className="text-xs w-full"
-                            onClick={() => handleAddSubAccount(index)}
-                          >
-                            <FaPlus className="mr-1" /> Tambah Sub
+
+                        {/* Tombol Tambah Sub Akun */}
+                        <TableCell>
+                          <Button onClick={() => handleAddSubAccount(index)}>
+                            <FaPlus /> Tambah Sub
                           </Button>
                         </TableCell>
                       </TableRow>
 
-                      {/* Baris sub akun */}
+                      {/* Baris untuk sub-akun */}
                       {account.subakun?.map((subAccount, subIndex) => (
                         <TableRow key={subAccount.id}>
-                          <TableCell className="text-center py-2"></TableCell>
-                          <TableCell className="text-center py-2">
+                          <TableCell></TableCell>
+
+                          {/* Input Nama Sub Akun */}
+                          <TableCell>
                             <Input
                               value={subAccount.name}
                               onChange={(e) =>
@@ -467,13 +529,14 @@ export default function Page() {
                                   e.target.value
                                 )
                               }
-                              placeholder="Masukkan nama sub akun"
+                              placeholder="Nama sub akun"
                             />
                           </TableCell>
-                          <TableCell className="text-center py-2">
-                            {subAccount.kodeAkun}
-                          </TableCell>
-                          <TableCell className="text-center py-2">
+
+                          <TableCell>{subAccount.kodeAkun}</TableCell>
+
+                          {/* Input Debit Sub Akun */}
+                          <TableCell>
                             <Input
                               type="number"
                               value={subAccount.debit || ""}
@@ -488,7 +551,9 @@ export default function Page() {
                               disabled={subAccount.kredit > 0}
                             />
                           </TableCell>
-                          <TableCell className="text-center py-2">
+
+                          {/* Input Kredit Sub Akun */}
+                          <TableCell>
                             <Input
                               type="number"
                               value={subAccount.kredit || ""}
@@ -503,7 +568,8 @@ export default function Page() {
                               disabled={subAccount.debit > 0}
                             />
                           </TableCell>
-                          <TableCell className="text-center py-2"></TableCell>
+
+                          <TableCell></TableCell>
                         </TableRow>
                       ))}
                     </React.Fragment>
