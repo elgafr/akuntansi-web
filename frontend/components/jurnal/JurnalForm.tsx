@@ -365,8 +365,28 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
 
   // Tambahkan fungsi handleSubmitAll untuk menyimpan semua transaksi
   const handleSubmitAll = async () => {
+    // Validasi data sebelum dikirim
+    if (tempTransactions.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Belum ada transaksi yang ditambahkan"
+      });
+      return;
+    }
+
+    if (!perusahaanId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "ID Perusahaan tidak ditemukan"
+      });
+      return;
+    }
+
     try {
       if (editingTransactions.length > 0) {
+        // Handle update
         await Promise.all(
           tempTransactions.map(async (transaction, index) => {
             const originalTransaction = editingTransactions[index];
@@ -376,10 +396,10 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                 bukti: transaction.documentType,
                 keterangan: transaction.description,
                 akun_id: transaction.akun_id,
-                debit: transaction.debit || 0,
-                kredit: transaction.kredit || 0,
+                debit: transaction.debit || null,
+                kredit: transaction.kredit || null,
                 perusahaan_id: perusahaanId,
-                sub_akun_id: transaction.sub_akun_id
+                sub_akun_id: transaction.sub_akun_id || null
               });
             }
           })
@@ -389,36 +409,47 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
           title: "Berhasil",
           description: "Data berhasil diupdate"
         });
+
+        // Hard refresh ke halaman jurnal
+        window.location.href = '/jurnal';
+        
       } else {
-        await axios.post('/mahasiswa/jurnal', {
-          transactions: tempTransactions.map(t => ({
-            tanggal: t.date,
-            bukti: t.documentType,
-            keterangan: t.description,
-            akun_id: t.akun_id,
-            debit: t.debit || 0,
-            kredit: t.kredit || 0,
-            perusahaan_id: perusahaanId,
-            sub_akun_id: t.sub_akun_id
-          }))
-        });
+        // Format data untuk create - kirim satu per satu
+        await Promise.all(
+          tempTransactions.map(async (t) => {
+            await axios.post('/mahasiswa/jurnal', {
+              tanggal: t.date,
+              bukti: t.documentType,
+              keterangan: t.description,
+              akun_id: t.akun_id,
+              debit: t.debit || null,
+              kredit: t.kredit || null,
+              perusahaan_id: perusahaanId,
+              sub_akun_id: t.sub_akun_id || null
+            });
+          })
+        );
 
         toast({
           title: "Berhasil",
           description: "Data berhasil disimpan"
         });
+
+        // Hard refresh ke halaman jurnal
+        window.location.href = '/jurnal';
       }
 
-      // Refresh after 2 seconds
-      setTimeout(() => {
-        window.location.href = '/jurnal';
-      }, 2000);
+    } catch (error: any) {
+      console.error('Error detail:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
 
-    } catch (error) {
       toast({
-        variant: "destructive", 
+        variant: "destructive",
         title: "Error",
-        description: "Gagal menyimpan data"
+        description: error.response?.data?.message || error.message || "Gagal menyimpan data"
       });
     }
   };
@@ -463,6 +494,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
             {/* Left side - Form */}
             <form onSubmit={handleSubmit} className="space-y-4 w-[400px]">
               <div className="grid gap-4">
+                {/* Form fields untuk event (tanggal, bukti, keterangan) */}
                 <div className="grid gap-2">
                   <label>Tanggal</label>
                   <Input
@@ -494,6 +526,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                   />
                 </div>
 
+                {/* Form fields untuk akun dan nominal */}
                 <div className="grid gap-2">
                   <label>Kode Akun</label>
                   <Select
@@ -659,21 +692,21 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-medium text-gray-700">Informasi Kejadian</h4>
                     {!isEditingEvent ? (
-                      <Button
+                      <Button 
                         variant="ghost"
                         size="sm"
                         onClick={handleEditEvent}
-                        className="h-8 px-2 hover:bg-gray-100"
+                        className="bg-[#E11D48] hover:bg-[#F43F5E] hover:text-white text-white rounded-lg"
                       >
                         <Pencil className="h-4 w-4 mr-1" />
                         Edit Kejadian
                       </Button>
                     ) : (
-                      <Button
+                      <Button 
                         variant="ghost"
                         size="sm"
                         onClick={handleUpdateEvent}
-                        className="h-8 px-2 hover:bg-gray-100 text-green-600"
+                        className="bg-[#E11D48] hover:bg-[#F43F5E] hover:text-white text-white rounded-lg"
                       >
                         Update Kejadian
                       </Button>
@@ -834,7 +867,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                 </div>
               </div>
 
-              {/* Status keseimbangan dan tombol submit */}
+              {/* Status dan tombol submit */}
               {tempTransactions.length > 0 && (
                 <>
                   <div className="text-center py-2">
@@ -850,7 +883,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                   </div>
                   <Button
                     type="button"
-                    className="w-full"
+                    className="w-full bg-[#E11D48] hover:bg-[#F43F5E] text-white"
                     onClick={handleSubmitAll}
                     disabled={calculateTotals().totalDebit !== calculateTotals().totalKredit}
                   >
