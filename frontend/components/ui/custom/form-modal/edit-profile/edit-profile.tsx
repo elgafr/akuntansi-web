@@ -20,8 +20,7 @@ interface EditProfileProps {
   isEditModalOpen: boolean;
   closeEditModal: () => void;
   profileData: ProfileData;
-  saveProfileData: (newData: ProfileData, profileId: string) => void;
-  profileId: string;
+  saveProfileData: (newData: ProfileData) => void;
 }
 
 export default function EditProfile({
@@ -29,7 +28,6 @@ export default function EditProfile({
   closeEditModal,
   profileData,
   saveProfileData,
-  profileId, 
 }: EditProfileProps) {
 
   const [newProfileData, setNewProfileData] = useState({
@@ -65,8 +63,23 @@ export default function EditProfile({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    saveProfileData(newProfileData, profileId);
+  
+    // Hanya kirim data yang diubah, bukan seluruh profil
+    const updatedData: Partial<ProfileData> = {};
+  
+    // Pastikan hanya data yang diubah yang dikirim
+    if (newProfileData.gender !== profileData.gender) updatedData.gender = newProfileData.gender;
+    if (newProfileData.email !== profileData.email) updatedData.email = newProfileData.email;
+    if (newProfileData.birthDate !== profileData.birthDate) updatedData.birthDate = newProfileData.birthDate;
+    if (newProfileData.address !== profileData.address) updatedData.address = newProfileData.address;
+    if (newProfileData.phone !== profileData.phone) updatedData.phone = newProfileData.phone;
+  
+    console.log("Data to be saved:", updatedData);  // Log the data before submitting
+    saveProfileData({ ...profileData, ...updatedData });  // Kirimkan data yang telah diperbarui
+    closeEditModal();  // Tutup modal setelah menyimpan
   };
+  
+  
 
   return (
     <Dialog open={isEditModalOpen} onOpenChange={closeEditModal}>

@@ -20,15 +20,19 @@ import Krs from "@/components/ui/custom/form-modal/krs/krs";
 export default function Page() {
   const [profileData, setProfileData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State to control modal visibility
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Fetch profile data from the backend
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
         const response = await axios.get("/mahasiswa/profile");
-        if (response.data.success) {
-          setProfileData(response.data.data); // Assuming the first item is the profile
+        console.log("Fetched profile data:", response.data.data); 
+        if (response.data.success && response.data) {
+          console.log("Profile data received:", response.data);
+          setProfileData(response.data);
+        } else {
+          console.error("No profile data found in response.");
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);
@@ -36,37 +40,59 @@ export default function Page() {
         setLoading(false);
       }
     };
-
     fetchProfileData();
   }, []);
+  
 
   const openEditModal = () => {
-    setIsEditModalOpen(true); // Open the modal
+    setIsEditModalOpen(true);
   };
 
   const closeEditModal = () => {
-    setIsEditModalOpen(false); // Close the modal
+    setIsEditModalOpen(false);
   };
 
-  // Save the updated profile data
   const saveProfileData = async (newData: any) => {
     try {
-      const userId = profileData?.id; // Safely access user.id
-      const response = await axios.put(`/mahasiswa/profile/${userId}`, newData); // Use user_id in URL for the PUT request
+      const profileId = profileData?.id;
+  
+      if (!profileId) {
+        console.error("Profile ID is missing.");
+        return;
+      }
+  
+      console.log("Saving profile with ID:", profileId);
+      console.log("Data being sent:", newData);
+  
+      // Kirim permintaan PATCH untuk memperbarui data profil mahasiswa yang terkait dengan ID pengguna yang login
+      const response = await axios.patch(`/mahasiswa/profile/${profileId}`, newData);
+  
       if (response.data.success) {
-        setProfileData(response.data.data); // Update profile data state
-        closeEditModal(); 
+        console.log("Profile updated successfully:", response.data);
+        setProfileData(response.data);
+        closeEditModal();
+      } else {
+        console.error("Failed to update profile:", response.data.message || response.data);
       }
     } catch (error) {
-      console.error("Error saving profile data:", error.response || error);
+      // Tangani error lebih rinci
+      if (error.response) {
+        console.error("Error response:", error.response.data);
+        console.error("Error status:", error.response.status);
+      } else if (error.request) {
+        console.error("Error request:", error.request);
+      } else {
+        console.error("Error message:", error.message);
+      }
     }
   };
+  
 
   if (loading) {
-    return <div>Loading...</div>; // Show loading state while fetching data
+    return <div>Loading...</div>;
   }
 
-  if (!profileData) {
+  if (!profileData || !profileData.user) {
     return <div>No profile data available</div>;
   }
 
@@ -189,8 +215,8 @@ export default function Page() {
           isEditModalOpen={isEditModalOpen}
           closeEditModal={closeEditModal}
           profileData={profileData.user}
-          saveProfileData={saveProfileData} // Pass the save function to EditProfile
-          profileId={profileData.user.id} // Pass profile ID to EditProfile
+          saveProfileData={saveProfileData}
+          // profileId={profileData.user.id}
         />
       </SidebarInset>
     </SidebarProvider>

@@ -10,18 +10,15 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { z } from "zod";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
+import axios from "@/lib/axios";
+
 import {
   Select,
   SelectContent,
@@ -56,35 +53,33 @@ const FormSchema = z.object({
 
 // Tipe data Company
 interface Company {
-  name: string;
-  category: string;
-  alamat: string;
-  tahunBerdiri: number;
+  nama: string;
 }
 
 // Tipe data Account
 interface Account {
-  name: string;
+  nama: string;
   kodeAkun: string;
   debit: number;
   kredit: number;
   isEditing: boolean;
 }
 
-interface ProfileData {
-  fullName: string;
-  // tambahkan properti lain jika diperlukan
-}
+// interface ProfileData {
+//   fullName: string;
+//   user_id: {
+//     nama: string;
+//     nim: string;
+//   };
+// }
+
 // Fungsi untuk memformat angka ke dalam notasi singkat (misal: 10jt, 100jt, dll.)
 const formatNumber = (value: number): string => {
   if (value >= 1_000_000_000) {
-    // Misalnya: 1.200.000.000 → "1,2M"
     return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   } else if (value >= 1_000_000) {
-    // Misalnya: 2.500.000 → "2,5jt"
     return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}jt`;
   } else if (value >= 100_000) {
-    // Misalnya: 100.000 → "100k"
     return `${(value / 1_000).toFixed(0)}k`;
   } else {
     return value.toLocaleString("id-ID");
@@ -101,65 +96,101 @@ export default function Page() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   // State untuk pilihan akun pada dropdown
   const [selectedAccount1, setSelectedAccount1] = useState<string | null>(null);
   const [selectedAccount2, setSelectedAccount2] = useState<string | null>(null);
   const [selectedAccount3, setSelectedAccount3] = useState<string | null>(null);
 
-  const [profileData, setProfileData] = useState<ProfileData>({
-    fullName: "Guest",
-  });
+  interface ProfileData {
+    user: {
+      name: string;
+      nim: string;
+    };
+  }
+
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
-  }, []);
-
-  // Load daftar perusahaan dari localStorage
-  useEffect(() => {
-    const savedCompanies = localStorage.getItem("companies");
-    if (savedCompanies) {
-      setCompanyList(JSON.parse(savedCompanies));
-    }
-  }, []);
-
-  // Saat komponen mount, inisialisasi nilai perusahaan dan data akun (jika ada) dari localStorage
-  useEffect(() => {
-    const storedCompany = localStorage.getItem("selectedCompany");
-    if (storedCompany) {
-      form.setValue("companyName", storedCompany);
-      setSelectedCompany(storedCompany);
-      setShowSuggestions(false);
-      const accountKey = `accounts_${storedCompany}`;
-      const savedAccounts = localStorage.getItem(accountKey);
-      if (savedAccounts) {
-        setAccounts(JSON.parse(savedAccounts));
-      } else {
-        setAccounts([]);
+    const fetchProfileData = async () => {
+      try {
+        const response = await axios.get("/mahasiswa/profile");
+        if (response.data.success) {
+          setProfileData(response.data.data); // Assuming response.data.data contains user info
+        }
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoadingProfile(false); // Ensure loading is false when done fetching
       }
+    };
+
+    fetchProfileData();
+  }, []);
+
+  // Fetch daftar perusahaan dari database
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await axios.get("/mahasiswa/perusahaan");
+
+        // Perbaiki cara kita mengakses data perusahaan
+        if (response.data && Array.isArray(response.data.data)) {
+          setCompanyList(response.data.data); // Ambil data dari objek 'data' yang ada di response
+        } else {
+          setCompanyList([]); // Set array kosong jika data tidak valid
+        }
+      } catch (error) {
+        console.error("Error fetching companies:", error);
+        setCompanyList([]); // Set array kosong jika error
+      }
+    };
+
+    fetchCompanies();
+  }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(companyList)) {
+      console.error("companyList is not an array:", companyList);
+      return;
     }
-  }, [form]);
 
-  const searchTerm = form.watch("companyName");
+    if (!searchTerm.trim()) {
+      setFilteredCompanies([]);
+      setShowSuggestions(false);
+      return;
+    }
 
-  const filteredCompanies = companyList.filter((company) =>
-    company.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    const results = companyList.filter(
+      (company) =>
+        company.nama &&
+        company.nama.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    console.log("Filtered Companies:", results); // Log untuk memeriksa hasil pencarian
+    setFilteredCompanies(results);
+    setShowSuggestions(true);
+  }, [searchTerm, companyList]);
 
   function onSubmit(data: z.infer<typeof FormSchema>) {
-    localStorage.setItem("selectedCompany", data.companyName);
     setSelectedCompany(data.companyName);
     setShowSuggestions(false);
-    const accountKey = `accounts_${data.companyName}`;
-    const savedAccounts = localStorage.getItem(accountKey);
-    if (savedAccounts) {
-      setAccounts(JSON.parse(savedAccounts));
-    } else {
-      setAccounts([]);
-    }
+
+    // Ambil data akun perusahaan berdasarkan perusahaan yang dipilih
+    const fetchAccounts = async () => {
+      try {
+        const response = await axios.get(`/instruktur/akun`);
+        setAccounts(response.data || []);
+      } catch (error) {
+        console.error("Error fetching accounts:", error);
+        setAccounts([]);
+      }
+    };
+
+    fetchAccounts();
     alert(`Form submitted with Company Name: ${data.companyName}`);
   }
 
@@ -169,8 +200,7 @@ export default function Page() {
     return account ? account.debit : 0;
   };
 
-  // Generate data grafik berdasarkan pilihan akun.
-  // Misal: untuk masing-masing bulan, nilai akun dihasilkan dari nilai debit dasar + variasi
+  // Generate data grafik berdasarkan pilihan akun
   const months = ["January", "February", "March", "April", "May", "June"];
   const mergedChartData = months.map((month, index) => ({
     month,
@@ -209,10 +239,17 @@ export default function Page() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <Avatar>
-                <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                <AvatarImage
+                  src="https://github.com/shadcn.png"
+                  alt="@shadcn"
+                />
               </Avatar>
               <div className="text-left mr-8">
-                <div className="text-sm font-medium">{profileData.fullName}</div>
+                <div className="text-sm font-medium">
+                  {loadingProfile
+                    ? "Loading..."
+                    : profileData?.user?.name || "Nama tidak tersedia"}
+                </div>
                 <div className="text-xs text-gray-800">Student</div>
               </div>
             </div>
@@ -241,69 +278,56 @@ export default function Page() {
                               {...field}
                               className="w-full pl-10 h-10 rounded-xl"
                               onChange={(e) => {
+                                const value = e.target.value;
                                 field.onChange(e);
-                                if (
-                                  selectedCompany &&
-                                  e.target.value !== selectedCompany
-                                ) {
-                                  setSelectedCompany(null);
-                                  setAccounts([]);
-                                }
+                                setSearchTerm(value);
                                 setShowSuggestions(true);
                               }}
                             />
                             <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                               <FaBuilding className="w-5 h-5 text-gray-700" />
                             </div>
-                            {searchTerm && showSuggestions && !selectedCompany && (
-                              <>
-                                {filteredCompanies.length > 0 ? (
-                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                                    {filteredCompanies.map((company, index) => (
-                                      <div
-                                        key={index}
-                                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                        onClick={() => {
-                                          form.setValue(
-                                            "companyName",
-                                            company.name
-                                          );
-                                          localStorage.setItem(
-                                            "selectedCompany",
-                                            company.name
-                                          );
-                                          setSelectedCompany(company.name);
-                                          setShowSuggestions(false);
-                                          const accountKey = `accounts_${company.name}`;
-                                          const savedAccounts = localStorage.getItem(
-                                            accountKey
-                                          );
-                                          if (savedAccounts) {
-                                            setAccounts(JSON.parse(savedAccounts));
-                                          } else {
-                                            setAccounts([]);
-                                          }
-                                        }}
-                                      >
-                                        {company.name}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                                    <div className="px-4 py-2 text-gray-500">
-                                      Perusahaan tidak ditemukan
+                            {searchTerm &&
+                              showSuggestions &&
+                              !selectedCompany && (
+                                <>
+                                  {filteredCompanies.length > 0 ? (
+                                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                                      {filteredCompanies.map(
+                                        (company, index) => (
+                                          <div
+                                            key={index}
+                                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              form.setValue(
+                                                "companyName",
+                                                company.nama
+                                              );
+                                              setSelectedCompany(company.nama);
+                                              setShowSuggestions(false);
+                                            }}
+                                          >
+                                            {company.nama}
+                                          </div>
+                                        )
+                                      )}
                                     </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
+                                  ) : (
+                                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                                      <div className="px-4 py-2 text-gray-500">
+                                        Perusahaan tidak ditemukan
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
                           </div>
                         </FormControl>
                       </FormItem>
                     </div>
                   )}
                 />
+
                 <Button
                   type="submit"
                   className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8"
@@ -330,9 +354,7 @@ export default function Page() {
           <div className="flex items-start gap-4">
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
-                <Avatar
-                  className="w-20 h-20 ring-white flex-shrink-0 self-center"
-                >
+                <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
                   <AvatarImage
                     src="https://randomuser.me/api/portraits/women/79.jpg"
                     alt="Mahasiswa"
@@ -344,24 +366,20 @@ export default function Page() {
                       Nama Mahasiswa
                     </p>
                     <p className="text-right w-[20px]">:</p>
-                    <p className="text-left break-words">Cody Alexander</p>
+                    {/* Conditional rendering based on loading state */}
+                    <p className="text-left break-words">
+                      {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.name || "Nama tidak tersedia"}
+                    </p>
+
                     <p className="font-semibold whitespace-nowrap">NIM</p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left break-words">
-                      123456789101112
+                      {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.nim || "NIM tidak tersedia"}
                     </p>
-                    <p className="font-semibold whitespace-nowrap">
-                      Program Studi
-                    </p>
-                    <p className="text-right w-[20px]">:</p>
-                    <p className="text-left break-words">
-                      Computer Science
-                    </p>
-                    <p className="font-semibold whitespace-nowrap">
-                      Semester
-                    </p>
-                    <p className="text-right w-[20px]">:</p>
-                    <p className="text-left">5</p>
                   </div>
                 </div>
               </CardContent>
@@ -382,7 +400,7 @@ export default function Page() {
                     <SelectGroup>
                       {accounts.map((account, index) => (
                         <SelectItem key={index} value={account.kodeAkun}>
-                          {account.kodeAkun} - {account.name}
+                          {account.kodeAkun} - {account.nama}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -403,7 +421,7 @@ export default function Page() {
                     <SelectGroup>
                       {accounts.map((account, index) => (
                         <SelectItem key={index} value={account.kodeAkun}>
-                          {account.kodeAkun} - {account.name}
+                          {account.kodeAkun} - {account.nama}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -424,7 +442,7 @@ export default function Page() {
                     <SelectGroup>
                       {accounts.map((account, index) => (
                         <SelectItem key={index} value={account.kodeAkun}>
-                          {account.kodeAkun} - {account.name}
+                          {account.kodeAkun} - {account.nama}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -438,9 +456,7 @@ export default function Page() {
           <Card className="mt-10 w-[174vh] p-4 shadow-md">
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
-                <CardTitle className="mb-4 text-gray-500">
-                  Buku Besar
-                </CardTitle>
+                <CardTitle className="mb-4 text-gray-500">Buku Besar</CardTitle>
                 <CardDescription className="text-black text-2xl font-bold">
                   {formatNumber(totalValue)}
                 </CardDescription>
@@ -454,7 +470,7 @@ export default function Page() {
                       {
                         accounts.find(
                           (acc) => acc.kodeAkun === selectedAccount1
-                        )?.name
+                        )?.nama
                       }
                     </span>
                   </div>
@@ -466,7 +482,7 @@ export default function Page() {
                       {
                         accounts.find(
                           (acc) => acc.kodeAkun === selectedAccount2
-                        )?.name
+                        )?.nama
                       }
                     </span>
                   </div>
@@ -478,7 +494,7 @@ export default function Page() {
                       {
                         accounts.find(
                           (acc) => acc.kodeAkun === selectedAccount3
-                        )?.name
+                        )?.nama
                       }
                     </span>
                   </div>
@@ -495,7 +511,9 @@ export default function Page() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis tickFormatter={formatNumber} />
-                    <Tooltip formatter={(value) => formatNumber(value as number)} />
+                    <Tooltip
+                      formatter={(value) => formatNumber(value as number)}
+                    />
                     {/* Render garis hanya jika akun sudah dipilih */}
                     {selectedAccount1 && (
                       <Line

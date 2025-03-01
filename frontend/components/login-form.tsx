@@ -70,7 +70,7 @@ export function LoginForm({
       const response = await axios.get(`/mahasiswa/profile`);
       if (response.data && response.data.success && response.data.data) {
         const profileData = response.data.data;
-        localStorage.setItem("profileData", JSON.stringify(profileData)); // Simpan data profil di localStorage
+        localStorage.setItem("profileData", JSON.stringify(profileData));
       } else {
         console.error("Profile data not found.");
       }

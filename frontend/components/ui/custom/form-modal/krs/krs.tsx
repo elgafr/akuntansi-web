@@ -38,47 +38,58 @@ interface ClassItem {
 
 export default function Krs() {
   const [selectedClasses, setSelectedClasses] = useState<KrsItem[]>([]);
-  const [classCategories, setClassCategories] = useState<
-    Record<string, ClassItem[]>
-  >({});
+  const [classCategories, setClassCategories] = useState<Record<string, ClassItem[]>>({});
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string>("");
+  const [userId, setUserId] = useState<string>(""); // userId state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [action, setAction] = useState<"add" | "delete">("add");
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
 
-  // Fetch initial data dari backend
+  // Fetch profile data and set userId
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProfile = async () => {
       try {
         const profileRes = await axios.get("/mahasiswa/profile");
+        console.log("Profile Response:", profileRes.data);
         if (profileRes.data.success) {
           const userIdFromProfile = profileRes.data.data[0]?.user_id || "";
-          setUserId(userIdFromProfile); // Set userId setelah mendapatkan data profil
+          setUserId(userIdFromProfile);
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      }
+    };
 
-          // Lanjutkan dengan fetch data kelas dan KRS berdasarkan userId
-          const [classesRes, krsRes] = await Promise.all([
-            axios.get("/instruktur/kelas"),
-            axios.get(`/mahasiswa/krs/${userIdFromProfile}`), // Dapatkan KRS berdasarkan userId yang valid
-          ]);
+    fetchProfile();
+  }, []);
+  // Fetch class and KRS data when userId is available
+  useEffect(() => {
+    if (userId) return;
 
-          // Set kelas dan kategori
-          if (classesRes.data.success) {
-            const categories = classesRes.data.data.reduce(
-              (acc: Record<string, ClassItem[]>, item: ClassItem) => {
-                if (!acc[item.kategori]) acc[item.kategori] = [];
-                acc[item.kategori].push(item);
-                return acc;
-              },
-              {}
-            );
-            setClassCategories(categories);
-          }
+    const fetchData = async () => {
+      try {
+        // Fetch classes and KRS based on userId
+        const [classesRes, krsRes] = await Promise.all([
+          axios.get("/instruktur/kelas"),
+          axios.get(`/mahasiswa/krs/${userId}`),
+        ]);
 
-          // Set selected classes berdasarkan user_id
-          if (krsRes.data.success) {
-            setSelectedClasses(krsRes.data.data);
-          }
+        // Set class categories if classes are fetched successfully
+        if (classesRes.data.success) {
+          const categories = classesRes.data.data.reduce(
+            (acc: Record<string, ClassItem[]>, item: ClassItem) => {
+              if (!acc[item.kategori]) acc[item.kategori] = [];
+              acc[item.kategori].push(item);
+              return acc;
+            },
+            {}
+          );
+          setClassCategories(categories);
+        }
+
+        // Set selected classes based on user_id
+        if (krsRes.data.success) {
+          setSelectedClasses(krsRes.data.data);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -87,14 +98,10 @@ export default function Krs() {
       }
     };
 
-    if (!userId) {
-      // Jangan jalankan fetchData jika userId belum ada
-      fetchData();
-    }
-  }, [userId]); // Fetch data hanya ketika userId sudah ada
+    fetchData(); 
+  }, [userId]); 
 
   const handleClassSelection = (classItem: ClassItem) => {
-    // Cek apakah kelas sudah dipilih
     if (selectedClasses.some((item) => item.kelas_id === classItem.id)) {
       alert("Kelas ini sudah dipilih.");
       return;
@@ -113,21 +120,15 @@ export default function Krs() {
 
   const handleConfirmAction = async () => {
     const token = localStorage.getItem("token");
-    // if (!token || !userId || !selectedClass) return;
-  
-    console.log("Mengirim data ke backend:", {
-      user_id: userId,
-      kelas_id: selectedClass?.id??"",
-    });
-  
+    if (!token || !userId || !selectedClass) return;
+
     try {
       if (action === "add" && selectedClass) {
-        // POST request ke backend untuk menambahkan kelas ke KRS
         const response = await axios.post(
           "/mahasiswa/krs",
           {
-            user_id: userId, // Menyertakan user_id yang sudah diambil dari profile
-            kelas_id: selectedClass.id, // Mengirimkan kelas yang dipilih
+            user_id: userId,
+            kelas_id: selectedClass.id,
           },
           {
             headers: {
@@ -136,11 +137,8 @@ export default function Krs() {
             },
           }
         );
-  
-        console.log("Response dari server:", response); // Cek response dari server
-  
+
         if (response.data.success) {
-          // Update state dengan data dari response backend
           setSelectedClasses((prev) => [
             ...prev,
             {
@@ -165,7 +163,6 @@ export default function Krs() {
       setSelectedClass(null);
     }
   };
-  
 
   if (loading) return <div>Memuat data...</div>;
 
@@ -215,12 +212,11 @@ export default function Krs() {
           </CardContent>
         </Card>
 
-        {/* KRS Terpilih - Diperbaiki tampilannya */}
+        {/* KRS Terpilih */}
         <Card className="w-1/2">
           <CardContent className="p-4 space-y-4">
             {selectedClasses.length > 0 ? (
               selectedClasses.map((krsItem) => {
-                // Mencari data class berdasarkan kelas_id
                 const classItem = Object.values(classCategories)
                   .flat()
                   .find((item) => item.id === krsItem.kelas_id);
@@ -275,7 +271,7 @@ export default function Krs() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick = {() => handleConfirmAction()}>
+            <AlertDialogAction onClick={() => handleConfirmAction()}>
               {action === "add" ? "Tambahkan" : "Hapus"}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -2,9 +2,9 @@ import axios from 'axios';
 
 // Membuat instance axios dengan baseURL
 const instance = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api', // Base URL Laravel API
+  baseURL: 'http://127.0.0.1:8000/api',
   headers: {
-    'Content-Type': 'application/json', // Menentukan header content type
+    'Content-Type': 'application/json',
   },
 });
 
