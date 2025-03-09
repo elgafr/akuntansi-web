@@ -6,21 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "lucide-react";
 
 type ProfileData = {
-  name: string;
-  nim: string;
-  gender: string;
-  birthPlace: string;
-  birthDate: string; 
-  email: string;
-  address: string;
-  phone: string;
+  id: string;
+  user: {
+    id: string;
+    name: string;
+    nim: string;
+    email: string;
+  };
+  gender?: string;
+  tanggal_lahir?: string;
+  alamat?: string;
+  hp?: string;
 };
 
 interface EditProfileProps {
   isEditModalOpen: boolean;
   closeEditModal: () => void;
   profileData: ProfileData;
-  saveProfileData: (newData: ProfileData) => void;
+  saveProfileData: (newData: Partial<ProfileData>) => void;
 }
 
 export default function EditProfile({
@@ -29,57 +32,33 @@ export default function EditProfile({
   profileData,
   saveProfileData,
 }: EditProfileProps) {
-
-  const [newProfileData, setNewProfileData] = useState({
-    name: profileData.name || '',
-    nim: profileData.nim || '',
-    gender: profileData.gender || '',
-    birthPlace: profileData.birthPlace || '',
-    birthDate: profileData.birthDate || '',
-    email: profileData.email || '',
-    address: profileData.address || '',
-    phone: profileData.phone || '',
+  const [formData, setFormData] = useState<Partial<ProfileData>>({
+    gender: '',
+    tanggal_lahir: '',
+    alamat: '',
+    hp: '',
   });
 
   useEffect(() => {
-     setNewProfileData({
-      name: profileData.name || '',
-      nim: profileData.nim || '',
+    setFormData({
       gender: profileData.gender || '',
-      birthPlace: profileData.birthPlace || '',
-      birthDate: profileData.birthDate || '',
-      email: profileData.email || '',
-      address: profileData.address || '',
-      phone: profileData.phone || '',
+      tanggal_lahir: profileData.tanggal_lahir || '',
+      alamat: profileData.alamat || '',
+      hp: profileData.hp || '',
     });
   }, [profileData]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewProfileData({
-      ...newProfileData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-  
-    // Hanya kirim data yang diubah, bukan seluruh profil
-    const updatedData: Partial<ProfileData> = {};
-  
-    // Pastikan hanya data yang diubah yang dikirim
-    if (newProfileData.gender !== profileData.gender) updatedData.gender = newProfileData.gender;
-    if (newProfileData.email !== profileData.email) updatedData.email = newProfileData.email;
-    if (newProfileData.birthDate !== profileData.birthDate) updatedData.birthDate = newProfileData.birthDate;
-    if (newProfileData.address !== profileData.address) updatedData.address = newProfileData.address;
-    if (newProfileData.phone !== profileData.phone) updatedData.phone = newProfileData.phone;
-  
-    console.log("Data to be saved:", updatedData);  // Log the data before submitting
-    saveProfileData({ ...profileData, ...updatedData });  // Kirimkan data yang telah diperbarui
-    closeEditModal();  // Tutup modal setelah menyimpan
+    saveProfileData(formData);
   };
-  
-  
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
 
   return (
     <Dialog open={isEditModalOpen} onOpenChange={closeEditModal}>
@@ -89,83 +68,60 @@ export default function EditProfile({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {/* Read-only fields */}
             <div>
-              <Label className="block mb-1">Nama Lengkap</Label>
-              <Input
-                name="name"
-                value={newProfileData.name}
-                onChange={handleChange}
-                disabled
-                className="rounded-xl"
-              />
+              <Label>Nama Lengkap</Label>
+              <Input value={profileData.user.name} disabled />
             </div>
             <div>
-              <Label className="block mb-1">NIM</Label>
-              <Input
-                name="nim"
-                value={newProfileData.nim}
-                onChange={handleChange}
-                disabled
-                className="rounded-xl"
-              />
+              <Label>NIM</Label>
+              <Input value={profileData.user.nim} disabled />
             </div>
+
+            {/* Editable fields */}
             <div>
-              <Label className="block mb-1">Gender</Label>
+              <Label>Gender</Label>
               <Input
                 name="gender"
-                value={newProfileData.gender}
+                value={formData.gender || ''}
                 onChange={handleChange}
-                className="rounded-xl"
               />
             </div>
             <div>
-              <Label className="block mb-1">Tanggal Lahir</Label>
+              <Label>Tanggal Lahir</Label>
               <div className="relative">
                 <Input
-                  name="birthDate"
-                  value={newProfileData.birthDate}
-                  onChange={handleChange}
                   type="date"
+                  name="tanggal_lahir"
+                  value={formData.tanggal_lahir || ''}
+                  onChange={handleChange}
                   className="rounded-xl pl-10"
                 />
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
               </div>
             </div>
             <div>
-              <Label className="block mb-1">Email</Label>
+              <Label>Alamat</Label>
               <Input
-                name="email"
-                value={newProfileData.email}
+                name="alamat"
+                value={formData.alamat || ''}
                 onChange={handleChange}
-                className="rounded-xl"
               />
             </div>
             <div>
-              <Label className="block mb-1">Alamat Rumah</Label>
+              <Label>No HP</Label>
               <Input
-                name="address"
-                value={newProfileData.address}
+                name="hp"
+                value={formData.hp || ''}
                 onChange={handleChange}
-                className="rounded-xl"
-              />
-            </div>
-            <div>
-              <Label className="block mb-1">No Handphone</Label>
-              <Input
-                name="phone"
-                value={newProfileData.phone}
-                onChange={handleChange}
-                className="rounded-xl"
               />
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={closeEditModal} className="rounded-xl">
+            <Button type="button" variant="outline" onClick={closeEditModal}>
               Cancel
             </Button>
-            <Button type="submit" className="rounded-xl">
-              Save
-            </Button>
+            <Button type="submit">Save</Button>
           </DialogFooter>
         </form>
       </DialogContent>

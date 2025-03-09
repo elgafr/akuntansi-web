@@ -29,7 +29,7 @@ export function LoginForm({
       const response = await axios.post("/mahasiswa/login", { nim, password });
       
       if (response.data?.success) {
-        const { token, user_id, fullName, nim } = response.data.data; // Pastikan backend mengirim data ini
+        const { token, user_id, fullName, nim } = response.data.data;
         
         // Simpan data profil sementara
         const tempProfile = {

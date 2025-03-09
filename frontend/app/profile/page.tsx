@@ -17,84 +17,72 @@ import EditProfile from "@/components/ui/custom/form-modal/edit-profile/edit-pro
 import axios from "@/lib/axios";
 import Krs from "@/components/ui/custom/form-modal/krs/krs";
 
+type ProfileData = {
+  id: string;
+  user_id: string;
+  gender?: string;
+  tanggal_lahir?: string;
+  alamat?: string;
+  hp?: string;
+  user?: {
+    id: string;
+    name: string;
+    nim: string;
+    email: string;
+  };
+};
+
 export default function Page() {
-  const [profileData, setProfileData] = useState<any | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // Fetch profile data from the backend
   useEffect(() => {
-    const fetchProfileData = async () => {
+    const fetchProfile = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
-        console.log("Fetched profile data:", response.data.data); 
-        if (response.data.success && response.data) {
-          console.log("Profile data received:", response.data);
-          setProfileData(response.data);
-        } else {
-          console.error("No profile data found in response.");
-        }
+        const response = await axios.get('/mahasiswa/profile');
+        setProfileData(response.data.data);
       } catch (error) {
-        console.error("Error fetching profile data:", error);
+        console.error('Gagal mengambil data profil:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchProfileData();
+    
+    fetchProfile();
   }, []);
-  
 
-  const openEditModal = () => {
-    setIsEditModalOpen(true);
-  };
-
-  const closeEditModal = () => {
-    setIsEditModalOpen(false);
-  };
-
-  const saveProfileData = async (newData: any) => {
+  const saveProfileData = async (updatedData: Partial<ProfileData>) => {
     try {
-      const profileId = profileData?.id;
-  
-      if (!profileId) {
-        console.error("Profile ID is missing.");
-        return;
-      }
-  
-      console.log("Saving profile with ID:", profileId);
-      console.log("Data being sent:", newData);
-  
-      // Kirim permintaan PATCH untuk memperbarui data profil mahasiswa yang terkait dengan ID pengguna yang login
-      const response = await axios.patch(`/mahasiswa/profile/${profileId}`, newData);
-  
+      if (!profileData) return;
+
+      const response = await axios.patch(
+        `/mahasiswa/profile/${profileData.id}`,
+        {
+          gender: updatedData.gender,
+          tanggal_lahir: updatedData.tanggal_lahir,
+          alamat: updatedData.alamat,
+          hp: updatedData.hp
+        }
+      );
+
       if (response.data.success) {
-        console.log("Profile updated successfully:", response.data);
-        setProfileData(response.data);
+        setProfileData(prev => ({
+          ...prev!,
+          ...response.data.data
+        }));
         closeEditModal();
-      } else {
-        console.error("Failed to update profile:", response.data.message || response.data);
       }
     } catch (error) {
-      // Tangani error lebih rinci
-      if (error.response) {
-        console.error("Error response:", error.response.data);
-        console.error("Error status:", error.response.status);
-      } else if (error.request) {
-        console.error("Error request:", error.request);
-      } else {
-        console.error("Error message:", error.message);
-      }
+      console.error("Update error:", error);
     }
   };
-  
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  const openEditModal = () => setIsEditModalOpen(true);
+  const closeEditModal = () => setIsEditModalOpen(false);
 
-  if (!profileData || !profileData.user) {
-    return <div>No profile data available</div>;
-  }
+  if (loading) return <div>Loading...</div>;
+  if (!profileData || !profileData.user) return <div>Data profil tidak ditemukan</div>;
 
   return (
     <SidebarProvider>
@@ -124,7 +112,7 @@ export default function Page() {
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">
-                    {profileData.user.name}
+                    {profileData.user?.name || 'Nama tidak tersedia'}
                   </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
@@ -141,10 +129,10 @@ export default function Page() {
               </Avatar>
               <div className="w-full text-start">
                 <h1 className="text-2xl font-semibold">
-                  {profileData.user.name}
+                  {profileData.user?.name || 'Nama tidak tersedia'}
                 </h1>
                 <h2 className="text-xl text-gray-600">
-                  {profileData.user.nim}
+                  {profileData.user?.nim || 'NIM tidak tersedia'}
                 </h2>
                 <Button className="text-black font-bold rounded-xl mt-2">
                   Student
@@ -168,41 +156,43 @@ export default function Page() {
                 <div className="space-y-1">
                   <Label className="text-xl">Nama Lengkap</Label>
                   <p className="text-gray-600 text-lg">
-                    {profileData.user.name}
+                    {profileData.user?.name || 'Nama tidak tersedia'}
                   </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Gender</Label>
                   <p className="text-gray-600 text-lg">
-                    {profileData.user.gender}
+                    {profileData.gender || 'Belum diisi'}
                   </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Tanggal Lahir</Label>
                   <p className="text-gray-600 text-lg">
-                    {profileData.user.tanggal_lahir}
+                    {profileData.tanggal_lahir || 'Belum diisi'}
                   </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Alamat Email</Label>
                   <p className="text-gray-600 text-lg">
-                    {profileData.user.email}
+                    {profileData.user?.email || 'Email tidak tersedia'}
                   </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">Alamat Rumah</Label>
                   <p className="text-gray-600 text-lg">
-                    {profileData.user.alamat}
+                    {profileData.alamat || 'Belum diisi'}
                   </p>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xl">No Handphone</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.hp}</p>
+                  <p className="text-gray-600 text-lg">
+                    {profileData.hp || 'Belum diisi'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -214,9 +204,15 @@ export default function Page() {
         <EditProfile
           isEditModalOpen={isEditModalOpen}
           closeEditModal={closeEditModal}
-          profileData={profileData.user}
+          profileData={{
+            id: profileData.id,
+            user: profileData.user,
+            gender: profileData.gender,
+            tanggal_lahir: profileData.tanggal_lahir,
+            alamat: profileData.alamat,
+            hp: profileData.hp
+          }}
           saveProfileData={saveProfileData}
-          // profileId={profileData.user.id}
         />
       </SidebarInset>
     </SidebarProvider>

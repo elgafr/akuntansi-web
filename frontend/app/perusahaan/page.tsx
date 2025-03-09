@@ -70,12 +70,12 @@ export default function Page() {
       try {
         const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
-          setProfileData(response.data.data); // Assuming response.data.data contains user info
+          setProfileData(response.data.data);
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);
       } finally {
-        setLoadingProfile(false); // Ensure loading is false when done fetching
+        setLoadingProfile(false);
       }
     };
 

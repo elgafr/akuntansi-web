@@ -51,20 +51,20 @@ interface Account {
   nama: string;
   kode: string;
   status: string;
-  debit: number; // Track debit
-  kredit: number; // Track kredit
+  debit: number;
+  kredit: number;
   isEditing: boolean;
-  subakun: SubAccount[]; // Link subaccounts here
+  subakun: SubAccount[];
 }
 
 interface SubAccount {
   id: string;
   kode: string;
   nama: string;
-  debit: number; // Track debit for subaccounts
-  kredit: number; // Track kredit for subaccounts
+  debit: number;
+  kredit: number;
   akun_id: string;
-  isEditing: boolean; // To track if subaccount is being edited
+  isEditing: boolean;
 }
 
 interface Transaction {
@@ -83,19 +83,19 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   // const [errors, setErrors] = useState<Record<string, string>>({});
   const { id } = useParams();
-
   const fetchAccounts = async (kategoriId: string) => {
     try {
       const response = await axios.get("/instruktur/akun");
       const filteredAccounts = response.data.data.filter(
-        (account: any) =>
-          account.kategori_id === kategoriId && account.status === "open"
+        (account: any) => account.kategori_id === kategoriId // Tampilkan semua status
       );
+  
 
       const accountsData = filteredAccounts.map((account: any) => ({
         id: account.id,
-        nama: account.nama, // Ensure this matches the backend field name
+        nama: account.nama,
         kode: account.kode,
+        status: account.status,
         debit: 0,
         kredit: 0,
         isEditing: false,
@@ -103,7 +103,7 @@ export default function Page() {
         subakun:
           account.subakun?.map((sub: any) => ({
             id: sub.id,
-            nama: sub.nama, // Again, make sure this is consistent
+            nama: sub.nama,
             kodeAkun: sub.kode,
             debit: 0,
             kredit: 0,
@@ -151,14 +151,15 @@ export default function Page() {
     return category ? category.nama : "Kategori Tidak Diketahui";
   };
 
+  // 2. Perbaikan handleEditAllAccounts untuk hanya mengaktifkan edit pada status open
   const handleEditAllAccounts = () => {
     const updatedAccounts = accounts.map((account) => ({
       ...account,
-      isEditing: true, // Aktifkan edit untuk akun utama
+      isEditing: account.status === "open", // Hanya aktifkan jika status open
       subakun:
         account.subakun?.map((sub) => ({
           ...sub,
-          isEditing: true, // Aktifkan edit untuk sub akun
+          isEditing: account.status === "open", // Wariskan status ke subakun
         })) || [],
     }));
     setAccounts(updatedAccounts);
@@ -201,7 +202,7 @@ export default function Page() {
   const handleSaveAccount = async () => {
     try {
       let hasError = false;
-  
+
       // Validasi sub akun name dan kode
       accounts.forEach((account) => {
         account.subakun?.forEach((sub) => {
@@ -214,28 +215,28 @@ export default function Page() {
           }
         });
       });
-  
+
       // Jika ada error atau perusahaan belum ada, hentikan
       if (hasError || !company) {
         toast.error("Perusahaan tidak ditemukan atau ada error");
         return;
       }
-  
+
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Token tidak ditemukan");
         return;
       }
-  
+
       const localAccounts = JSON.parse(JSON.stringify(accounts));
       const transactions: Transaction[] = [];
-  
+
       // Pastikan data perusahaan dan akun valid
       if (!company.id) {
         toast.error("Perusahaan ID tidak ditemukan");
         return;
       }
-  
+
       // Mengambil data debit dan kredit dari akun utama
       localAccounts.forEach((account) => {
         // Ambil debit dan kredit dari akun utama, bukan sub akun
@@ -243,38 +244,39 @@ export default function Page() {
         console.log("Perusahaan ID:", company.id);
         console.log("Debit:", account.debit);
         console.log("Kredit:", account.kredit);
-  
+
         // Sub akun ID hanya diisi jika ada sub akun yang terkait
-        const subAccountId = account.subakun?.length > 0 ? account.subakun[0].id : null;
-  
+        const subAccountId =
+          account.subakun?.length > 0 ? account.subakun[0].id : null;
+
         if ((account.debit || account.kredit) && account.id && company.id) {
           // Mengirim transaksi dengan sub_akun_id atau null jika tidak ada
           transactions.push({
-            akun_id: account.id,  // Mengambil akun_id dari akun yang ada
-            perusahaan_id: company.id,  // Mengambil perusahaan_id dari company
-            debit: account.debit || 0,  // Kirim debit dari akun utama, jika tidak ada, kirim 0
-            kredit: account.kredit || 0,  // Kirim kredit dari akun utama, jika tidak ada, kirim 0
-            sub_akun_id: subAccountId,  // Kirim sub_akun_id, jika tidak ada maka null
+            akun_id: account.id, // Mengambil akun_id dari akun yang ada
+            perusahaan_id: company.id, // Mengambil perusahaan_id dari company
+            debit: account.debit || 0, // Kirim debit dari akun utama, jika tidak ada, kirim 0
+            kredit: account.kredit || 0, // Kirim kredit dari akun utama, jika tidak ada, kirim 0
+            sub_akun_id: subAccountId, // Kirim sub_akun_id, jika tidak ada maka null
           });
         }
       });
-  
+
       // Verifikasi bahwa transactions berisi data yang benar
       console.log("Data transaksi yang akan dikirim:", transactions);
-  
+
       // Cek apakah transaksi kosong
       if (transactions.length === 0) {
         toast.error("Tidak ada transaksi untuk dikirim.");
         return;
       }
-  
+
       // Kirim transaksi ke backend
       await axios.post(
         "/mahasiswa/keuangan", // Endpoint utama untuk menyimpan data
         { transactions },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
       // Update state dan local storage setelah transaksi berhasil
       const finalAccounts = localAccounts.map((account) => ({
         ...account,
@@ -285,21 +287,19 @@ export default function Page() {
             isEditing: false,
           })) || [],
       }));
-  
+
       setAccounts(finalAccounts);
       localStorage.setItem(
         `accounts_${company.id}`,
         JSON.stringify(finalAccounts)
       );
-  
+
       toast.success("Data berhasil disimpan!");
     } catch (error) {
       console.error("Gagal menyimpan:", error);
       toast.error("Gagal menyimpan data");
     }
   };
-  
-  
 
   // const handleSubAccountKodeChange = (
   //   accountIndex: number,
@@ -498,7 +498,10 @@ export default function Page() {
 
                         {/* Button to add subaccount */}
                         <TableCell>
-                          <Button onClick={() => handleAddSubAccount(index)}>
+                          <Button
+                            onClick={() => handleAddSubAccount(index)}
+                            disabled={account.status !== "open"} // Tambahkan disabled condition
+                          >
                             <FaPlus /> Tambah Sub
                           </Button>
                         </TableCell>
