@@ -24,7 +24,7 @@ type ProfileData = {
   tanggal_lahir?: string;
   alamat?: string;
   hp?: string;
-  user?: {
+  user: {
     id: string;
     name: string;
     nim: string;
@@ -36,91 +36,166 @@ export default function Page() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    
+    // 1. Cek token tanpa redirect langsung
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+
     const fetchProfile = async () => {
       try {
-        const response = await axios.get('/mahasiswa/profile');
-        setProfileData(response.data.data);
-      } catch (error) {
-        console.error('Gagal mengambil data profil:', error);
+        // 2. Validasi token dengan request ke endpoint yang sama
+        const response = await axios.get('/mahasiswa/profile', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        // 3. Handle response yang tidak valid
+        if (!response.data?.success || !response.data.user) {
+          throw new Error('Invalid session');
+        }
+
+        const currentUser = response.data.user;
+        const userProfile = response.data.data.find(
+          (p: any) => p.user_id === currentUser.id
+        );
+
+        if (userProfile) {
+          setProfileData({
+            id: userProfile.id,
+            user_id: userProfile.user_id,
+            gender: userProfile.gender,
+            tanggal_lahir: userProfile.tanggal_lahir,
+            alamat: userProfile.alamat,
+            hp: userProfile.hp,
+            user: {
+              id: currentUser.id,
+              name: currentUser.name,
+              nim: currentUser.nim,
+              email: currentUser.email
+            }
+          });
+        } else {
+          setError('Profil belum dibuat');
+        }
+        
+      } catch (error: any) {
+        console.error('Error:', error);
+        
+        // 4. Handle error spesifik untuk invalid token
+        if (error.response?.status === 401) {
+          localStorage.removeItem("token");
+          window.location.href = '/login';
+        } else {
+          setError('Gagal memuat profil: ' + error.message);
+        }
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchProfile();
   }, []);
 
   const saveProfileData = async (updatedData: Partial<ProfileData>) => {
     try {
-      if (!profileData) return;
+      const token = localStorage.getItem("token");
+      if (!token || !profileData) return;
 
       const response = await axios.patch(
         `/mahasiswa/profile/${profileData.id}`,
+        updatedData,
         {
-          gender: updatedData.gender,
-          tanggal_lahir: updatedData.tanggal_lahir,
-          alamat: updatedData.alamat,
-          hp: updatedData.hp
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
       );
 
       if (response.data.success) {
-        setProfileData(prev => ({
+        setProfileData((prev) => ({
           ...prev!,
-          ...response.data.data
+          ...response.data.data,
         }));
         closeEditModal();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Update error:", error);
+      setError(error.response?.data?.message || "Gagal menyimpan perubahan");
     }
   };
 
   const openEditModal = () => setIsEditModalOpen(true);
   const closeEditModal = () => setIsEditModalOpen(false);
 
-  if (loading) return <div>Loading...</div>;
-  if (!profileData || !profileData.user) return <div>Data profil tidak ditemukan</div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-red-500 text-center p-4 max-w-md">
+          <h2 className="text-xl font-bold mb-2">⚠️ Terjadi Kesalahan</h2>
+          <p className="mb-4">{error}</p>
+          <Button 
+            onClick={() => window.location.reload()}
+            variant="outline"
+          >
+            Coba Lagi
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profileData) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-yellow-600 text-xl">
+          Profil belum tersedia. Silakan buat profil terlebih dahulu.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
-          <div className="flex items-center gap-2 px-4 w-full justify-between">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-6 text-black">
-                    Dashboard
-                  </h1>
-                  <h2 className="text-sm ml-6">
-                    Let&apos;s check your Dashboard today
-                  </h2>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                  />
-                </Avatar>
-                <div className="text-left mr-12">
-                  <div className="text-sm font-medium">
-                    {profileData.user?.name || 'Nama tidak tersedia'}
-                  </div>
-                  <div className="text-xs text-gray-800">Student</div>
-                </div>
-              </div>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <h1 className="text-2xl font-bold text-black">Dashboard</h1>
+                <h2 className="text-sm">Let's check your Dashboard today</h2>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+
+          <div className="flex items-center gap-4">
+            <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" alt="Profile" />
+            </Avatar>
+            <div>
+              <p className="font-medium">{profileData.user?.name}</p>
+              <p className="text-xs text-gray-600">Student</p>
             </div>
           </div>
         </header>
 
+        {/* Profile Card */}
         <div className="flex gap-6 px-10 mt-6">
           <Card className="w-[400px] flex-shrink-0">
             <div className="flex flex-col items-center gap-10 p-6">
@@ -129,10 +204,10 @@ export default function Page() {
               </Avatar>
               <div className="w-full text-start">
                 <h1 className="text-2xl font-semibold">
-                  {profileData.user?.name || 'Nama tidak tersedia'}
+                  {profileData.user?.name || "Nama tidak tersedia"}
                 </h1>
                 <h2 className="text-xl text-gray-600">
-                  {profileData.user?.nim || 'NIM tidak tersedia'}
+                  {profileData.user?.nim || "NIM tidak tersedia"}
                 </h2>
                 <Button className="text-black font-bold rounded-xl mt-2">
                   Student
@@ -147,52 +222,47 @@ export default function Page() {
             </div>
           </Card>
 
+          {/* Data Diri Card */}
           <Card className="flex-1">
-            <CardHeader className="pb-6 text-3xl">
-              <CardTitle>Informasi Data Diri</CardTitle>
+            <CardHeader>
+              <CardTitle className="text-2xl">Informasi Data Diri</CardTitle>
             </CardHeader>
-            <CardContent className="h-full">
-              <div className="grid grid-cols-2 gap-6 h-full px-6 pb-6">
-                <div className="space-y-1">
-                  <Label className="text-xl">Nama Lengkap</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user?.name || 'Nama tidak tersedia'}
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 p-4">
+                <div className="space-y-2">
+                  <Label>Nama Lengkap</Label>
+                  <p>{profileData.user?.name}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <p>{profileData.gender || "-"}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tanggal Lahir</Label>
+                  <p>
+                    {profileData.tanggal_lahir
+                      ? new Date(profileData.tanggal_lahir).toLocaleDateString(
+                          "id-ID"
+                        )
+                      : "-"}
                   </p>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xl">Gender</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.gender || 'Belum diisi'}
-                  </p>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <p>{profileData.user?.email}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xl">Tanggal Lahir</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.tanggal_lahir || 'Belum diisi'}
-                  </p>
+                <div className="space-y-2">
+                  <Label>Alamat</Label>
+                  <p>{profileData.alamat || "-"}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xl">Alamat Email</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user?.email || 'Email tidak tersedia'}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xl">Alamat Rumah</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.alamat || 'Belum diisi'}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xl">No Handphone</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.hp || 'Belum diisi'}
-                  </p>
+                <div className="space-y-2">
+                  <Label>No. HP</Label>
+                  <p>{profileData.hp || "-"}</p>
                 </div>
               </div>
             </CardContent>
@@ -204,14 +274,7 @@ export default function Page() {
         <EditProfile
           isEditModalOpen={isEditModalOpen}
           closeEditModal={closeEditModal}
-          profileData={{
-            id: profileData.id,
-            user: profileData.user,
-            gender: profileData.gender,
-            tanggal_lahir: profileData.tanggal_lahir,
-            alamat: profileData.alamat,
-            hp: profileData.hp
-          }}
+          profileData={profileData}
           saveProfileData={saveProfileData}
         />
       </SidebarInset>

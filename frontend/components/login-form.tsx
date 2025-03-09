@@ -7,76 +7,63 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
-import axios from "@/lib/axios"; // Mengimpor axios yang sudah dikonfigurasi
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline"; // Ikon mata untuk toggle
+import axios from "@/lib/axios";
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { useRouter } from "next/navigation";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
-  const [nim, setNim] = useState(""); // Menyimpan NIM
-  const [password, setPassword] = useState(""); // Menyimpan password
-  const [isSubmitting, setIsSubmitting] = useState(false); // Menangani status submit
-  const [error, setError] = useState(""); // Menangani error jika login gagal
-  const [passwordVisible, setPasswordVisible] = useState(false); // Menyimpan status visibility password
+  const router = useRouter();
+  const [nim, setNim] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
-  // LoginForm.tsx
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-  
+    setError("");
+
     try {
-      const response = await axios.post("/mahasiswa/login", { nim, password });
-      
-      if (response.data?.success) {
-        const { token, user_id, fullName, nim } = response.data.data;
+      const response = await axios.post("/mahasiswa/login", {
+        nim: nim.trim(),
+        password
+      });
+
+      if (response.data.success) {
+        // Simpan data sesuai response backend
+        const { token, nama, nim, email } = response.data.data;
         
-        // Simpan data profil sementara
-        const tempProfile = {
-          fullName,
+        // Simpan token dan data user ke localStorage
+        localStorage.setItem("token", token);
+        localStorage.setItem("userData", JSON.stringify({
+          nama,
           nim,
-          // Data lain bisa dikosongkan atau diisi default
-          gender: "",
-          birthPlace: "",
-          birthDate: "",
-          email: "",
-          address: "",
-          phone: ""
-        };
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('profileData', JSON.stringify(tempProfile)); // Simpan data sementara
-        
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        // Ambil data lengkap (jika diperlukan)
-        await fetchProfileData(user_id);
-        
-        window.location.href = "/perusahaan";
+          email
+        }));
+
+        // Set header axios untuk request berikutnya
+        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+        // Redirect ke halaman perusahaan
+        router.push("/perusahaan");
       }
-    } catch (error) {
-      // ... handle error
+    } catch (error: any) {
       console.error("Login error:", error);
+      setError(
+        error.response?.data?.message || 
+        "Login gagal. Periksa NIM dan password Anda"
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
 
   const togglePasswordVisibility = () => {
-    setPasswordVisible(!passwordVisible); // Membalikkan status passwordVisible
-  };
-
-  const fetchProfileData = async (user_id: string) => {
-    try {
-      const response = await axios.get(`/mahasiswa/profile`);
-      if (response.data && response.data.success && response.data.data) {
-        const profileData = response.data.data;
-        localStorage.setItem("profileData", JSON.stringify(profileData));
-      } else {
-        console.error("Profile data not found.");
-      }
-    } catch (error) {
-      console.error("Error fetching profile data:", error);
-    }
+    setPasswordVisible(!passwordVisible);
   };
 
   return (
@@ -84,7 +71,7 @@ export function LoginForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl text-center">
-            Login to your account
+            Login Mahasiswa
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -97,24 +84,24 @@ export function LoginForm({
                   placeholder="NIM"
                   required
                   value={nim}
-                  onChange={(e) => setNim(e.target.value)} // Update nim state
+                  onChange={(e) => setNim(e.target.value)}
                   className="rounded-xl"
                 />
               </div>
+              
               <div className="relative grid gap-2">
                 <Input
                   id="password"
-                  type={passwordVisible ? "text" : "password"} // Toggle antara "text" dan "password"
+                  type={passwordVisible ? "text" : "password"}
                   placeholder="Password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)} // Update password state
-                  className="rounded-xl pr-10" // Add padding for the eye icon button
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="rounded-xl pr-10"
                 />
-                {/* Tombol mata untuk toggle password */}
                 <button
                   type="button"
-                  onClick={togglePasswordVisibility} // Fungsi toggle
+                  onClick={togglePasswordVisibility}
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
                 >
                   {passwordVisible ? (
@@ -124,44 +111,25 @@ export function LoginForm({
                   )}
                 </button>
               </div>
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="terms2" className="rounded-xl" />
-                  <label
-                    htmlFor="terms2"
-                    className="text-xs font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Remember me
-                  </label>
-                </div>
-                <a
-                  href="#"
-                  className="text-sm underline-offset-4 hover:underline text-destructive"
-                >
-                  Forgot your password?
-                </a>
-              </div>
+
               <Button
                 type="submit"
                 className="w-full bg-destructive rounded-xl"
-                disabled={isSubmitting} // Disable button saat sedang submit
+                disabled={isSubmitting}
               >
-                {isSubmitting ? "Logging in..." : "Login"}
+                {isSubmitting ? "Sedang masuk..." : "Masuk"}
               </Button>
             </div>
           </form>
 
-          {/* Menampilkan pesan error jika login gagal */}
-          {error && <div className="text-red-500 text-center">{error}</div>}
+          {error && <div className="text-red-500 text-center mt-4">{error}</div>}
 
-          <Link href="/register">
-            <Button
-              variant="outline"
-              className="w-full mt-4 rounded-xl border-destructive text-destructive"
-            >
-              Sign Up
-            </Button>
-          </Link>
+          <div className="mt-4 text-center">
+            <span className="text-sm">Belum punya akun? </span>
+            <Link href="/register" className="text-sm text-destructive underline">
+              Daftar disini
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
