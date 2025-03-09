@@ -40,25 +40,25 @@ export default function Page() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    
+
     // 1. Cek token tanpa redirect langsung
     if (!token) {
-      window.location.href = '/login';
+      window.location.href = "/login";
       return;
     }
 
     const fetchProfile = async () => {
       try {
         // 2. Validasi token dengan request ke endpoint yang sama
-        const response = await axios.get('/mahasiswa/profile', {
+        const response = await axios.get("/mahasiswa/profile", {
           headers: {
-            Authorization: `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         // 3. Handle response yang tidak valid
         if (!response.data?.success || !response.data.user) {
-          throw new Error('Invalid session');
+          throw new Error("Invalid session");
         }
 
         const currentUser = response.data.user;
@@ -78,22 +78,21 @@ export default function Page() {
               id: currentUser.id,
               name: currentUser.name,
               nim: currentUser.nim,
-              email: currentUser.email
-            }
+              email: currentUser.email,
+            },
           });
         } else {
-          setError('Profil belum dibuat');
+          setError("Profil belum dibuat");
         }
-        
       } catch (error: any) {
-        console.error('Error:', error);
-        
+        console.error("Error:", error);
+
         // 4. Handle error spesifik untuk invalid token
         if (error.response?.status === 401) {
           localStorage.removeItem("token");
-          window.location.href = '/login';
+          window.location.href = "/login";
         } else {
-          setError('Gagal memuat profil: ' + error.message);
+          setError("Gagal memuat profil: " + error.message);
         }
       } finally {
         setLoading(false);
@@ -106,29 +105,99 @@ export default function Page() {
   const saveProfileData = async (updatedData: Partial<ProfileData>) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token || !profileData) return;
+      if (!token || !profileData) {
+        alert("Sesi telah berakhir, silakan login kembali");
+        window.location.href = "/login";
+        return;
+      }
 
-      const response = await axios.patch(
+      // 1. Validasi data sebelum dikirim
+      const validationErrors = validateProfileData(updatedData);
+      if (validationErrors.length > 0) {
+        alert(validationErrors.join("\n"));
+        return;
+      }
+
+      // 2. Format data untuk backend
+      const formattedData = formatProfileData(updatedData);
+
+      // 3. Kirim request
+      const response = await axios.put(
         `/mahasiswa/profile/${profileData.id}`,
-        updatedData,
+        formattedData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
           },
         }
       );
 
-      if (response.data.success) {
+      // 4. Handle response
+      if (response.data?.success) {
         setProfileData((prev) => ({
-          ...prev!,
+          ...(prev || {}),
           ...response.data.data,
+          user: prev?.user || response.data.data.user || {},
         }));
         closeEditModal();
+        alert("Data berhasil diperbarui!");
+      } else {
+        throw new Error("Respon server tidak valid");
       }
     } catch (error: any) {
-      console.error("Update error:", error);
-      setError(error.response?.data?.message || "Gagal menyimpan perubahan");
+      // 5. Penanganan error terstruktur
+      const errorMessage = getErrorMessage(error);
+      console.error("Update Error:", errorMessage);
+      alert(`Gagal menyimpan perubahan: ${errorMessage}`);
+    }
+  };
+
+  // Fungsi format data terpisah
+  const formatProfileData = (data: Partial<ProfileData>) => {
+    const formatted = { ...data };
+
+    // Hapus field kosong
+    Object.keys(formatted).forEach((key) => {
+      if (
+        formatted[key as keyof ProfileData] === undefined ||
+        formatted[key as keyof ProfileData] === ""
+      ) {
+        delete formatted[key as keyof ProfileData];
+      }
+    });
+    return formatted;
+  };
+
+  // Fungsi validasi terpisah
+  const validateProfileData = (data: Partial<ProfileData>): string[] => {
+    const errors = [];
+    if (data.hp && !/^\d+$/.test(data.hp)) {
+      errors.push("Nomor HP harus berupa angka");
+    }
+    // Validasi format tanggal dengan regex
+    if (data.tanggal_lahir && !/^\d{4}-\d{2}-\d{2}$/.test(data.tanggal_lahir)) {
+      errors.push("Format tanggal lahir tidak valid (YYYY-MM-DD)");
+    }
+    return errors;
+  };
+
+  // Fungsi penanganan error terpusat
+  const getErrorMessage = (error: any): string => {
+    if (error.response) {
+      // Error dari server
+      return (
+        error.response.data?.message ||
+        error.response.data?.errors?.join("\n") ||
+        `Error ${error.response.status}: ${error.response.statusText}`
+      );
+    } else if (error.request) {
+      // Tidak ada response dari server
+      return "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+    } else {
+      // Error lainnya
+      return error.message || "Terjadi kesalahan tidak terduga";
     }
   };
 
@@ -149,10 +218,7 @@ export default function Page() {
         <div className="text-red-500 text-center p-4 max-w-md">
           <h2 className="text-xl font-bold mb-2">⚠️ Terjadi Kesalahan</h2>
           <p className="mb-4">{error}</p>
-          <Button 
-            onClick={() => window.location.reload()}
-            variant="outline"
-          >
+          <Button onClick={() => window.location.reload()} variant="outline">
             Coba Lagi
           </Button>
         </div>
