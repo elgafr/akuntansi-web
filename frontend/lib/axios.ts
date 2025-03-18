@@ -2,19 +2,20 @@ import axios from 'axios';
 
 // Membuat instance axios dengan baseURL
 const instance = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api', // Base URL Laravel API
+  baseURL: 'http://127.0.0.1:8000/api',
   headers: {
-    'Content-Type': 'application/json', // Menentukan header content type
+    'Content-Type': 'application/json',
   },
 });
 
-// Add request interceptor to add token
-instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+instance.interceptors.response.use(
+  response => response,
+  error => {
+    if(error.response.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
-
+);
 export default instance;

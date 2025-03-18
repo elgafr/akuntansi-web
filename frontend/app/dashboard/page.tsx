@@ -10,18 +10,15 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { z } from "zod";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
+import axios from "@/lib/axios";
+
 import {
   Select,
   SelectContent,
@@ -47,48 +44,30 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// Schema validasi form
 const FormSchema = z.object({
   companyName: z.string().min(2, {
     message: "Company name must be at least 2 characters.",
   }),
 });
 
-// Tipe data Company
 interface Company {
-  name: string;
-  category: string;
-  alamat: string;
-  tahunBerdiri: number;
+  id: string;
+  nama: string;
+  status: "online" | "offline";
 }
 
-// Tipe data Account
 interface Account {
-  name: string;
-  kodeAkun: string;
+  nama: string;
+  kode: string;
   debit: number;
   kredit: number;
-  isEditing: boolean;
 }
 
-interface ProfileData {
-  fullName: string;
-  // tambahkan properti lain jika diperlukan
-}
-// Fungsi untuk memformat angka ke dalam notasi singkat (misal: 10jt, 100jt, dll.)
 const formatNumber = (value: number): string => {
-  if (value >= 1_000_000_000) {
-    // Misalnya: 1.200.000.000 → "1,2M"
-    return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  } else if (value >= 1_000_000) {
-    // Misalnya: 2.500.000 → "2,5jt"
-    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}jt`;
-  } else if (value >= 100_000) {
-    // Misalnya: 100.000 → "100k"
-    return `${(value / 1_000).toFixed(0)}k`;
-  } else {
-    return value.toLocaleString("id-ID");
-  }
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}M`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}jt`;
+  if (value >= 100_000) return `${(value / 1_000).toFixed(0)}k`;
+  return value.toLocaleString("id-ID");
 };
 
 export default function Page() {
@@ -98,95 +77,127 @@ export default function Page() {
   });
 
   const [companyList, setCompanyList] = useState<Company[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(true);
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([
+    "",
+    "",
+    "",
+  ]);
+  const [profileData, setProfileData] = useState<{
+    user: { name: string; nim: string };
+  } | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // State untuk pilihan akun pada dropdown
-  const [selectedAccount1, setSelectedAccount1] = useState<string | null>(null);
-  const [selectedAccount2, setSelectedAccount2] = useState<string | null>(null);
-  const [selectedAccount3, setSelectedAccount3] = useState<string | null>(null);
-
-  const [profileData, setProfileData] = useState<ProfileData>({
-    fullName: "Guest",
-  });
-
+  // Fetch data awal
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
-  }, []);
+    const fetchData = async () => {
+      try {
+        const [profileRes, companiesRes, accountsRes] = await Promise.all([
+          axios.get("/mahasiswa/profile"),
+          axios.get("/mahasiswa/perusahaan"),
+          axios.get("/instruktur/akun"),
+        ]);
 
-  // Load daftar perusahaan dari localStorage
-  useEffect(() => {
-    const savedCompanies = localStorage.getItem("companies");
-    if (savedCompanies) {
-      setCompanyList(JSON.parse(savedCompanies));
-    }
-  }, []);
+        // Handle perusahaan
+        const companiesData = companiesRes.data?.data || [];
+        setCompanyList(companiesData);
 
-  // Saat komponen mount, inisialisasi nilai perusahaan dan data akun (jika ada) dari localStorage
-  useEffect(() => {
-    const storedCompany = localStorage.getItem("selectedCompany");
-    if (storedCompany) {
-      form.setValue("companyName", storedCompany);
-      setSelectedCompany(storedCompany);
-      setShowSuggestions(false);
-      const accountKey = `accounts_${storedCompany}`;
-      const savedAccounts = localStorage.getItem(accountKey);
-      if (savedAccounts) {
-        setAccounts(JSON.parse(savedAccounts));
-      } else {
-        setAccounts([]);
+        const onlineCompany = companiesData.find(
+          (c: Company) => c.status === "online"
+        );
+        if (onlineCompany) {
+          setSelectedCompany(onlineCompany);
+          form.setValue("companyName", onlineCompany.nama);
+        }
+
+        // Handle akun
+        setAccounts(accountsRes.data?.data || []);
+
+        // Handle profil
+        setProfileData(profileRes.data?.data || null);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoadingProfile(false);
       }
+    };
+
+    fetchData();
+  }, []);
+
+  // Handle pencarian perusahaan
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredCompanies([]);
+      return;
     }
-  }, [form]);
 
-  const searchTerm = form.watch("companyName");
+    const results = companyList.filter((company) =>
+      company.nama.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredCompanies(results);
+  }, [searchTerm, companyList]);
 
-  const filteredCompanies = companyList.filter((company) =>
-    company.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    localStorage.setItem("selectedCompany", data.companyName);
-    setSelectedCompany(data.companyName);
-    setShowSuggestions(false);
-    const accountKey = `accounts_${data.companyName}`;
-    const savedAccounts = localStorage.getItem(accountKey);
-    if (savedAccounts) {
-      setAccounts(JSON.parse(savedAccounts));
-    } else {
-      setAccounts([]);
+  // Handle submit form
+  const onSubmit = async (data: z.infer<typeof FormSchema>) => {
+    if (!selectedCompany) {
+      const company = companyList.find(
+        (c) => c.nama.toLowerCase() === data.companyName.toLowerCase()
+      );
+      if (company) await handleCompanySelect(company);
     }
-    alert(`Form submitted with Company Name: ${data.companyName}`);
-  }
-
-  // Fungsi helper untuk mendapatkan nilai debit dari sebuah akun
-  const getAccountDebit = (kodeAkun: string): number => {
-    const account = accounts.find((acc) => acc.kodeAkun === kodeAkun);
-    return account ? account.debit : 0;
   };
 
-  // Generate data grafik berdasarkan pilihan akun.
-  // Misal: untuk masing-masing bulan, nilai akun dihasilkan dari nilai debit dasar + variasi
-  const months = ["January", "February", "March", "April", "May", "June"];
-  const mergedChartData = months.map((month, index) => ({
-    month,
-    account1: selectedAccount1
-      ? getAccountDebit(selectedAccount1) + index * 5
-      : undefined,
-    account2: selectedAccount2
-      ? getAccountDebit(selectedAccount2) + index * 3
-      : undefined,
-    account3: selectedAccount3
-      ? getAccountDebit(selectedAccount3) + index * 4
-      : undefined,
-  }));
+  // Handle pilih perusahaan
+ // Di dalam fungsi handleCompanySelect
+const handleCompanySelect = async (company: Company) => {
+  try {
+    // Matikan perusahaan sebelumnya jika ada
+    if (selectedCompany) {
+      await axios.put(`/mahasiswa/perusahaan/${selectedCompany.id}`, {
+        status: "offline"
+      });
+    }
 
-  // Misalnya nilai total buku besar (ini dapat diganti dengan nilai dinamis)
-  const totalValue = 9846;
+    // Nyalakan perusahaan baru
+    const response = await axios.put(`/mahasiswa/perusahaan/${company.id}`, {
+      status: "online"
+    });
+
+    // Update state
+    setCompanyList(prev => 
+      prev.map(c => ({
+        ...c,
+        status: c.id === company.id ? "online" : "offline"
+      }))
+    );
+
+    setSelectedCompany(company);
+    form.setValue("companyName", company.nama);
+    setFilteredCompanies([]);
+    
+  } catch (error) {
+    console.error("Gagal memilih perusahaan:", error);
+    alert("Gagal memilih perusahaan");
+  }
+};
+
+
+  // Generate data chart
+  const chartData = Array.from({ length: 6 }, (_, i) => ({
+    month: `Bulan ${i + 1}`,
+    ...selectedAccounts.reduce(
+      (acc, curr, idx) => ({
+        ...acc,
+        [`account${idx + 1}`]:
+          accounts.find((a) => a.kode === curr)?.debit || 0 * (i + 1),
+      }),
+      {}
+    ),
+  }));
 
   return (
     <SidebarProvider>
@@ -209,17 +220,24 @@ export default function Page() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <Avatar>
-                <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                <AvatarImage
+                  src="https://github.com/shadcn.png"
+                  alt="@shadcn"
+                />
               </Avatar>
               <div className="text-left mr-8">
-                <div className="text-sm font-medium">{profileData.fullName}</div>
+                <div className="text-sm font-medium">
+                  {loadingProfile
+                    ? "Loading..."
+                    : profileData?.user?.name || "Nama tidak tersedia"}
+                </div>
                 <div className="text-xs text-gray-800">Student</div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Form Pencarian & Tombol */}
+        {/* Form Pencarian */}
         <div className="p-4 relative">
           <Form {...form}>
             <form
@@ -242,61 +260,23 @@ export default function Page() {
                               className="w-full pl-10 h-10 rounded-xl"
                               onChange={(e) => {
                                 field.onChange(e);
-                                if (
-                                  selectedCompany &&
-                                  e.target.value !== selectedCompany
-                                ) {
-                                  setSelectedCompany(null);
-                                  setAccounts([]);
-                                }
-                                setShowSuggestions(true);
+                                setSearchTerm(e.target.value);
                               }}
                             />
-                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                              <FaBuilding className="w-5 h-5 text-gray-700" />
-                            </div>
-                            {searchTerm && showSuggestions && !selectedCompany && (
-                              <>
-                                {filteredCompanies.length > 0 ? (
-                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                                    {filteredCompanies.map((company, index) => (
-                                      <div
-                                        key={index}
-                                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                        onClick={() => {
-                                          form.setValue(
-                                            "companyName",
-                                            company.name
-                                          );
-                                          localStorage.setItem(
-                                            "selectedCompany",
-                                            company.name
-                                          );
-                                          setSelectedCompany(company.name);
-                                          setShowSuggestions(false);
-                                          const accountKey = `accounts_${company.name}`;
-                                          const savedAccounts = localStorage.getItem(
-                                            accountKey
-                                          );
-                                          if (savedAccounts) {
-                                            setAccounts(JSON.parse(savedAccounts));
-                                          } else {
-                                            setAccounts([]);
-                                          }
-                                        }}
-                                      >
-                                        {company.name}
-                                      </div>
-                                    ))}
+                            <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-700" />
+
+                            {searchTerm && filteredCompanies.length > 0 && (
+                              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                                {filteredCompanies.map((company) => (
+                                  <div
+                                    key={company.id}
+                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                    onClick={() => handleCompanySelect(company)}
+                                  >
+                                    {company.nama}
                                   </div>
-                                ) : (
-                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                                    <div className="px-4 py-2 text-gray-500">
-                                      Perusahaan tidak ditemukan
-                                    </div>
-                                  </div>
-                                )}
-                              </>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </FormControl>
@@ -304,6 +284,7 @@ export default function Page() {
                     </div>
                   )}
                 />
+
                 <Button
                   type="submit"
                   className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8"
@@ -316,7 +297,7 @@ export default function Page() {
           </Form>
         </div>
 
-        {/* Bagian Pilih Akun */}
+        {/* Konten Utama */}
         <div className="flex flex-col ml-10 mt-6 gap-4">
           <div className="flex items-start gap-20">
             <h2 className="text-lg font-semibold mb-2 w-[420px]">
@@ -328,15 +309,11 @@ export default function Page() {
           </div>
 
           <div className="flex items-start gap-4">
+            {/* Card Profil */}
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
-                <Avatar
-                  className="w-20 h-20 ring-white flex-shrink-0 self-center"
-                >
-                  <AvatarImage
-                    src="https://randomuser.me/api/portraits/women/79.jpg"
-                    alt="Mahasiswa"
-                  />
+                <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
+                  <AvatarImage src="https://randomuser.me/api/portraits/women/79.jpg" />
                 </Avatar>
                 <div className="text-md w-full">
                   <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
@@ -344,93 +321,57 @@ export default function Page() {
                       Nama Mahasiswa
                     </p>
                     <p className="text-right w-[20px]">:</p>
-                    <p className="text-left break-words">Cody Alexander</p>
+                    <p className="text-left break-words">
+                      {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.name || "Nama tidak tersedia"}
+                    </p>
+
                     <p className="font-semibold whitespace-nowrap">NIM</p>
                     <p className="text-right w-[20px]">:</p>
                     <p className="text-left break-words">
-                      123456789101112
+                      {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.nim || "NIM tidak tersedia"}
                     </p>
-                    <p className="font-semibold whitespace-nowrap">
-                      Program Studi
-                    </p>
-                    <p className="text-right w-[20px]">:</p>
-                    <p className="text-left break-words">
-                      Computer Science
-                    </p>
-                    <p className="font-semibold whitespace-nowrap">
-                      Semester
-                    </p>
-                    <p className="text-right w-[20px]">:</p>
-                    <p className="text-left">5</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Dropdown Pilih Akun */}
+            {/* Dropdown Akun */}
             <div className="flex flex-col gap-3 text-gray-600 w-[450px]">
-              {/* Pilih Akun Pertama */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-destructive">
-                  Pilih Akun Pertama
-                </label>
-                <Select onValueChange={(value) => setSelectedAccount1(value)}>
-                  <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
-                    <SelectValue placeholder="Pilih Akun Pertama" />
-                  </SelectTrigger>
-                  <SelectContent className="text-gray-500">
-                    <SelectGroup>
-                      {accounts.map((account, index) => (
-                        <SelectItem key={index} value={account.kodeAkun}>
-                          {account.kodeAkun} - {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Pilih Akun Kedua */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-destructive">
-                  Pilih Akun Kedua
-                </label>
-                <Select onValueChange={(value) => setSelectedAccount2(value)}>
-                  <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
-                    <SelectValue placeholder="Pilih Akun Kedua" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {accounts.map((account, index) => (
-                        <SelectItem key={index} value={account.kodeAkun}>
-                          {account.kodeAkun} - {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Pilih Akun Ketiga */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-destructive">
-                  Pilih Akun Ketiga
-                </label>
-                <Select onValueChange={(value) => setSelectedAccount3(value)}>
-                  <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
-                    <SelectValue placeholder="Pilih Akun Ketiga" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {accounts.map((account, index) => (
-                        <SelectItem key={index} value={account.kodeAkun}>
-                          {account.kodeAkun} - {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-destructive">
+                    Pilih Akun {index + 1}
+                  </label>
+                  <Select
+                    value={selectedAccounts[index]}
+                    onValueChange={(value) => {
+                      const newAccounts = [...selectedAccounts];
+                      newAccounts[index] = value;
+                      setSelectedAccounts(newAccounts);
+                    }}
+                  >
+                    <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
+                      <SelectValue placeholder={`Pilih Akun ${index + 1}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {accounts.map((account) => (
+                          <SelectItem
+                            key={account.kode}
+                            value={account.kode}
+                          >
+                            {account.kode} - {account.nama}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -438,91 +379,59 @@ export default function Page() {
           <Card className="mt-10 w-[174vh] p-4 shadow-md">
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
-                <CardTitle className="mb-4 text-gray-500">
-                  Buku Besar
-                </CardTitle>
+                <CardTitle className="mb-4 text-gray-500">Buku Besar</CardTitle>
                 <CardDescription className="text-black text-2xl font-bold">
-                  {formatNumber(totalValue)}
+                  {formatNumber(9846)}
                 </CardDescription>
               </div>
-              {/* Legend berdasarkan akun yang dipilih */}
+
               <div className="flex flex-col gap-2 mt-2">
-                {selectedAccount1 && (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-[#8884d8]"></div>
-                    <span>
-                      {
-                        accounts.find(
-                          (acc) => acc.kodeAkun === selectedAccount1
-                        )?.name
-                      }
-                    </span>
-                  </div>
-                )}
-                {selectedAccount2 && (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-[#82ca9d]"></div>
-                    <span>
-                      {
-                        accounts.find(
-                          (acc) => acc.kodeAkun === selectedAccount2
-                        )?.name
-                      }
-                    </span>
-                  </div>
-                )}
-                {selectedAccount3 && (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-[#ffc658]"></div>
-                    <span>
-                      {
-                        accounts.find(
-                          (acc) => acc.kodeAkun === selectedAccount3
-                        )?.name
-                      }
-                    </span>
-                  </div>
+                {selectedAccounts.map(
+                  (account, idx) =>
+                    account && (
+                      <div  key={`account-legend-${account}-${idx}`} className="flex items-center gap-2">
+                        <div
+                          className={`w-4 h-4 rounded-full ${
+                            idx === 0
+                              ? "bg-[#8884d8]"
+                              : idx === 1
+                              ? "bg-[#82ca9d]"
+                              : "bg-[#ffc658]"
+                          }`}
+                        />
+                        <span>
+                          {accounts.find((a) => a.kode === account)?.nama ||
+                            "-"}
+                        </span>
+                      </div>
+                    )
                 )}
               </div>
             </CardHeader>
+
             <CardContent>
               <div className="w-full h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={mergedChartData}
-                    margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                  >
+                  <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis tickFormatter={formatNumber} />
-                    <Tooltip formatter={(value) => formatNumber(value as number)} />
-                    {/* Render garis hanya jika akun sudah dipilih */}
-                    {selectedAccount1 && (
-                      <Line
-                        type="monotone"
-                        dataKey="account1"
-                        stroke="#8884d8"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    )}
-                    {selectedAccount2 && (
-                      <Line
-                        type="monotone"
-                        dataKey="account2"
-                        stroke="#82ca9d"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    )}
-                    {selectedAccount3 && (
-                      <Line
-                        type="monotone"
-                        dataKey="account3"
-                        stroke="#ffc658"
-                        strokeWidth={2}
-                        dot={false}
-                      />
+                    <Tooltip
+                      formatter={(value) => formatNumber(Number(value))}
+                    />
+
+                    {selectedAccounts.map(
+                      (account, idx) =>
+                        account && (
+                          <Line
+                          key={`chart-line-${account}-${idx}`}
+                            type="monotone"
+                            dataKey={`account${idx + 1}`}
+                            stroke={["#8884d8", "#82ca9d", "#ffc658"][idx]}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        )
                     )}
                   </LineChart>
                 </ResponsiveContainer>

@@ -55,16 +55,31 @@ export default function Page() {
   const router = useRouter();
   const [companyData, setCompanyData] = useState<Company | null>(null);
 
-  const [profileData, setProfileData] = useState<ProfileData>({
-    fullName: "Guest",
-  });
+  interface ProfileData {
+    user: {
+      name: string;
+      nim: string;
+    };
+  }
 
-  // Ambil data profil dari localStorage
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
+    const fetchProfileData = async () => {
+      try {
+        const response = await axios.get("/mahasiswa/profile");
+        if (response.data.success) {
+          setProfileData(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfileData();
   }, []);
 
   // Fetch KRS ID
@@ -200,7 +215,9 @@ export default function Page() {
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">
-                    {profileData.fullName}
+                  {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.name || "Nama tidak tersedia"}
                   </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>

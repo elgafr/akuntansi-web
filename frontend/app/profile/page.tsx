@@ -17,57 +17,223 @@ import EditProfile from "@/components/ui/custom/form-modal/edit-profile/edit-pro
 import axios from "@/lib/axios";
 import Krs from "@/components/ui/custom/form-modal/krs/krs";
 
-export default function Page() {
-  const [profileData, setProfileData] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State to control modal visibility
+type ProfileData = {
+  id: string;
+  user_id: string;
+  gender?: string;
+  tanggal_lahir?: string;
+  alamat?: string;
+  hp?: string;
+  user: {
+    id: string;
+    name: string;
+    nim: string;
+    email: string;
+  };
+};
 
-  // Fetch profile data from the backend
+export default function Page() {
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    const fetchProfileData = async () => {
+    const token = localStorage.getItem("token");
+
+    // 1. Cek token tanpa redirect langsung
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const fetchProfile = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
-        if (response.data.success) {
-          setProfileData(response.data.data); // Assuming the first item is the profile
+        // 2. Validasi token dengan request ke endpoint yang sama
+        const response = await axios.get("/mahasiswa/profile", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // 3. Handle response yang tidak valid
+        if (!response.data?.success || !response.data.user) {
+          throw new Error("Invalid session");
         }
-      } catch (error) {
-        console.error("Error fetching profile data:", error);
+
+        const currentUser = response.data.user;
+        const userProfile = response.data.data.find(
+          (p: any) => p.user_id === currentUser.id
+        );
+
+        if (userProfile) {
+          setProfileData({
+            id: userProfile.id,
+            user_id: userProfile.user_id,
+            gender: userProfile.gender,
+            tanggal_lahir: userProfile.tanggal_lahir,
+            alamat: userProfile.alamat,
+            hp: userProfile.hp,
+            user: {
+              id: currentUser.id,
+              name: currentUser.name,
+              nim: currentUser.nim,
+              email: currentUser.email,
+            },
+          });
+        } else {
+          setError("Profil belum dibuat");
+        }
+      } catch (error: any) {
+        console.error("Error:", error);
+
+        // 4. Handle error spesifik untuk invalid token
+        if (error.response?.status === 401) {
+          localStorage.removeItem("token");
+          window.location.href = "/login";
+        } else {
+          setError("Gagal memuat profil: " + error.message);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfileData();
+    fetchProfile();
   }, []);
 
-  const openEditModal = () => {
-    setIsEditModalOpen(true); // Open the modal
-  };
-
-  const closeEditModal = () => {
-    setIsEditModalOpen(false); // Close the modal
-  };
-
-  // Save the updated profile data
-  const saveProfileData = async (newData: any) => {
+  const saveProfileData = async (updatedData: Partial<ProfileData>) => {
     try {
-      const userId = profileData?.id; // Safely access user.id
-      const response = await axios.put(`/mahasiswa/profile/${userId}`, newData); // Use user_id in URL for the PUT request
-      if (response.data.success) {
-        setProfileData(response.data.data); // Update profile data state
-        closeEditModal(); 
+      const token = localStorage.getItem("token");
+      if (!token || !profileData) {
+        alert("Sesi telah berakhir, silakan login kembali");
+        window.location.href = "/login";
+        return;
       }
-    } catch (error) {
-      console.error("Error saving profile data:", error.response || error);
+
+      // 1. Validasi data sebelum dikirim
+      const validationErrors = validateProfileData(updatedData);
+      if (validationErrors.length > 0) {
+        alert(validationErrors.join("\n"));
+        return;
+      }
+
+      // 2. Format data untuk backend
+      const formattedData = formatProfileData(updatedData);
+
+      // 3. Kirim request
+      const response = await axios.put(
+        `/mahasiswa/profile/${profileData.id}`,
+        formattedData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        }
+      );
+
+      // 4. Handle response
+      if (response.data?.success) {
+        setProfileData((prev) => ({
+          ...(prev || {}),
+          ...response.data.data,
+          user: prev?.user || response.data.data.user || {},
+        }));
+        closeEditModal();
+        alert("Data berhasil diperbarui!");
+      } else {
+        throw new Error("Respon server tidak valid");
+      }
+    } catch (error: any) {
+      // 5. Penanganan error terstruktur
+      const errorMessage = getErrorMessage(error);
+      console.error("Update Error:", errorMessage);
+      alert(`Gagal menyimpan perubahan: ${errorMessage}`);
     }
   };
 
+  // Fungsi format data terpisah
+  const formatProfileData = (data: Partial<ProfileData>) => {
+    const formatted = { ...data };
+
+    // Hapus field kosong
+    Object.keys(formatted).forEach((key) => {
+      if (
+        formatted[key as keyof ProfileData] === undefined ||
+        formatted[key as keyof ProfileData] === ""
+      ) {
+        delete formatted[key as keyof ProfileData];
+      }
+    });
+    return formatted;
+  };
+
+  // Fungsi validasi terpisah
+  const validateProfileData = (data: Partial<ProfileData>): string[] => {
+    const errors = [];
+    if (data.hp && !/^\d+$/.test(data.hp)) {
+      errors.push("Nomor HP harus berupa angka");
+    }
+    // Validasi format tanggal dengan regex
+    if (data.tanggal_lahir && !/^\d{4}-\d{2}-\d{2}$/.test(data.tanggal_lahir)) {
+      errors.push("Format tanggal lahir tidak valid (YYYY-MM-DD)");
+    }
+    return errors;
+  };
+
+  // Fungsi penanganan error terpusat
+  const getErrorMessage = (error: any): string => {
+    if (error.response) {
+      // Error dari server
+      return (
+        error.response.data?.message ||
+        error.response.data?.errors?.join("\n") ||
+        `Error ${error.response.status}: ${error.response.statusText}`
+      );
+    } else if (error.request) {
+      // Tidak ada response dari server
+      return "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+    } else {
+      // Error lainnya
+      return error.message || "Terjadi kesalahan tidak terduga";
+    }
+  };
+
+  const openEditModal = () => setIsEditModalOpen(true);
+  const closeEditModal = () => setIsEditModalOpen(false);
+
   if (loading) {
-    return <div>Loading...</div>; // Show loading state while fetching data
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-red-500 text-center p-4 max-w-md">
+          <h2 className="text-xl font-bold mb-2">⚠️ Terjadi Kesalahan</h2>
+          <p className="mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Coba Lagi
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (!profileData) {
-    return <div>No profile data available</div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-yellow-600 text-xl">
+          Profil belum tersedia. Silakan buat profil terlebih dahulu.
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -75,38 +241,27 @@ export default function Page() {
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
-          <div className="flex items-center gap-2 px-4 w-full justify-between">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <h1 className="text-2xl font-bold ml-6 text-black">
-                    Dashboard
-                  </h1>
-                  <h2 className="text-sm ml-6">
-                    Let&apos;s check your Dashboard today
-                  </h2>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                  />
-                </Avatar>
-                <div className="text-left mr-12">
-                  <div className="text-sm font-medium">
-                    {profileData.user.name}
-                  </div>
-                  <div className="text-xs text-gray-800">Student</div>
-                </div>
-              </div>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <h1 className="text-2xl font-bold text-black">Dashboard</h1>
+                <h2 className="text-sm">Let's check your Dashboard today</h2>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+
+          <div className="flex items-center gap-4">
+            <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" alt="Profile" />
+            </Avatar>
+            <div>
+              <p className="font-medium">{profileData.user?.name}</p>
+              <p className="text-xs text-gray-600">Student</p>
             </div>
           </div>
         </header>
 
+        {/* Profile Card */}
         <div className="flex gap-6 px-10 mt-6">
           <Card className="w-[400px] flex-shrink-0">
             <div className="flex flex-col items-center gap-10 p-6">
@@ -115,10 +270,10 @@ export default function Page() {
               </Avatar>
               <div className="w-full text-start">
                 <h1 className="text-2xl font-semibold">
-                  {profileData.user.name}
+                  {profileData.user?.name || "Nama tidak tersedia"}
                 </h1>
                 <h2 className="text-xl text-gray-600">
-                  {profileData.user.nim}
+                  {profileData.user?.nim || "NIM tidak tersedia"}
                 </h2>
                 <Button className="text-black font-bold rounded-xl mt-2">
                   Student
@@ -133,50 +288,47 @@ export default function Page() {
             </div>
           </Card>
 
+          {/* Data Diri Card */}
           <Card className="flex-1">
-            <CardHeader className="pb-6 text-3xl">
-              <CardTitle>Informasi Data Diri</CardTitle>
+            <CardHeader>
+              <CardTitle className="text-2xl">Informasi Data Diri</CardTitle>
             </CardHeader>
-            <CardContent className="h-full">
-              <div className="grid grid-cols-2 gap-6 h-full px-6 pb-6">
-                <div className="space-y-1">
-                  <Label className="text-xl">Nama Lengkap</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user.name}
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 p-4">
+                <div className="space-y-2">
+                  <Label>Nama Lengkap</Label>
+                  <p>{profileData.user?.name}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <p>{profileData.gender || "-"}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tanggal Lahir</Label>
+                  <p>
+                    {profileData.tanggal_lahir
+                      ? new Date(profileData.tanggal_lahir).toLocaleDateString(
+                          "id-ID"
+                        )
+                      : "-"}
                   </p>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xl">Gender</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user.gender}
-                  </p>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <p>{profileData.user?.email}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xl">Tanggal Lahir</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user.tanggal_lahir}
-                  </p>
+                <div className="space-y-2">
+                  <Label>Alamat</Label>
+                  <p>{profileData.alamat || "-"}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xl">Alamat Email</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user.email}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xl">Alamat Rumah</Label>
-                  <p className="text-gray-600 text-lg">
-                    {profileData.user.alamat}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xl">No Handphone</Label>
-                  <p className="text-gray-600 text-lg">{profileData.user.hp}</p>
+                <div className="space-y-2">
+                  <Label>No. HP</Label>
+                  <p>{profileData.hp || "-"}</p>
                 </div>
               </div>
             </CardContent>
@@ -188,9 +340,8 @@ export default function Page() {
         <EditProfile
           isEditModalOpen={isEditModalOpen}
           closeEditModal={closeEditModal}
-          profileData={profileData.user}
-          saveProfileData={saveProfileData} // Pass the save function to EditProfile
-          profileId={profileData.user.id} // Pass profile ID to EditProfile
+          profileData={profileData}
+          saveProfileData={saveProfileData}
         />
       </SidebarInset>
     </SidebarProvider>
