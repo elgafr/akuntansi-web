@@ -376,7 +376,7 @@ const handleCompanySelect = async (company: Company) => {
           </div>
 
           {/* Chart Section */}
-          <Card className="mt-10 w-[174vh] p-4 shadow-md">
+          <Card className="mt-10 w-full p-4 shadow-md">
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
                 <CardTitle className="mb-4 text-gray-500">Buku Besar</CardTitle>
