@@ -12,8 +12,7 @@ import { Input } from "@/components/ui/input";
 import axios from "@/lib/axios";
 import React, { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { FaArrowLeft } from "react-icons/fa";
-import { FaPlus } from "react-icons/fa";
+import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import Link from "next/link";
 import {
   Card,
@@ -61,14 +60,15 @@ interface SubAccount {
   id: string;
   kode: string;
   nama: string;
+  akun_id: string;
+  perusahaan_id: string;
+  isEditing: boolean;
+  isNew?: boolean;
   debit: number;
   kredit: number;
-  akun_id: string;
-  isEditing: boolean;
 }
 
-interface Transaction {
-  id?: string;
+interface TransactionPayload {
   akun_id: string;
   perusahaan_id: string;
   debit: number;
@@ -81,15 +81,15 @@ export default function Page() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // const [errors, setErrors] = useState<Record<string, string>>({});
+  const [addingSubAccountIndex, setAddingSubAccountIndex] = useState<number | null>(null);
   const { id } = useParams();
+
   const fetchAccounts = async (kategoriId: string) => {
     try {
       const response = await axios.get("/instruktur/akun");
       const filteredAccounts = response.data.data.filter(
-        (account: any) => account.kategori_id === kategoriId // Tampilkan semua status
+        (account: any) => account.kategori_id === kategoriId
       );
-  
 
       const accountsData = filteredAccounts.map((account: any) => ({
         id: account.id,
@@ -99,20 +99,16 @@ export default function Page() {
         debit: 0,
         kredit: 0,
         isEditing: false,
-        perusahaan_id: company?.id || "",
-        subakun:
-          account.subakun?.map((sub: any) => ({
-            id: sub.id,
-            nama: sub.nama,
-            kodeAkun: sub.kode,
-            debit: 0,
-            kredit: 0,
-            isEditing: false,
-            perusahaan_id: company?.id || "",
-          })) || [],
+        subakun: account.subakun?.map((sub: any) => ({
+          id: sub.id,
+          kode: sub.kode,
+          nama: sub.nama,
+          akun_id: account.id,
+          perusahaan_id: company?.id || "",
+          isEditing: false
+        })) || [],
       }));
 
-      // Handle setting accounts
       setAccounts(accountsData);
     } catch (error) {
       toast.error("Gagal memuat data akun");
@@ -151,148 +147,148 @@ export default function Page() {
     return category ? category.nama : "Kategori Tidak Diketahui";
   };
 
-  // 2. Perbaikan handleEditAllAccounts untuk hanya mengaktifkan edit pada status open
   const handleEditAllAccounts = () => {
     const updatedAccounts = accounts.map((account) => ({
       ...account,
-      isEditing: account.status === "open", // Hanya aktifkan jika status open
-      subakun:
-        account.subakun?.map((sub) => ({
-          ...sub,
-          isEditing: account.status === "open", // Wariskan status ke subakun
-        })) || [],
+      isEditing: account.status === "open",
+      subakun: account.subakun?.map((sub) => ({
+        ...sub,
+        isEditing: account.status === "open",
+      })) || [],
     }));
     setAccounts(updatedAccounts);
   };
 
-  // 2. Handler untuk menambah sub akun baru
-  const handleAddSubAccount = (index: number) => {
+  const startAddSubAccount = (accountIndex: number) => {
     const updatedAccounts = [...accounts];
-    const parentAccount = updatedAccounts[index];
-
-    // Membuat sub-akun baru dengan kode yang dimasukkan oleh pengguna
-    const newSubAccount: Account = {
-      id: `temp-${Date.now()}`, // ID sementara
-      nama: "",
-      kode: "", // Kode yang dimasukkan oleh user untuk sub-akun
-      debit: 0,
-      kredit: 0,
+    updatedAccounts[accountIndex].subakun.unshift({
+      id: 'temp-' + Date.now(),
+      kode: '',
+      nama: '',
+      akun_id: accounts[accountIndex].id,
+      perusahaan_id: company?.id || '',
       isEditing: true,
-      perusahaan_id: company?.id || "",
-    };
+      isNew: true
+    });
+    
+    setAccounts(updatedAccounts);
+    setAddingSubAccountIndex(accountIndex);
+  };
 
-    if (!parentAccount.subakun) {
-      parentAccount.subakun = [];
+  const saveNewSubAccount = async (accountIndex: number, subIndex: number) => {
+    try {
+      const account = accounts[accountIndex];
+      const subAccount = account.subakun[subIndex];
+
+      if (!subAccount.nama || !subAccount.kode) {
+        toast.error("Nama dan kode sub akun harus diisi");
+        return;
+      }
+
+      const response = await axios.post("/mahasiswa/subakun", {
+        nama: subAccount.nama,
+        kode: subAccount.kode,
+        akun_id: account.id,
+        perusahaan_id: company?.id
+      });
+
+      const updatedAccounts = [...accounts];
+      updatedAccounts[accountIndex].subakun[subIndex] = {
+        ...response.data.data,
+        isEditing: false,
+        akun_id: account.id,
+        perusahaan_id: company?.id || ''
+      };
+      
+      setAccounts(updatedAccounts);
+      setAddingSubAccountIndex(null);
+      toast.success("Sub akun berhasil ditambahkan!");
+
+    } catch (error) {
+      console.error("Gagal menyimpan sub akun:", error);
+      toast.error("Gagal menyimpan sub akun");
     }
+  };
 
-    parentAccount.subakun.push(newSubAccount);
+  const cancelAddSubAccount = (accountIndex: number, subIndex: number) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[accountIndex].subakun = updatedAccounts[accountIndex].subakun.filter(
+      (_, idx) => idx !== subIndex
+    );
+    setAccounts(updatedAccounts);
+    setAddingSubAccountIndex(null);
+  };
+
+  const handleSubAccountNameChange = (
+    accountIndex: number,
+    subIndex: number,
+    value: string
+  ) => {
+    const updatedAccounts = [...accounts];
+    updatedAccounts[accountIndex].subakun[subIndex].nama = value;
     setAccounts(updatedAccounts);
   };
 
   const handleSubAccountKodeChange = (
     accountIndex: number,
     subIndex: number,
-    newKode: string
+    value: string
   ) => {
     const updatedAccounts = [...accounts];
-    updatedAccounts[accountIndex].subakun![subIndex].kode = newKode; // Perbarui kode sub-akun
+    updatedAccounts[accountIndex].subakun[subIndex].kode = value;
     setAccounts(updatedAccounts);
   };
 
   const handleSaveAccount = async () => {
     try {
-      let hasError = false;
+      if (!company?.id) {
+        toast.error("Perusahaan tidak valid");
+        return;
+      }
 
-      // Validasi sub akun name dan kode
+      const transactions: TransactionPayload[] = [];
+
       accounts.forEach((account) => {
-        account.subakun?.forEach((sub) => {
-          if (!sub) return; // Cek apakah sub ada
-          if (sub.id.startsWith("temp-")) {
-            if (!sub.nama.trim() || !sub.kode.trim()) {
-              toast.error("Nama dan kode sub akun harus diisi");
-              hasError = true;
-            }
+        if (account.debit !== 0 || account.kredit !== 0) {
+          transactions.push({
+            akun_id: account.id,
+            perusahaan_id: company.id,
+            debit: Number(account.debit),
+            kredit: Number(account.kredit),
+            sub_akun_id: null
+          });
+        }
+
+        account.subakun.forEach((sub) => {
+          if (sub.debit !== 0 || sub.kredit !== 0) {
+            transactions.push({
+              akun_id: account.id,
+              perusahaan_id: company.id,
+              debit: Number(sub.debit),
+              kredit: Number(sub.kredit),
+              sub_akun_id: sub.id
+            });
           }
         });
       });
 
-      // Jika ada error atau perusahaan belum ada, hentikan
-      if (hasError || !company) {
-        toast.error("Perusahaan tidak ditemukan atau ada error");
-        return;
-      }
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast.error("Token tidak ditemukan");
-        return;
-      }
-
-      const localAccounts = JSON.parse(JSON.stringify(accounts));
-      const transactions: Transaction[] = [];
-
-      // Pastikan data perusahaan dan akun valid
-      if (!company.id) {
-        toast.error("Perusahaan ID tidak ditemukan");
-        return;
-      }
-
-      // Mengambil data debit dan kredit dari akun utama
-      localAccounts.forEach((account) => {
-        // Ambil debit dan kredit dari akun utama, bukan sub akun
-        console.log("Akun ID:", account.id);
-        console.log("Perusahaan ID:", company.id);
-        console.log("Debit:", account.debit);
-        console.log("Kredit:", account.kredit);
-
-        // Sub akun ID hanya diisi jika ada sub akun yang terkait
-        const subAccountId =
-          account.subakun?.length > 0 ? account.subakun[0].id : null;
-
-        if ((account.debit || account.kredit) && account.id && company.id) {
-          // Mengirim transaksi dengan sub_akun_id atau null jika tidak ada
-          transactions.push({
-            akun_id: account.id, // Mengambil akun_id dari akun yang ada
-            perusahaan_id: company.id, // Mengambil perusahaan_id dari company
-            debit: account.debit || 0, // Kirim debit dari akun utama, jika tidak ada, kirim 0
-            kredit: account.kredit || 0, // Kirim kredit dari akun utama, jika tidak ada, kirim 0
-            sub_akun_id: subAccountId, // Kirim sub_akun_id, jika tidak ada maka null
-          });
-        }
-      });
-
-      // Verifikasi bahwa transactions berisi data yang benar
-      console.log("Data transaksi yang akan dikirim:", transactions);
-
-      // Cek apakah transaksi kosong
       if (transactions.length === 0) {
-        toast.error("Tidak ada transaksi untuk dikirim.");
+        toast.error("Tidak ada transaksi untuk disimpan");
         return;
       }
 
-      // Kirim transaksi ke backend
-      await axios.post(
-        "/mahasiswa/keuangan", // Endpoint utama untuk menyimpan data
-        { transactions },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.post("/mahasiswa/keuangan", { transactions });
 
-      // Update state dan local storage setelah transaksi berhasil
-      const finalAccounts = localAccounts.map((account) => ({
-        ...account,
-        isEditing: false,
-        subakun:
-          account.subakun?.map((sub) => ({
-            ...sub,
-            isEditing: false,
-          })) || [],
-      }));
-
-      setAccounts(finalAccounts);
-      localStorage.setItem(
-        `accounts_${company.id}`,
-        JSON.stringify(finalAccounts)
-      );
+      setAccounts(prev => prev.map(acc => ({
+        ...acc,
+        debit: 0,
+        kredit: 0,
+        subakun: acc.subakun.map(sub => ({
+          ...sub,
+          debit: 0,
+          kredit: 0
+        }))
+      })));
 
       toast.success("Data berhasil disimpan!");
     } catch (error) {
@@ -301,17 +297,6 @@ export default function Page() {
     }
   };
 
-  // const handleSubAccountKodeChange = (
-  //   accountIndex: number,
-  //   subIndex: number,
-  //   newKode: string
-  // ) => {
-  //   const updatedAccounts = [...accounts];
-  //   updatedAccounts[accountIndex].subakun![subIndex].kode = newKode;
-  //   setAccounts(updatedAccounts);
-  // };
-
-  // Handles debit changes for both main account and subaccounts
   const handleDebitChange = (
     index: number,
     value: string,
@@ -320,14 +305,15 @@ export default function Page() {
   ) => {
     const updatedAccounts = [...accounts];
     if (isSubAccount) {
-      updatedAccounts[index].subakun![subIndex].debit = Number(value) || 0;
+      updatedAccounts[index].subakun[subIndex].debit = Number(value) || 0;
+      updatedAccounts[index].subakun[subIndex].kredit = 0;
     } else {
       updatedAccounts[index].debit = Number(value) || 0;
+      updatedAccounts[index].kredit = 0;
     }
     setAccounts(updatedAccounts);
   };
 
-  // Handles kredit changes for both main account and subaccounts
   const handleKreditChange = (
     index: number,
     value: string,
@@ -336,20 +322,12 @@ export default function Page() {
   ) => {
     const updatedAccounts = [...accounts];
     if (isSubAccount) {
-      updatedAccounts[index].subakun![subIndex].kredit = Number(value) || 0;
+      updatedAccounts[index].subakun[subIndex].kredit = Number(value) || 0;
+      updatedAccounts[index].subakun[subIndex].debit = 0;
     } else {
       updatedAccounts[index].kredit = Number(value) || 0;
+      updatedAccounts[index].debit = 0;
     }
-    setAccounts(updatedAccounts);
-  };
-
-  const handleSubAccountNameChange = (
-    accountIndex: number,
-    subIndex: number,
-    newName: string
-  ) => {
-    const updatedAccounts = [...accounts];
-    updatedAccounts[accountIndex].subakun![subIndex].name = newName;
     setAccounts(updatedAccounts);
   };
 
@@ -460,13 +438,11 @@ export default function Page() {
                 <TableBody>
                   {accounts.map((account, index) => (
                     <React.Fragment key={account.id}>
-                      {/* Row for main account */}
                       <TableRow>
                         <TableCell>{account.nama}</TableCell>
                         <TableCell></TableCell>
                         <TableCell>{account.kode}</TableCell>
 
-                        {/* Debit Field for Main Account */}
                         <TableCell>
                           {account.isEditing ? (
                             <Input
@@ -481,7 +457,6 @@ export default function Page() {
                           )}
                         </TableCell>
 
-                        {/* Kredit Field for Main Account */}
                         <TableCell>
                           {account.isEditing ? (
                             <Input
@@ -496,93 +471,95 @@ export default function Page() {
                           )}
                         </TableCell>
 
-                        {/* Button to add subaccount */}
                         <TableCell>
                           <Button
-                            onClick={() => handleAddSubAccount(index)}
-                            disabled={account.status !== "open"} // Tambahkan disabled condition
+                            onClick={() => startAddSubAccount(index)}
+                            disabled={account.status !== "open"}
                           >
                             <FaPlus /> Tambah Sub
                           </Button>
                         </TableCell>
                       </TableRow>
 
-                      {/* Row for subaccounts */}
                       {account.subakun?.map((subAccount, subIndex) => (
                         <TableRow key={subAccount.id}>
                           <TableCell></TableCell>
 
-                          {/* Subaccount Name Field */}
                           <TableCell>
-                            <Input
-                              value={subAccount.nama}
-                              onChange={(e) =>
-                                handleSubAccountNameChange(
-                                  index,
-                                  subIndex,
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Nama sub akun"
-                              disabled={!subAccount.isEditing}
-                            />
+                            {subAccount.isNew ? (
+                              <Input
+                                value={subAccount.nama}
+                                onChange={(e) =>
+                                  handleSubAccountNameChange(index, subIndex, e.target.value)
+                                }
+                                placeholder="Nama sub akun"
+                              />
+                            ) : (
+                              subAccount.nama
+                            )}
                           </TableCell>
 
-                          {/* Subaccount Code Field */}
                           <TableCell>
-                            {subAccount.isEditing ? (
+                            {subAccount.isNew ? (
                               <Input
                                 value={subAccount.kode}
                                 onChange={(e) =>
-                                  handleSubAccountKodeChange(
-                                    index,
-                                    subIndex,
-                                    e.target.value
-                                  )
+                                  handleSubAccountKodeChange(index, subIndex, e.target.value)
                                 }
                                 placeholder="Kode sub akun"
-                                disabled={!subAccount.isEditing}
                               />
                             ) : (
                               subAccount.kode
                             )}
                           </TableCell>
 
-                          {/* Debit Field for Sub Account */}
                           <TableCell>
-                            <Input
-                              type="number"
-                              value={subAccount.debit || ""}
-                              onChange={(e) =>
-                                handleDebitChange(
-                                  index,
-                                  e.target.value,
-                                  true,
-                                  subIndex
-                                )
-                              }
-                              disabled={subAccount.kredit > 0}
-                            />
+                            {subAccount.isEditing ? (
+                              <Input
+                                type="number"
+                                value={subAccount.debit || ""}
+                                onChange={(e) =>
+                                  handleDebitChange(index, e.target.value, true, subIndex)
+                                }
+                              />
+                            ) : (
+                              subAccount.debit
+                            )}
                           </TableCell>
 
-                          {/* Kredit Field for Sub Account */}
                           <TableCell>
-                            <Input
-                              type="number"
-                              value={subAccount.kredit || ""}
-                              onChange={(e) =>
-                                handleKreditChange(
-                                  index,
-                                  e.target.value,
-                                  true,
-                                  subIndex
-                                )
-                              }
-                              disabled={subAccount.debit > 0}
-                            />
+                            {subAccount.isEditing ? (
+                              <Input
+                                type="number"
+                                value={subAccount.kredit || ""}
+                                onChange={(e) =>
+                                  handleKreditChange(index, e.target.value, true, subIndex)
+                                }
+                              />
+                            ) : (
+                              subAccount.kredit
+                            )}
                           </TableCell>
 
-                          <TableCell></TableCell>
+                          {subAccount.isNew && (
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => saveNewSubAccount(index, subIndex)}
+                                >
+                                  Simpan
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => cancelAddSubAccount(index, subIndex)}
+                                >
+                                  Batal
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </React.Fragment>
@@ -630,11 +607,4 @@ export default function Page() {
       </SidebarInset>
     </SidebarProvider>
   );
-}
-
-function mergeAccounts(localAccounts: Account[], apiAccounts: Account[]) {
-  return apiAccounts.map((apiAcc) => {
-    const localAcc = localAccounts.find((la) => la.id === apiAcc.id);
-    return localAcc ? { ...apiAcc, ...localAcc } : apiAcc;
-  });
 }
