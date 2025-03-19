@@ -2,12 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "@/lib/axios";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,21 +64,15 @@ export default function Krs() {
     const fetchData = async () => {
       try {
         // Fetch classes and KRS based on userId
-        const [classesRes, krsRes] = await Promise.all([
-          axios.get("/instruktur/kelas"),
-          axios.get(`/mahasiswa/krs/${userId}`),
-        ]);
+        const [classesRes, krsRes] = await Promise.all([axios.get("/instruktur/kelas"), axios.get(`/mahasiswa/krs/${userId}`)]);
 
         // Set class categories if classes are fetched successfully
         if (classesRes.data.success) {
-          const categories = classesRes.data.data.reduce(
-            (acc: Record<string, ClassItem[]>, item: ClassItem) => {
-              if (!acc[item.kategori]) acc[item.kategori] = [];
-              acc[item.kategori].push(item);
-              return acc;
-            },
-            {}
-          );
+          const categories = classesRes.data.data.reduce((acc: Record<string, ClassItem[]>, item: ClassItem) => {
+            if (!acc[item.kategori]) acc[item.kategori] = [];
+            acc[item.kategori].push(item);
+            return acc;
+          }, {});
           setClassCategories(categories);
         }
 
@@ -98,8 +87,8 @@ export default function Krs() {
       }
     };
 
-    fetchData(); 
-  }, [userId]); 
+    fetchData();
+  }, [userId]);
 
   const handleClassSelection = (classItem: ClassItem) => {
     if (selectedClasses.some((item) => item.kelas_id === classItem.id)) {
@@ -120,8 +109,10 @@ export default function Krs() {
 
   const handleConfirmAction = async () => {
     const token = localStorage.getItem("token");
-    if (!token || !userId || !selectedClass) return;
+    const userData= JSON.parse(localStorage.getItem("userData") || "{}");
+    const userId = userData.id;
 
+    if (!token || !userId || !selectedClass) return;
     try {
       if (action === "add" && selectedClass) {
         const response = await axios.post(
@@ -137,6 +128,7 @@ export default function Krs() {
             },
           }
         );
+        console.log("response", response);
 
         if (response.data.success) {
           setSelectedClasses((prev) => [
@@ -153,11 +145,7 @@ export default function Krs() {
       }
     } catch (error) {
       console.error("Error processing request:", error);
-      alert(
-        `Gagal ${action === "add" ? "menambah" : "menghapus"} kelas: ${
-          error.response?.data?.message || "Terjadi kesalahan"
-        }`
-      );
+      alert(`Gagal ${action === "add" ? "menambah" : "menghapus"} kelas: ${error.response?.data?.message || "Terjadi kesTalahan"}`);
     } finally {
       setShowConfirmDialog(false);
       setSelectedClass(null);
@@ -180,9 +168,7 @@ export default function Krs() {
             <Accordion type="single" collapsible>
               {Object.entries(classCategories).map(([category, classes]) => (
                 <AccordionItem key={category} value={category}>
-                  <AccordionTrigger className="font-semibold">
-                    {category}
-                  </AccordionTrigger>
+                  <AccordionTrigger className="font-semibold">{category}</AccordionTrigger>
                   {classes.map((classItem) => (
                     <AccordionContent
                       key={classItem.id}
@@ -192,16 +178,10 @@ export default function Krs() {
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="font-medium">{classItem.nama}</p>
-                          <p className="text-sm text-gray-500">
-                            Angkatan {classItem.angkatan}
-                          </p>
+                          <p className="text-sm text-gray-500">Angkatan {classItem.angkatan}</p>
                         </div>
-                        {selectedClasses.some(
-                          (c) => c.kelas_id === classItem.id
-                        ) && (
-                          <span className="text-green-500 text-sm">
-                            ✓ Terpilih
-                          </span>
+                        {selectedClasses.some((c) => c.kelas_id === classItem.id) && (
+                          <span className="text-green-500 text-sm">✓ Terpilih</span>
                         )}
                       </div>
                     </AccordionContent>
@@ -226,18 +206,10 @@ export default function Krs() {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-lg">
-                            {classItem.nama}
-                          </h3>
-                          <p className="text-gray-500 text-sm">
-                            Angkatan: {classItem.angkatan}
-                          </p>
+                          <h3 className="font-semibold text-lg">{classItem.nama}</h3>
+                          <p className="text-gray-500 text-sm">Angkatan: {classItem.angkatan}</p>
                         </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteClass(krsItem.id)}
-                        >
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteClass(krsItem.id)}>
                           Hapus
                         </Button>
                       </div>
@@ -246,9 +218,7 @@ export default function Krs() {
                 ) : null;
               })
             ) : (
-              <div className="text-center py-6 text-gray-500">
-                Belum ada kelas yang dipilih
-              </div>
+              <div className="text-center py-6 text-gray-500">Belum ada kelas yang dipilih</div>
             )}
           </CardContent>
         </Card>
@@ -258,11 +228,7 @@ export default function Krs() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {action === "add"
-                ? "Tambah Kelas ke KRS?"
-                : "Hapus Kelas dari KRS?"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{action === "add" ? "Tambah Kelas ke KRS?" : "Hapus Kelas dari KRS?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {action === "add"
                 ? "Anda akan menambahkan kelas ini ke Kartu Rencana Studi"
@@ -271,9 +237,7 @@ export default function Krs() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleConfirmAction()}>
-              {action === "add" ? "Tambahkan" : "Hapus"}
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => handleConfirmAction()}>{action === "add" ? "Tambahkan" : "Hapus"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

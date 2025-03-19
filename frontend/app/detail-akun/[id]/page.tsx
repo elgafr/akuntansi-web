@@ -1,11 +1,7 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-} from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,21 +10,8 @@ import React, { useEffect, useState } from "react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -87,9 +70,7 @@ export default function Page() {
   const fetchAccounts = async (kategoriId: string) => {
     try {
       const response = await axios.get("/instruktur/akun");
-      const filteredAccounts = response.data.data.filter(
-        (account: any) => account.kategori_id === kategoriId
-      );
+      const filteredAccounts = response.data.data.filter((account: any) => account.kategori_id === kategoriId);
 
       const accountsData = filteredAccounts.map((account: any) => ({
         id: account.id,
@@ -99,14 +80,15 @@ export default function Page() {
         debit: 0,
         kredit: 0,
         isEditing: false,
-        subakun: account.subakun?.map((sub: any) => ({
-          id: sub.id,
-          kode: sub.kode,
-          nama: sub.nama,
-          akun_id: account.id,
-          perusahaan_id: company?.id || "",
-          isEditing: false
-        })) || [],
+        subakun:
+          account.subakun?.map((sub: any) => ({
+            id: sub.id,
+            kode: sub.kode,
+            nama: sub.nama,
+            akun_id: account.id,
+            perusahaan_id: company?.id || "",
+            isEditing: false,
+          })) || [],
       }));
 
       setAccounts(accountsData);
@@ -151,10 +133,11 @@ export default function Page() {
     const updatedAccounts = accounts.map((account) => ({
       ...account,
       isEditing: account.status === "open",
-      subakun: account.subakun?.map((sub) => ({
-        ...sub,
-        isEditing: account.status === "open",
-      })) || [],
+      subakun:
+        account.subakun?.map((sub) => ({
+          ...sub,
+          isEditing: account.status === "open",
+        })) || [],
     }));
     setAccounts(updatedAccounts);
   };
@@ -162,15 +145,15 @@ export default function Page() {
   const startAddSubAccount = (accountIndex: number) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[accountIndex].subakun.unshift({
-      id: 'temp-' + Date.now(),
-      kode: '',
-      nama: '',
+      id: "temp-" + Date.now(),
+      kode: "",
+      nama: "",
       akun_id: accounts[accountIndex].id,
-      perusahaan_id: company?.id || '',
+      perusahaan_id: company?.id || "",
       isEditing: true,
-      isNew: true
+      isNew: true,
     });
-    
+
     setAccounts(updatedAccounts);
     setAddingSubAccountIndex(accountIndex);
   };
@@ -189,7 +172,7 @@ export default function Page() {
         nama: subAccount.nama,
         kode: subAccount.kode,
         akun_id: account.id,
-        perusahaan_id: company?.id
+        perusahaan_id: company?.id,
       });
 
       const updatedAccounts = [...accounts];
@@ -197,13 +180,12 @@ export default function Page() {
         ...response.data.data,
         isEditing: false,
         akun_id: account.id,
-        perusahaan_id: company?.id || ''
+        perusahaan_id: company?.id || "",
       };
-      
+
       setAccounts(updatedAccounts);
       setAddingSubAccountIndex(null);
       toast.success("Sub akun berhasil ditambahkan!");
-
     } catch (error) {
       console.error("Gagal menyimpan sub akun:", error);
       toast.error("Gagal menyimpan sub akun");
@@ -212,28 +194,18 @@ export default function Page() {
 
   const cancelAddSubAccount = (accountIndex: number, subIndex: number) => {
     const updatedAccounts = [...accounts];
-    updatedAccounts[accountIndex].subakun = updatedAccounts[accountIndex].subakun.filter(
-      (_, idx) => idx !== subIndex
-    );
+    updatedAccounts[accountIndex].subakun = updatedAccounts[accountIndex].subakun.filter((_, idx) => idx !== subIndex);
     setAccounts(updatedAccounts);
     setAddingSubAccountIndex(null);
   };
 
-  const handleSubAccountNameChange = (
-    accountIndex: number,
-    subIndex: number,
-    value: string
-  ) => {
+  const handleSubAccountNameChange = (accountIndex: number, subIndex: number, value: string) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[accountIndex].subakun[subIndex].nama = value;
     setAccounts(updatedAccounts);
   };
 
-  const handleSubAccountKodeChange = (
-    accountIndex: number,
-    subIndex: number,
-    value: string
-  ) => {
+  const handleSubAccountKodeChange = (accountIndex: number, subIndex: number, value: string) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[accountIndex].subakun[subIndex].kode = value;
     setAccounts(updatedAccounts);
@@ -255,7 +227,7 @@ export default function Page() {
             perusahaan_id: company.id,
             debit: Number(account.debit),
             kredit: Number(account.kredit),
-            sub_akun_id: null
+            sub_akun_id: null,
           });
         }
 
@@ -266,29 +238,35 @@ export default function Page() {
               perusahaan_id: company.id,
               debit: Number(sub.debit),
               kredit: Number(sub.kredit),
-              sub_akun_id: sub.id
+              sub_akun_id: sub.id,
             });
           }
         });
       });
+
+      console.log("Transactions:", { transactions });
 
       if (transactions.length === 0) {
         toast.error("Tidak ada transaksi untuk disimpan");
         return;
       }
 
-      await axios.post("/mahasiswa/keuangan", { transactions });
+      transactions.forEach(async (element) => {
+        await axios.post("/mahasiswa/keuangan", element);
+      });
 
-      setAccounts(prev => prev.map(acc => ({
-        ...acc,
-        debit: 0,
-        kredit: 0,
-        subakun: acc.subakun.map(sub => ({
-          ...sub,
+      setAccounts((prev) =>
+        prev.map((acc) => ({
+          ...acc,
           debit: 0,
-          kredit: 0
+          kredit: 0,
+          subakun: acc.subakun.map((sub) => ({
+            ...sub,
+            debit: 0,
+            kredit: 0,
+          })),
         }))
-      })));
+      );
 
       toast.success("Data berhasil disimpan!");
     } catch (error) {
@@ -297,12 +275,7 @@ export default function Page() {
     }
   };
 
-  const handleDebitChange = (
-    index: number,
-    value: string,
-    isSubAccount: boolean,
-    subIndex: number = 0
-  ) => {
+  const handleDebitChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];
     if (isSubAccount) {
       updatedAccounts[index].subakun[subIndex].debit = Number(value) || 0;
@@ -314,12 +287,7 @@ export default function Page() {
     setAccounts(updatedAccounts);
   };
 
-  const handleKreditChange = (
-    index: number,
-    value: string,
-    isSubAccount: boolean,
-    subIndex: number = 0
-  ) => {
+  const handleKreditChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];
     if (isSubAccount) {
       updatedAccounts[index].subakun[subIndex].kredit = Number(value) || 0;
@@ -357,19 +325,14 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-10">Perusahaan</h1>
-                  <h2 className="text-sm ml-10">
-                    Let's check your Company today
-                  </h2>
+                  <h2 className="text-sm ml-10">Let's check your Company today</h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                  />
+                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">Guest</div>
@@ -392,30 +355,17 @@ export default function Page() {
         <div className="mt-10 ml-14 flex gap-x-6">
           <Card className="w-[700px]">
             <CardHeader>
-              <CardTitle className="text-5xl text-primary py-2 mb-4">
-                {company.nama}
-              </CardTitle>
-              <CardTitle className="text-3xl text-primary">
-                {getCategoryNameById(company.kategori_id)}
-              </CardTitle>
-              <CardDescription className="text-lg">
-                Kelola Kredit dan debit akun perusahaan
-              </CardDescription>
+              <CardTitle className="text-5xl text-primary py-2 mb-4">{company.nama}</CardTitle>
+              <CardTitle className="text-3xl text-primary">{getCategoryNameById(company.kategori_id)}</CardTitle>
+              <CardDescription className="text-lg">Kelola Kredit dan debit akun perusahaan</CardDescription>
             </CardHeader>
 
             <CardContent>
               <div className="flex justify-end mb-4 gap-2">
-                <Button
-                  variant="outline"
-                  className="w-32 rounded-xl h-10"
-                  onClick={handleEditAllAccounts}
-                >
+                <Button variant="outline" className="w-32 rounded-xl h-10" onClick={handleEditAllAccounts}>
                   Edit Semua
                 </Button>
-                <Button
-                  className="rounded-xl w-32 h-10"
-                  onClick={handleSaveAccount}
-                >
+                <Button className="rounded-xl w-32 h-10" onClick={handleSaveAccount}>
                   Simpan
                 </Button>
               </div>
@@ -423,13 +373,9 @@ export default function Page() {
               <Table className="w-full border border-gray-300 rounded-xl overflow-hidden">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
-                    <TableHead className="text-center py-2">
-                      Nama Akun
-                    </TableHead>
+                    <TableHead className="text-center py-2">Nama Akun</TableHead>
                     <TableHead className="text-center py-2">Sub Akun</TableHead>
-                    <TableHead className="text-center py-2">
-                      Kode Akun
-                    </TableHead>
+                    <TableHead className="text-center py-2">Kode Akun</TableHead>
                     <TableHead className="text-center py-2">Debit</TableHead>
                     <TableHead className="text-center py-2">Kredit</TableHead>
                     <TableHead className="text-center py-2">Aksi</TableHead>
@@ -448,9 +394,7 @@ export default function Page() {
                             <Input
                               type="number"
                               value={account.debit || ""}
-                              onChange={(e) =>
-                                handleDebitChange(index, e.target.value, false)
-                              }
+                              onChange={(e) => handleDebitChange(index, e.target.value, false)}
                             />
                           ) : (
                             account.debit
@@ -462,9 +406,7 @@ export default function Page() {
                             <Input
                               type="number"
                               value={account.kredit || ""}
-                              onChange={(e) =>
-                                handleKreditChange(index, e.target.value, false)
-                              }
+                              onChange={(e) => handleKreditChange(index, e.target.value, false)}
                             />
                           ) : (
                             account.kredit
@@ -472,10 +414,7 @@ export default function Page() {
                         </TableCell>
 
                         <TableCell>
-                          <Button
-                            onClick={() => startAddSubAccount(index)}
-                            disabled={account.status !== "open"}
-                          >
+                          <Button onClick={() => startAddSubAccount(index)} disabled={account.status !== "open"}>
                             <FaPlus /> Tambah Sub
                           </Button>
                         </TableCell>
@@ -489,9 +428,7 @@ export default function Page() {
                             {subAccount.isNew ? (
                               <Input
                                 value={subAccount.nama}
-                                onChange={(e) =>
-                                  handleSubAccountNameChange(index, subIndex, e.target.value)
-                                }
+                                onChange={(e) => handleSubAccountNameChange(index, subIndex, e.target.value)}
                                 placeholder="Nama sub akun"
                               />
                             ) : (
@@ -503,9 +440,7 @@ export default function Page() {
                             {subAccount.isNew ? (
                               <Input
                                 value={subAccount.kode}
-                                onChange={(e) =>
-                                  handleSubAccountKodeChange(index, subIndex, e.target.value)
-                                }
+                                onChange={(e) => handleSubAccountKodeChange(index, subIndex, e.target.value)}
                                 placeholder="Kode sub akun"
                               />
                             ) : (
@@ -518,9 +453,7 @@ export default function Page() {
                               <Input
                                 type="number"
                                 value={subAccount.debit || ""}
-                                onChange={(e) =>
-                                  handleDebitChange(index, e.target.value, true, subIndex)
-                                }
+                                onChange={(e) => handleDebitChange(index, e.target.value, true, subIndex)}
                               />
                             ) : (
                               subAccount.debit
@@ -532,9 +465,7 @@ export default function Page() {
                               <Input
                                 type="number"
                                 value={subAccount.kredit || ""}
-                                onChange={(e) =>
-                                  handleKreditChange(index, e.target.value, true, subIndex)
-                                }
+                                onChange={(e) => handleKreditChange(index, e.target.value, true, subIndex)}
                               />
                             ) : (
                               subAccount.kredit
@@ -544,17 +475,10 @@ export default function Page() {
                           {subAccount.isNew && (
                             <TableCell>
                               <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => saveNewSubAccount(index, subIndex)}
-                                >
+                                <Button size="sm" onClick={() => saveNewSubAccount(index, subIndex)}>
                                   Simpan
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => cancelAddSubAccount(index, subIndex)}
-                                >
+                                <Button size="sm" variant="outline" onClick={() => cancelAddSubAccount(index, subIndex)}>
                                   Batal
                                 </Button>
                               </div>
@@ -571,22 +495,16 @@ export default function Page() {
 
           <Card className="w-[400px]">
             <CardHeader>
-              <CardTitle className="text-primary text-3xl">
-                Detail Perusahaan
-              </CardTitle>
+              <CardTitle className="text-primary text-3xl">Detail Perusahaan</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-md w-full">
                 <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
-                  <p className="font-semibold whitespace-nowrap">
-                    Nama Perusahaan
-                  </p>
+                  <p className="font-semibold whitespace-nowrap">Nama Perusahaan</p>
                   <p>:</p>
                   <p>{company.nama}</p>
 
-                  <p className="font-semibold whitespace-nowrap">
-                    Kategori Perusahaan
-                  </p>
+                  <p className="font-semibold whitespace-nowrap">Kategori Perusahaan</p>
                   <p>:</p>
                   <p>{getCategoryNameById(company.kategori_id)}</p>
 
@@ -594,9 +512,7 @@ export default function Page() {
                   <p>:</p>
                   <p>{company.alamat}</p>
 
-                  <p className="font-semibold whitespace-nowrap">
-                    Tahun Berdiri
-                  </p>
+                  <p className="font-semibold whitespace-nowrap">Tahun Berdiri</p>
                   <p>:</p>
                   <p>{company.tahun_berdiri}</p>
                 </div>

@@ -40,6 +40,9 @@ export default function Page() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+    console.log(userData.id)
+    
 
     // 1. Cek token tanpa redirect langsung
     if (!token) {
@@ -50,21 +53,21 @@ export default function Page() {
     const fetchProfile = async () => {
       try {
         // 2. Validasi token dengan request ke endpoint yang sama
-        const response = await axios.get("/mahasiswa/profile", {
+        const response = await axios.get(`/mahasiswa/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-
+        
         // 3. Handle response yang tidak valid
-        if (!response.data?.success || !response.data.user) {
-          throw new Error("Invalid session");
-        }
-
-        const currentUser = response.data.user;
-        const userProfile = response.data.data.find(
-          (p: any) => p.user_id === currentUser.id
-        );
+        // if (!response.data?.success || !response.data.user) {
+          //   throw new Error("Invalid session");
+          // }
+          
+          
+          const currentUser = response.data.data.user;
+          console.log(currentUser);
+        const userProfile = currentUser ? response.data.data : null;
 
         if (userProfile) {
           setProfileData({

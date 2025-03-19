@@ -35,11 +35,12 @@ export function LoginForm({
 
       if (response.data.success) {
         // Simpan data sesuai response backend
-        const { token, nama, nim, email } = response.data.data;
-        
+        const { token, nama, nim, email,id } = response.data.data;
+        console.log(response.data)
         // Simpan token dan data user ke localStorage
         localStorage.setItem("token", token);
         localStorage.setItem("userData", JSON.stringify({
+          id,
           nama,
           nim,
           email
