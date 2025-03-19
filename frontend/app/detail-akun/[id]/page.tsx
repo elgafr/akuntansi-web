@@ -53,13 +53,13 @@ interface SubAccount {
   keuanganId: string;
 }
 
-interface TransactionPayload {
-  akun_id: string;
-  perusahaan_id: string;
-  debit: number;
-  kredit: number;
-  sub_akun_id?: string | null;
-}
+// interface TransactionPayload {
+//   akun_id: string;
+//   perusahaan_id: string;
+//   debit: number;
+//   kredit: number;
+//   sub_akun_id?: string | null;
+// }
 
 export default function Page() {
   const [company, setCompany] = useState<Company | null>(null);
@@ -71,25 +71,22 @@ export default function Page() {
 
   const fetchAccounts = async (perusahaanId: string) => {
     try {
-      const response = await axios.get(`/mahasiswa/keuangan`, {
-        params: { perusahaan_id: perusahaanId }
-      });
+      // Ambil data subakun terpisah
+      const [keuanganResponse, subakunResponse] = await Promise.all([
+        axios.get(`/mahasiswa/keuangan`, { params: { perusahaan_id: perusahaanId } }),
+        axios.get(`/mahasiswa/subakun`, { params: { perusahaan_id: perusahaanId } })
+      ]);
 
-      console.log("Keuangan entries:", response.data.data);
-      const keuanganEntries = response.data.data;
-  
-      const accountsMap: { [key: string]: Account } = {};
-  
-      keuanganEntries.forEach((entry: any) => {
+      const keuanganEntries = keuanganResponse.data.data;
+      const subakunEntries = subakunResponse.data.data;
+
+      // Proses data akun utama
+      const accountsMap = keuanganEntries.reduce((acc: { [key: string]: Account }, entry: any) => {
         const akun = entry.akun;
-        const subAkun = entry.sub_akun;
-  
-        if (!accountsMap[akun.id]) {
-          accountsMap[akun.id] = {
-            id: akun.id,
-            nama: akun.nama,
-            kode: akun.kode,
-            status: akun.status || 'open',
+        
+        if (!acc[akun.id]) {
+          acc[akun.id] = {
+            ...akun,
             debit: entry.debit,
             kredit: entry.kredit,
             isEditing: false,
@@ -97,27 +94,24 @@ export default function Page() {
             keuanganId: entry.id,
           };
         }
-  
-        if (subAkun) {
-          const existingSub = accountsMap[akun.id].subakun.find(sub => sub.id === subAkun.id);
-          if (!existingSub) {
-            accountsMap[akun.id].subakun.push({
-              id: subAkun.id,
-              kode: subAkun.kode,
-              nama: subAkun.nama,
-              akun_id: akun.id,
-              perusahaan_id: entry.perusahaan_id,
-              isEditing: false,
-              debit: entry.debit,
-              kredit: entry.kredit,
-              keuanganId: entry.id,
-            });
-          }
+        
+        return acc;
+      }, {});
+
+      // Proses data subakun
+      subakunEntries.forEach((sub: any) => {
+        if (accountsMap[sub.akun_id]) {
+          accountsMap[sub.akun_id].subakun.push({
+            ...sub,
+            isEditing: false,
+            debit: 0,
+            kredit: 0,
+            keuanganId: ""
+          });
         }
       });
-  
-      const accountsData = Object.values(accountsMap);
-      setAccounts(accountsData);
+
+      setAccounts(Object.values(accountsMap));
     } catch (error) {
       toast.error("Gagal memuat data keuangan");
     }
