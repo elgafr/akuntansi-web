@@ -19,13 +19,14 @@ type ProfileData = {
   tanggal_lahir?: string;
   alamat?: string;
   hp?: string;
+  foto?: string;
 };
 
 interface EditProfileProps {
   isEditModalOpen: boolean;
   closeEditModal: () => void;
   profileData: ProfileData;
-  saveProfileData: (newData: Partial<ProfileData>) => void;
+  saveProfileData: (formData: FormData) => void;
 }
 
 export default function EditProfile({
@@ -41,6 +42,34 @@ export default function EditProfile({
     hp: '',
   });
 
+  const [preview, setPreview] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (isEditModalOpen && profileData.foto) {
+      setPreview(`${process.env.NEXT_PUBLIC_API_URL}/storage/${profileData.foto}`);
+    }
+  }, [isEditModalOpen]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Hanya file gambar yang diperbolehkan');
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('Ukuran file maksimal 3MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
   // Inisialisasi form data saat modal dibuka
   useEffect(() => {
     if (profileData && isEditModalOpen) {
@@ -57,14 +86,21 @@ export default function EditProfile({
     e.preventDefault();
     
     if (!validateForm()) return;
+
+    const formPayload = new FormData();
     
-    // Siapkan payload dengan ID profil
-    const payload = {
-      ...formData,
-      id: profileData.id // Pastikan ID profil dikirim
-    };
+    // Append data text
+    formPayload.append('gender', formData.gender || '');
+    formPayload.append('tanggal_lahir', formData.tanggal_lahir || '');
+    formPayload.append('alamat', formData.alamat || '');
+    formPayload.append('hp', formData.hp || '');
     
-    saveProfileData(payload);
+    // Append file jika ada
+    if (selectedFile) {
+      formPayload.append('foto', selectedFile);
+    }
+
+    saveProfileData(formPayload);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -175,6 +211,7 @@ export default function EditProfile({
               pattern="[0-9]*"
             />
           </div>
+          
 
           <DialogFooter className="mt-6">
             <Button 

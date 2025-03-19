@@ -37,6 +37,7 @@ interface Account {
   kredit: number;
   isEditing: boolean;
   subakun: SubAccount[];
+  keuanganId: string;
 }
 
 interface SubAccount {
@@ -49,6 +50,7 @@ interface SubAccount {
   isNew?: boolean;
   debit: number;
   kredit: number;
+  keuanganId: string;
 }
 
 interface TransactionPayload {
@@ -67,35 +69,60 @@ export default function Page() {
   const [addingSubAccountIndex, setAddingSubAccountIndex] = useState<number | null>(null);
   const { id } = useParams();
 
-  const fetchAccounts = async (kategoriId: string) => {
+  const fetchAccounts = async (perusahaanId: string) => {
     try {
-      const response = await axios.get("/instruktur/akun");
-      const filteredAccounts = response.data.data.filter((account: any) => account.kategori_id === kategoriId);
+      const response = await axios.get(`/mahasiswa/keuangan`, {
+        params: { perusahaan_id: perusahaanId }
+      });
 
-      const accountsData = filteredAccounts.map((account: any) => ({
-        id: account.id,
-        nama: account.nama,
-        kode: account.kode,
-        status: account.status,
-        debit: 0,
-        kredit: 0,
-        isEditing: false,
-        subakun:
-          account.subakun?.map((sub: any) => ({
-            id: sub.id,
-            kode: sub.kode,
-            nama: sub.nama,
-            akun_id: account.id,
-            perusahaan_id: company?.id || "",
+      console.log("Keuangan entries:", response.data.data);
+      const keuanganEntries = response.data.data;
+  
+      const accountsMap: { [key: string]: Account } = {};
+  
+      keuanganEntries.forEach((entry: any) => {
+        const akun = entry.akun;
+        const subAkun = entry.sub_akun;
+  
+        if (!accountsMap[akun.id]) {
+          accountsMap[akun.id] = {
+            id: akun.id,
+            nama: akun.nama,
+            kode: akun.kode,
+            status: akun.status || 'open',
+            debit: entry.debit,
+            kredit: entry.kredit,
             isEditing: false,
-          })) || [],
-      }));
-
+            subakun: [],
+            keuanganId: entry.id,
+          };
+        }
+  
+        if (subAkun) {
+          const existingSub = accountsMap[akun.id].subakun.find(sub => sub.id === subAkun.id);
+          if (!existingSub) {
+            accountsMap[akun.id].subakun.push({
+              id: subAkun.id,
+              kode: subAkun.kode,
+              nama: subAkun.nama,
+              akun_id: akun.id,
+              perusahaan_id: entry.perusahaan_id,
+              isEditing: false,
+              debit: entry.debit,
+              kredit: entry.kredit,
+              keuanganId: entry.id,
+            });
+          }
+        }
+      });
+  
+      const accountsData = Object.values(accountsMap);
       setAccounts(accountsData);
     } catch (error) {
-      toast.error("Gagal memuat data akun");
+      toast.error("Gagal memuat data keuangan");
     }
   };
+  
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,7 +134,7 @@ export default function Page() {
 
         if (companyRes.data.success) {
           setCompany(companyRes.data.data);
-          await fetchAccounts(companyRes.data.data.kategori_id);
+          await fetchAccounts(companyRes.data.data.id);
         }
 
         if (categoriesRes.data.success) {
@@ -145,14 +172,17 @@ export default function Page() {
   const startAddSubAccount = (accountIndex: number) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[accountIndex].subakun.unshift({
-      id: "temp-" + Date.now(),
-      kode: "",
-      nama: "",
-      akun_id: accounts[accountIndex].id,
-      perusahaan_id: company?.id || "",
-      isEditing: true,
-      isNew: true,
-    });
+          id: "temp-" + Date.now(),
+          kode: "",
+          nama: "",
+          akun_id: accounts[accountIndex].id,
+          perusahaan_id: company?.id || "",
+          isEditing: true,
+          isNew: true,
+          debit: 0,
+          kredit: 0,
+          keuanganId: "",
+        });
 
     setAccounts(updatedAccounts);
     setAddingSubAccountIndex(accountIndex);
@@ -162,6 +192,8 @@ export default function Page() {
     try {
       const account = accounts[accountIndex];
       const subAccount = account.subakun[subIndex];
+
+      console.log("Saving sub account:", subAccount);
 
       if (!subAccount.nama || !subAccount.kode) {
         toast.error("Nama dan kode sub akun harus diisi");
@@ -212,68 +244,45 @@ export default function Page() {
   };
 
   const handleSaveAccount = async () => {
-    try {
-      if (!company?.id) {
-        toast.error("Perusahaan tidak valid");
-        return;
-      }
+  try {
+    if (!company?.id) {
+      toast.error("Perusahaan tidak valid");
+      return;
+    }
 
-      const transactions: TransactionPayload[] = [];
+    const updatePromises = [];
 
-      accounts.forEach((account) => {
-        if (account.debit !== 0 || account.kredit !== 0) {
-          transactions.push({
-            akun_id: account.id,
-            perusahaan_id: company.id,
+    for (const account of accounts) {
+      if (account.keuanganId && (account.debit !== 0 || account.kredit !== 0)) {
+        updatePromises.push(
+          axios.put(`/mahasiswa/keuangan/${account.keuanganId}`, {
             debit: Number(account.debit),
             kredit: Number(account.kredit),
-            sub_akun_id: null,
-          });
-        }
-
-        account.subakun.forEach((sub) => {
-          if (sub.debit !== 0 || sub.kredit !== 0) {
-            transactions.push({
-              akun_id: account.id,
-              perusahaan_id: company.id,
-              debit: Number(sub.debit),
-              kredit: Number(sub.kredit),
-              sub_akun_id: sub.id,
-            });
-          }
-        });
-      });
-
-      console.log("Transactions:", { transactions });
-
-      if (transactions.length === 0) {
-        toast.error("Tidak ada transaksi untuk disimpan");
-        return;
+          })
+        );
       }
 
-      transactions.forEach(async (element) => {
-        await axios.post("/mahasiswa/keuangan", element);
-      });
-
-      setAccounts((prev) =>
-        prev.map((acc) => ({
-          ...acc,
-          debit: 0,
-          kredit: 0,
-          subakun: acc.subakun.map((sub) => ({
-            ...sub,
-            debit: 0,
-            kredit: 0,
-          })),
-        }))
-      );
-
-      toast.success("Data berhasil disimpan!");
-    } catch (error) {
-      console.error("Gagal menyimpan:", error);
-      toast.error("Gagal menyimpan data");
+      for (const sub of account.subakun) {
+        if (sub.keuanganId && (sub.debit !== 0 || sub.kredit !== 0)) {
+          updatePromises.push(
+            axios.put(`/mahasiswa/keuangan/${sub.keuanganId}`, {
+              debit: Number(sub.debit),
+              kredit: Number(sub.kredit),
+            })
+          );
+        }
+      }
     }
-  };
+
+    await Promise.all(updatePromises);
+    await fetchAccounts(company.id);
+    
+    toast.success("Data berhasil diperbarui!");
+  } catch (error) {
+    console.error("Gagal menyimpan:", error);
+    toast.error("Gagal menyimpan data");
+  }
+};
 
   const handleDebitChange = (index: number, value: string, isSubAccount: boolean, subIndex: number = 0) => {
     const updatedAccounts = [...accounts];

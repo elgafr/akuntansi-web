@@ -24,6 +24,7 @@ type ProfileData = {
   tanggal_lahir?: string;
   alamat?: string;
   hp?: string;
+  foto?: string;
   user: {
     id: string;
     name: string;
@@ -41,8 +42,7 @@ export default function Page() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userData = JSON.parse(localStorage.getItem("userData") || "{}");
-    console.log(userData.id)
-    
+    console.log(userData.id);
 
     // 1. Cek token tanpa redirect langsung
     if (!token) {
@@ -58,15 +58,14 @@ export default function Page() {
             Authorization: `Bearer ${token}`,
           },
         });
-        
+
         // 3. Handle response yang tidak valid
         // if (!response.data?.success || !response.data.user) {
-          //   throw new Error("Invalid session");
-          // }
-          
-          
-          const currentUser = response.data.data.user;
-          console.log(currentUser);
+        //   throw new Error("Invalid session");
+        // }
+
+        const currentUser = response.data.data.user;
+        console.log(currentUser);
         const userProfile = currentUser ? response.data.data : null;
 
         if (userProfile) {
@@ -77,6 +76,7 @@ export default function Page() {
             tanggal_lahir: userProfile.tanggal_lahir,
             alamat: userProfile.alamat,
             hp: userProfile.hp,
+            foto: userProfile.foto,
             user: {
               id: currentUser.id,
               name: currentUser.name,
@@ -105,7 +105,11 @@ export default function Page() {
     fetchProfile();
   }, []);
 
-  const saveProfileData = async (updatedData: Partial<ProfileData>) => {
+  const saveProfileData = async (formData: FormData) => {
+    const updatedData: Partial<ProfileData> = {};
+    formData.forEach((value, key) => {
+      updatedData[key as keyof ProfileData] = value as any;
+    });
     try {
       const token = localStorage.getItem("token");
       if (!token || !profileData) {
@@ -143,9 +147,10 @@ export default function Page() {
           ...(prev || {}),
           ...response.data.data,
           user: prev?.user || response.data.data.user || {},
+          foto: prev?.foto || response.data.data.foto || {},
         }));
         closeEditModal();
-        alert("Data berhasil diperbarui!");
+        toast("Data berhasil diperbarui!");
       } else {
         throw new Error("Respon server tidak valid");
       }
@@ -153,7 +158,7 @@ export default function Page() {
       // 5. Penanganan error terstruktur
       const errorMessage = getErrorMessage(error);
       console.error("Update Error:", errorMessage);
-      alert(`Gagal menyimpan perubahan: ${errorMessage}`);
+      toast(`Gagal menyimpan perubahan: ${errorMessage}`);
     }
   };
 
@@ -255,7 +260,14 @@ export default function Page() {
 
           <div className="flex items-center gap-4">
             <Avatar>
-              <AvatarImage src="https://github.com/shadcn.png" alt="Profile" />
+              <AvatarImage
+                src={
+                  profileData?.foto
+                    ? `${process.env.NEXT_PUBLIC_API_URL}/storage/${profileData.foto}`
+                    : "https://github.com/shadcn.png"
+                }
+                alt="Profile"
+              />
             </Avatar>
             <div>
               <p className="font-medium">{profileData.user?.name}</p>
@@ -349,4 +361,7 @@ export default function Page() {
       </SidebarInset>
     </SidebarProvider>
   );
+}
+function toast(arg0: string) {
+  throw new Error("Function not implemented.");
 }
