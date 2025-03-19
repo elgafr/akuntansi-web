@@ -70,13 +70,11 @@ interface SubAccount {
   keuanganId: string;
 }
 
-// interface TransactionPayload {
-//   akun_id: string;
-//   perusahaan_id: string;
-//   debit: number;
-//   kredit: number;
-//   sub_akun_id?: string | null;
-// }
+interface Profile {
+  user:{
+    name: string;
+  }
+}
 
 export default function Page() {
   const [company, setCompany] = useState<Company | null>(null);
@@ -84,8 +82,9 @@ export default function Page() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingSubAccountIndex, setAddingSubAccountIndex] = useState<
-    number | null
+  number | null
   >(null);
+  const [profileData, setProfileData] = useState<Profile | null>(null);
   const { id } = useParams();
 
   const fetchAccounts = async (perusahaanId: string) => {
@@ -132,10 +131,15 @@ export default function Page() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [companyRes, categoriesRes] = await Promise.all([
+        const [companyRes, categoriesRes,profileRes] = await Promise.all([
           axios.get(`/mahasiswa/perusahaan/${id}`),
           axios.get("/instruktur/kategori"),
+          axios.get("/mahasiswa/profile")
         ]);
+
+        if (profileRes.data.success) {
+          setProfileData(profileRes.data.data);
+        }
 
         if (companyRes.data.success) {
           setCompany(companyRes.data.data);
@@ -388,7 +392,7 @@ export default function Page() {
                   />
                 </Avatar>
                 <div className="text-left">
-                  <div className="text-sm font-medium">Guest</div>
+                  <div className="text-sm font-medium">{profileData?.user.name}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>

@@ -22,11 +22,10 @@ interface Transaction {
   sub_akun_id: string | null | undefined;
 }
 
-interface Akun {
-  id: string;
-  kode: number;
-  nama: string;
-  status: string;
+interface Profile {
+  user : {
+    name: string;
+  }
 }
 
 interface JurnalResponse {
@@ -55,8 +54,26 @@ export default function JurnalPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState({ fullName: "Guest" });
+  const [profileData, setProfileData] = useState<Profile | null>(null);
 
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        const response = await axios.get('/mahasiswa/profile');
+        if (response.data.success) {
+          setProfileData(response.data.data);
+          // Simpan ke localStorage untuk cache
+          localStorage.setItem('profileData', JSON.stringify(response.data.data));
+        }
+      } catch (error) {
+        console.error('Gagal memuat profil:', error);
+      }
+    };
+  
+    fetchProfileData();
+  }, []);
+  
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -152,7 +169,7 @@ export default function JurnalPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData.fullName}</div>
+                  <div className="text-sm font-medium">{profileData?.user?.name}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>

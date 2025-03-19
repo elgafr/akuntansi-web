@@ -59,11 +59,6 @@ export default function Page() {
           },
         });
 
-        // 3. Handle response yang tidak valid
-        // if (!response.data?.success || !response.data.user) {
-        //   throw new Error("Invalid session");
-        // }
-
         const currentUser = response.data.data.user;
         console.log(currentUser);
         const userProfile = currentUser ? response.data.data : null;
