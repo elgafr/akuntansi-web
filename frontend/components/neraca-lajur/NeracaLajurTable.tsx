@@ -8,92 +8,80 @@ import { useAccounts } from "@/contexts/AccountContext";
 import { useTransactions } from "@/contexts/TransactionContext";
 import { Card } from "@/components/ui/card";
 import axios from "@/lib/axios";
+import { useNeracaLajur } from "@/hooks/useNeracaLajur";
+import { useQuery } from '@tanstack/react-query';
 
-interface NeracaLajurTableProps {
-  type: 'before' | 'after'; // before = sebelum penyesuaian, after = setelah penyesuaian
-}
-
-interface Akun {
+// Interface untuk data akun dari API
+interface AkunData {
   id: string;
   kode: number;
   nama: string;
   status: string;
+  kategori_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
-interface SubAkun {
+// Interface untuk data sub-akun dari API
+interface SubAkunData {
   id: string;
   kode: number;
   nama: string;
   akun_id: string;
 }
 
+// Interface untuk item neraca lajur dari API
 interface NeracaLajurItem {
-  akun: Akun;
-  sub_akun: SubAkun | null;
+  akun: AkunData;
+  sub_akun: SubAkunData | null;
   debit: number;
   kredit: number;
 }
 
-interface NeracaLajurData {
-  [key: string]: NeracaLajurItem;
+// Interface untuk response API neraca lajur
+interface NeracaLajurResponse {
+  success: boolean;
+  data: {
+    [key: string]: NeracaLajurItem;
+  };
 }
 
-export function NeracaLajurTable({ type }: NeracaLajurTableProps) {
+export function NeracaLajurTable({ type }: { type: 'before' | 'after' }) {
   const { accounts } = useAccounts();
   const { transactions } = useTransactions();
-  const [search, setSearch] = useState("");
-  const [filteredData, setFilteredData] = useState<NeracaLajurData>({});
+  const [neracaLajurData, setNeracaLajurData] = useState<Record<string, NeracaLajurItem>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  // Transform data untuk table
-  const transformDataToArray = (data: NeracaLajurData) => {
-    return Object.entries(data).map(([namaAkun, item]) => ({
-      id: item.akun.id,
-      kode_akun: item.akun.kode.toString(),
-      nama_akun: namaAkun,
-      debit: item.debit,
-      kredit: item.kredit,
-      sub_akun: item.sub_akun
-    }));
-  };
+  const { data, isLoading: queryLoading, isError, error } = useQuery({
+    queryKey: ['neracaLajur', type],
+    queryFn: async () => {
+      const endpoint = type === 'before' 
+        ? '/mahasiswa/neracalajur/sebelumpenyesuaian'
+        : '/mahasiswa/neracalajur/setelahpenyesuaian';
+      
+      const response = await axios.get<NeracaLajurResponse>(endpoint);
+      
+      if (response.data.success) {
+        return response.data.data;
+      }
+      throw new Error('Failed to fetch data');
+    }
+  });
 
-  // Get current page data
-  const getCurrentPageData = () => {
-    const dataArray = transformDataToArray(filteredData);
-    return dataArray;
-  };
+  useEffect(() => {
+    if (data) {
+      setNeracaLajurData(data);
+      setIsLoading(false);
+    }
+  }, [data]);
 
-  // Hitung total
   const calculateTotals = () => {
-    return Object.values(filteredData).reduce((acc, curr) => ({
+    return Object.values(neracaLajurData).reduce((acc, curr) => ({
       totalDebit: acc.totalDebit + (curr.debit || 0),
-      totalKredit: acc.totalKredit + (curr.kredit || 0)
+      totalKredit: acc.totalKredit + (Math.abs(curr.kredit) || 0) // Mengambil nilai absolut untuk kredit
     }), { totalDebit: 0, totalKredit: 0 });
   };
-
-  // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const endpoint = type === 'before' 
-          ? '/mahasiswa/neracalajur/sebelumpenyesuaian'
-          : '/mahasiswa/neracalajur/setelahpenyesuaian';
-
-        const response = await axios.get(endpoint);
-        
-        if (response.data.success) {
-          setFilteredData(response.data.data);
-        }
-      } catch (error) {
-        console.error('Error fetching neraca lajur data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [type]);
 
   // Fungsi untuk menghitung saldo sebelum penyesuaian
   const calculateBalanceBeforeAdjustment = (kodeAkun: string) => {
@@ -143,8 +131,12 @@ export function NeracaLajurTable({ type }: NeracaLajurTableProps) {
     )
     .sort((a, b) => a.kodeAkun.localeCompare(b.kodeAkun));
 
-  if (isLoading) {
+  if (queryLoading) {
     return <div className="text-center py-4">Loading...</div>;
+  }
+
+  if (isError) {
+    return <div className="text-center py-4">Error: {error?.message}</div>;
   }
 
   return (
@@ -160,19 +152,23 @@ export function NeracaLajurTable({ type }: NeracaLajurTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Object.entries(filteredData).map(([namaAkun, item]) => (
-              <TableRow key={item.akun.id}>
-                <TableCell>{item.akun.kode}</TableCell>
-                <TableCell>{namaAkun}</TableCell>
-                <TableCell className="text-right">
-                  {item.debit ? `Rp ${item.debit.toLocaleString()}` : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  {item.kredit ? `Rp ${item.kredit.toLocaleString()}` : '-'}
-                </TableCell>
-              </TableRow>
-            ))}
-            {/* Total Row */}
+            {Object.entries(neracaLajurData).map(([namaAkun, item]) => {
+              // Handle nilai kredit negatif dari API
+              const kreditValue = item.kredit < 0 ? Math.abs(item.kredit) : item.kredit;
+              
+              return (
+                <TableRow key={item.akun.id}>
+                  <TableCell>{item.akun.kode}</TableCell>
+                  <TableCell>{namaAkun}</TableCell>
+                  <TableCell className="text-right">
+                    {item.debit > 0 ? `Rp ${item.debit.toLocaleString()}` : '-'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {kreditValue > 0 ? `Rp ${kreditValue.toLocaleString()}` : '-'}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             <TableRow className="font-semibold bg-gray-50/80">
               <TableCell colSpan={2}>Total</TableCell>
               <TableCell className="text-right">

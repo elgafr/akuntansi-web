@@ -30,3 +30,13 @@ instance.interceptors.response.use(
 );
 
 export default instance;
+
+// Tambahkan opsi cache untuk Next.js
+export const fetchWithCache = async (url: string) => {
+  const response = await fetch(url, {
+    next: {
+      revalidate: 300, // Cache selama 5 menit
+    },
+  });
+  return response.json();
+};

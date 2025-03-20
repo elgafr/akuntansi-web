@@ -74,7 +74,7 @@ const fetchLaporanKeuangan = async (): Promise<LaporanResponse> => {
   }
 };
 
-export function LaporanUmumSection() {
+export function LaporanKeuanganSection() {
   const queryClient = useQueryClient();
   
   // Use React Query hook

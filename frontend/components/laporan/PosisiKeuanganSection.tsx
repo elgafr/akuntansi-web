@@ -3,184 +3,184 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import axios from "@/lib/axios";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, parse } from "date-fns";
+import { id } from "date-fns/locale";
 
-interface PosisiKeuanganData {
-  aset: {
-    lancar: {
-      'Kas Kecil': number;
-      'Kas Bank': number;
-      'Surat Berharga Saham': number;
-      'Surat Berharga Obligasi': number;
-      'Asuransi Dibayar Dimuka': number;
-      'Perlengkapan Showroom': number;
-      'Perlengkapan Service': number;
-      'Piutang Bunga': number;
-      'Piutang Usaha': number;
-      'Cadangan Kerugian Piutang': number;
-      'Piutang Deviden': number;
-      'Persediaan': number;
-    };
-    tetap: {
-      'Tanah': number;
-      'Gedung': number;
-      'Akumulasi Penyusutan Gedung': number;
-      'Peralatan Showroom': number;
-      'Akum. Penyusutan Peralatan Showroom': number;
-      'Peralatan Servis': number;
-      'Akum. Penyusutan Peralatan Servis': number;
-      'Kendaraan': number;
-      'Akum. Penyusutan Kendaraan': number;
-    };
-  };
-  kewajiban: {
-    'Kewajiban Usaha': number;
-    'Kewajiban Gaji': number;
-    'Kewajiban Bunga': number;
-    'Kewajiban Pajak Penghasilan Badan': number;
-    'Kewajiban Wesel': number;
-    'Kewajiban Bank': number;
-    'Kewajiban Hipotik': number;
-  };
-  ekuitas: {
-    'Modal, Ahmad': number;
-    'Modal, Adi': number;
-    'Modal, Ida': number;
-  };
+// Create interfaces to match the API response structure
+interface Perusahaan {
+  id: string;
+  nama: string;
+  alamat: string;
+  tahun_berdiri: number;
+  start_priode: string;
+  end_priode: string;
+  status: string;
+  kategori_id: string;
+  krs_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export function PosisiKeuanganSection() {
-  const [data, setData] = useState<PosisiKeuanganData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface Akun {
+  id: string;
+  kode: number;
+  nama: string;
+  saldo_normal: string;
+  status: string;
+  kategori_id: string;
+  created_at: string;
+  updated_at: string;
+}
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get('/mahasiswa/laporan/keuangan');
-        if (response.data.success) {
-          const transformedData: PosisiKeuanganData = {
-            aset: {
-              lancar: {
-                'Kas Kecil': response.data.data.aset?.lancar?.['Kas Kecil'] || 0,
-                'Kas Bank': response.data.data.aset?.lancar?.['Kas Bank'] || 0,
-                'Surat Berharga Saham': response.data.data.aset?.lancar?.['Surat Berharga Saham'] || 0,
-                'Surat Berharga Obligasi': response.data.data.aset?.lancar?.['Surat Berharga Obligasi'] || 0,
-                'Asuransi Dibayar Dimuka': response.data.data.aset?.lancar?.['Asuransi Dibayar Dimuka'] || 0,
-                'Perlengkapan Showroom': response.data.data.aset?.lancar?.['Perlengkapan Showroom'] || 0,
-                'Perlengkapan Service': response.data.data.aset?.lancar?.['Perlengkapan Service'] || 0,
-                'Piutang Bunga': response.data.data.aset?.lancar?.['Piutang Bunga'] || 0,
-                'Piutang Usaha': response.data.data.aset?.lancar?.['Piutang Usaha'] || 0,
-                'Cadangan Kerugian Piutang': response.data.data.aset?.lancar?.['Cadangan Kerugian Piutang'] || 0,
-                'Piutang Deviden': response.data.data.aset?.lancar?.['Piutang Deviden'] || 0,
-                'Persediaan': response.data.data.aset?.lancar?.['Persediaan'] || 0,
-              },
-              tetap: {
-                'Tanah': response.data.data.aset?.tetap?.['Tanah'] || 0,
-                'Gedung': response.data.data.aset?.tetap?.['Gedung'] || 0,
-                'Akumulasi Penyusutan Gedung': response.data.data.aset?.tetap?.['Akumulasi Penyusutan Gedung'] || 0,
-                'Peralatan Showroom': response.data.data.aset?.tetap?.['Peralatan Showroom'] || 0,
-                'Akum. Penyusutan Peralatan Showroom': response.data.data.aset?.tetap?.['Akum. Penyusutan Peralatan Showroom'] || 0,
-                'Peralatan Servis': response.data.data.aset?.tetap?.['Peralatan Servis'] || 0,
-                'Akum. Penyusutan Peralatan Servis': response.data.data.aset?.tetap?.['Akum. Penyusutan Peralatan Servis'] || 0,
-                'Kendaraan': response.data.data.aset?.tetap?.['Kendaraan'] || 0,
-                'Akum. Penyusutan Kendaraan': response.data.data.aset?.tetap?.['Akum. Penyusutan Kendaraan'] || 0,
-              }
-            },
-            kewajiban: {
-              'Kewajiban Usaha': response.data.data.kewajiban?.['Kewajiban Usaha'] || 0,
-              'Kewajiban Gaji': response.data.data.kewajiban?.['Kewajiban Gaji'] || 0,
-              'Kewajiban Bunga': response.data.data.kewajiban?.['Kewajiban Bunga'] || 0,
-              'Kewajiban Pajak Penghasilan Badan': response.data.data.kewajiban?.['Kewajiban Pajak Penghasilan Badan'] || 0,
-              'Kewajiban Wesel': response.data.data.kewajiban?.['Kewajiban Wesel'] || 0,
-              'Kewajiban Bank': response.data.data.kewajiban?.['Kewajiban Bank'] || 0,
-              'Kewajiban Hipotik': response.data.data.kewajiban?.['Kewajiban Hipotik'] || 0,
-            },
-            ekuitas: {
-              'Modal, Ahmad': response.data.data.ekuitas?.['Modal, Ahmad'] || 0,
-              'Modal, Adi': response.data.data.ekuitas?.['Modal, Adi'] || 0,
-              'Modal, Ida': response.data.data.ekuitas?.['Modal, Ida'] || 0
-            }
-          };
-          setData(transformedData);
-        }
-      } catch (error) {
-        console.error('Error fetching laporan:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+interface AkunDetails {
+  akun: Akun;
+  kode: number;
+  total: number;
+}
 
-    fetchData();
-  }, []);
+interface AsetLancar {
+  akun: AkunDetails[];
+  total_keseluruhan: number;
+}
 
-  if (isLoading) return <div>Loading...</div>;
-  if (!data) return <div>Tidak ada data</div>;
+interface AsetTetapItem {
+  akun: Akun;
+  kode: number;
+  total: number;
+}
 
-  const actualData = data || {
-    aset: {
-      lancar: {
-        'Kas Kecil': 9000000,
-        'Kas Bank': 483193500,
-        'Surat Berharga Saham': 116250000,
-        'Surat Berharga Obligasi': 500000000,
-        'Asuransi Dibayar Dimuka': 10500000,
-        'Perlengkapan Showroom': 55700000,
-        'Perlengkapan Service': 60050000,
-        'Piutang Bunga': 5000000,
-        'Piutang Usaha': 801190000,
-        'Cadangan Kerugian Piutang': 24335700,
-        'Piutang Deviden': 0,
-        'Persediaan': 839000000
-      },
-      tetap: {
-        'Tanah': 1200000000,
-        'Gedung': 2500000000,
-        'Akumulasi Penyusutan Gedung': 395917000,
-        'Peralatan Showroom': 100000000,
-        'Akum. Penyusutan Peralatan Showroom': 35833000,
-        'Peralatan Servis': 300000000,
-        'Akum. Penyusutan Peralatan Servis': 107500000,
-        'Kendaraan': 175000000,
-        'Akum. Penyusutan Kendaraan': 53750000
-      }
-    },
-    kewajiban: {
-      'Kewajiban Usaha': 545500000,
-      'Kewajiban Gaji': 34000000,
-      'Kewajiban Bunga': 8550000,
-      'Kewajiban Pajak Penghasilan Badan': 360000,
-      'Kewajiban Wesel': 0,
-      'Kewajiban Bank': 855000000,
-      'Kewajiban Hipotik': 0
-    },
-    ekuitas: {
-      'Modal, Ahmad': 1548045933,
-      'Modal, Adi': 1548045933,
-      'Modal, Ida': 1998045933
-    }
+interface AsetTetap {
+  akun: {
+    [key: string]: AsetTetapItem;
   };
+  total_keseluruhan: number;
+}
 
+interface KewajibanItem {
+  akun: Akun;
+  kode: number;
+  total: number;
+}
+
+interface Kewajiban {
+  akun: {
+    [key: string]: KewajibanItem;
+  };
+  total_keseluruhan: number;
+}
+
+interface EkuitasItem {
+  akun: Akun;
+  kode: number;
+  total: number;
+}
+
+interface Ekuitas {
+  akun: {
+    [key: string]: EkuitasItem;
+  };
+  total_keseluruhan: number;
+}
+
+interface PosisiKeuanganResponse {
+  aset_lancar: AsetLancar;
+  aset_tetap: AsetTetap;
+  kewajiban: Kewajiban;
+  ekuitas: Ekuitas;
+  total_aset: number;
+  total_kewajiban_ekuitas: number;
+  perusahaan?: Perusahaan;
+}
+
+// Add an interface for the Laporan Keuangan response
+interface LaporanKeuanganResponse {
+  success: boolean;
+  perusahaan: {
+    id: string;
+    nama: string;
+    alamat: string;
+    tahun_berdiri: number;
+    status: string;
+    start_priode: string;
+    end_priode: string;
+    kategori_id?: string;
+    krs_id?: string;
+    created_at?: string;
+    updated_at?: string;
+  };
+  data: Array<any>; // We don't need the detailed structure for this purpose
+  total_keseluruhan: number;
+}
+
+// Format a date string to a readable format
+const formatDate = (dateString: string): string => {
+  try {
+    const date = parse(dateString, 'yyyy-MM-dd', new Date());
+    return format(date, 'd MMMM yyyy', { locale: id });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
+};
+
+// Fetch function for company data
+const fetchPerusahaanData = async () => {
+  try {
+    const response = await axios.get('/mahasiswa/perusahaan');
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error('No company data available');
+  } catch (error) {
+    console.error('Error fetching company data:', error);
+    throw new Error('Failed to fetch company data');
+  }
+};
+
+// Improved API fetch function
+const fetchPosisiKeuangan = async (): Promise<PosisiKeuanganResponse> => {
+  try {
+    // Fetch posisi keuangan data
+    const response = await axios.get('/mahasiswa/laporan/posisikeuangan');
+    
+    // Ensure we have a valid response
+    if (!response.data) {
+      throw new Error('Invalid response data from server');
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching position data:', error);
+    throw new Error('Failed to fetch financial position data');
+  }
+};
+
+export function PosisiKeuanganSection() {
+  const queryClient = useQueryClient();
+  
+  // Use React Query for posisi keuangan data - now this will also include company info
+  const { 
+    data, 
+    isLoading, 
+    isError, 
+    error,
+    refetch,
+    isFetching
+  } = useQuery({
+    queryKey: ['posisiKeuangan'],
+    queryFn: fetchPosisiKeuangan,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+  
+  // Helper functions
   const formatCurrency = (amount: number) => {
     return `Rp ${amount.toLocaleString('id-ID')}`;
-  };
-
-  const getTotalAsetLancar = () => {
-    return actualData.aset?.lancar ? Object.values(actualData.aset.lancar).reduce((a, b) => a + b, 0) : 0;
-  };
-
-  const getTotalAsetTetap = () => {
-    return actualData.aset?.tetap ? Object.values(actualData.aset.tetap).reduce((a, b) => a + b, 0) : 0;
-  };
-
-  const getTotalKewajiban = () => {
-    return actualData.kewajiban ? Object.values(actualData.kewajiban).reduce((a, b) => a + b, 0) : 0;
-  };
-
-  const getTotalEkuitas = () => {
-    return actualData.ekuitas ? Object.values(actualData.ekuitas).reduce((a, b) => a + b, 0) : 0;
   };
 
   const handleExportPDF = async () => {
@@ -216,12 +216,15 @@ export function PosisiKeuanganSection() {
         'FAST'
       );
 
+      // Use data.perusahaan directly
+      const companyName = data?.perusahaan?.nama || 'PERUSAHAAN';
+      
       pdf.setProperties({
-        title: 'Laporan Posisi Keuangan - CV FAJAR JAYA',
+        title: 'Laporan Posisi Keuangan - ' + companyName,
         subject: 'Laporan Posisi Keuangan',
-        author: 'CV FAJAR JAYA',
+        author: companyName,
         keywords: 'laporan, keuangan, posisi keuangan',
-        creator: 'CV FAJAR JAYA'
+        creator: companyName
       });
 
       pdf.save('laporan-posisi-keuangan.pdf');
@@ -230,18 +233,55 @@ export function PosisiKeuanganSection() {
     }
   };
 
+  // Manual refresh function
+  const handleRefresh = () => {
+    refetch();
+  };
+
+  // Render loading state
+  if (isLoading) {
+    return <div className="bg-white p-6 rounded-lg border text-center">Loading data...</div>;
+  }
+
+  // Render error state
+  if (isError) {
+    return (
+      <div className="bg-white p-6 rounded-lg border text-center text-red-500">
+        {error instanceof Error ? error.message : 'An error occurred while fetching data'}
+        <div className="mt-4">
+          <Button variant="outline" onClick={handleRefresh}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return <div className="bg-white p-6 rounded-lg border text-center text-red-500">No financial position data available</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Laporan Posisi Keuangan</h2>
-        <Button 
-          variant="outline" 
-          onClick={handleExportPDF}
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Export PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleRefresh}
+            className="flex items-center gap-2"
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleExportPDF}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       <Card 
@@ -249,28 +289,38 @@ export function PosisiKeuanganSection() {
         className="p-8 w-full bg-white"
       >
         <div className="text-center mb-8">
-          <h2 className="text-xl font-bold mb-1">CV FAJAR JAYA</h2>
+          <h2 className="text-xl font-bold mb-1">
+            {data.perusahaan?.nama ? data.perusahaan.nama.toUpperCase() : "PERUSAHAAN"}
+          </h2>
           <h3 className="text-lg font-semibold">LAPORAN POSISI KEUANGAN</h3>
+          {data.perusahaan?.start_priode && data.perusahaan?.end_priode && (
+            <p className="text-sm mt-1">
+              Periode {formatDate(data.perusahaan.start_priode)} s/d {formatDate(data.perusahaan.end_priode)}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-12">
           {/* Kolom ASET */}
           <div>
-            <h4 className="font-bold mb-4 text-lg">ASET</h4>
+            <h4 className="font-bold mb-4 text-lg border-b pb-1">ASET</h4>
             
             {/* Aset Lancar */}
             <div className="mb-8">
               <h5 className="font-semibold mb-3">Aset Lancar :</h5>
               <div className="space-y-2">
-                {actualData.aset?.lancar && Object.entries(actualData.aset.lancar).map(([name, value]) => (
-                  <div key={name} className="flex justify-between py-1">
-                    <span>{name}</span>
-                    <span className="tabular-nums">{formatCurrency(value)}</span>
+                {data.aset_lancar?.akun?.map((item, index) => (
+                  <div key={`aset-lancar-${index}`} className="flex justify-between py-1">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
+                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
+                    </div>
+                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Aset Lancar</span>
-                  <span className="tabular-nums">{formatCurrency(getTotalAsetLancar())}</span>
+                  <span className="tabular-nums">{formatCurrency(data.aset_lancar?.total_keseluruhan || 0)}</span>
                 </div>
               </div>
             </div>
@@ -279,15 +329,18 @@ export function PosisiKeuanganSection() {
             <div>
               <h5 className="font-semibold mb-3">Aset Tetap :</h5>
               <div className="space-y-2">
-                {actualData.aset?.tetap && Object.entries(actualData.aset.tetap).map(([name, value]) => (
-                  <div key={name} className="flex justify-between py-1">
-                    <span>{name}</span>
-                    <span className="tabular-nums">{formatCurrency(value)}</span>
+                {data.aset_tetap?.akun && Object.values(data.aset_tetap.akun).map((item, index) => (
+                  <div key={`aset-tetap-${index}`} className="flex justify-between py-1">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
+                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
+                    </div>
+                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Aset Tetap</span>
-                  <span className="tabular-nums">{formatCurrency(getTotalAsetTetap())}</span>
+                  <span className="tabular-nums">{formatCurrency(data.aset_tetap?.total_keseluruhan || 0)}</span>
                 </div>
               </div>
             </div>
@@ -295,27 +348,30 @@ export function PosisiKeuanganSection() {
             {/* Total Aset */}
             <div className="flex justify-between py-3 font-bold border-t border-black mt-4">
               <span>TOTAL ASET</span>
-              <span className="tabular-nums">{formatCurrency(getTotalAsetLancar() + getTotalAsetTetap())}</span>
+              <span className="tabular-nums">{formatCurrency(data.total_aset || 0)}</span>
             </div>
           </div>
 
           {/* Kolom KEWAJIBAN DAN EKUITAS */}
           <div>
-            <h4 className="font-bold mb-4 text-lg">KEWAJIBAN DAN EKUITAS</h4>
+            <h4 className="font-bold mb-4 text-lg border-b pb-1">KEWAJIBAN DAN EKUITAS</h4>
 
             {/* Kewajiban */}
             <div className="mb-8">
               <h5 className="font-semibold mb-3">Kewajiban :</h5>
               <div className="space-y-2">
-                {actualData.kewajiban && Object.entries(actualData.kewajiban).map(([name, value]) => (
-                  <div key={name} className="flex justify-between py-1">
-                    <span>{name}</span>
-                    <span className="tabular-nums">{formatCurrency(value)}</span>
+                {data.kewajiban?.akun && Object.values(data.kewajiban.akun).map((item, index) => (
+                  <div key={`kewajiban-${index}`} className="flex justify-between py-1">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
+                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
+                    </div>
+                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Kewajiban</span>
-                  <span className="tabular-nums">{formatCurrency(getTotalKewajiban())}</span>
+                  <span className="tabular-nums">{formatCurrency(data.kewajiban?.total_keseluruhan || 0)}</span>
                 </div>
               </div>
             </div>
@@ -324,15 +380,18 @@ export function PosisiKeuanganSection() {
             <div>
               <h5 className="font-semibold mb-3">Ekuitas :</h5>
               <div className="space-y-2">
-                {actualData.ekuitas && Object.entries(actualData.ekuitas).map(([name, value]) => (
-                  <div key={name} className="flex justify-between py-1">
-                    <span>{name}</span>
-                    <span className="tabular-nums">{formatCurrency(value)}</span>
+                {data.ekuitas?.akun && Object.values(data.ekuitas.akun).map((item, index) => (
+                  <div key={`ekuitas-${index}`} className="flex justify-between py-1">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
+                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
+                    </div>
+                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Ekuitas</span>
-                  <span className="tabular-nums">{formatCurrency(getTotalEkuitas())}</span>
+                  <span className="tabular-nums">{formatCurrency(data.ekuitas?.total_keseluruhan || 0)}</span>
                 </div>
               </div>
             </div>
@@ -340,7 +399,7 @@ export function PosisiKeuanganSection() {
             {/* Total Kewajiban dan Ekuitas */}
             <div className="flex justify-between py-3 font-bold border-t border-black mt-4">
               <span>TOTAL KEWAJIBAN DAN EKUITAS</span>
-              <span className="tabular-nums">{formatCurrency(getTotalKewajiban() + getTotalEkuitas())}</span>
+              <span className="tabular-nums">{formatCurrency(data.total_kewajiban_ekuitas || 0)}</span>
             </div>
           </div>
         </div>

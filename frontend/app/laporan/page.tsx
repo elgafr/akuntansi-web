@@ -9,6 +9,7 @@ import { PosisiKeuanganSection } from "@/components/laporan/PosisiKeuanganSectio
 import { ArusKasSection } from "@/components/laporan/ArusKasSection";
 import { PerubahanEkuitasSection } from "@/components/laporan/PerubahanEkuitasSection";
 import { LaporanUmumSection } from "@/components/laporan/LaporanUmumSection";
+import { LaporanKeuanganSection } from "@/components/laporan/LaporanKeuanganSection";
 import { useEffect, useState } from "react";
 import axios from "axios";
 
@@ -83,39 +84,40 @@ export default function LaporanPage() {
 
         {/* Content Section */}
         <section className="p-6">
-          <Tabs defaultValue="laporan-umum" className="w-full">
+          <Tabs defaultValue="laporan-keuangan" className="w-full">
             <div className="flex justify-between items-center mb-6">
               <TabsList className="w-full justify-between bg-muted/50">
-                <TabsTrigger value="laporan-umum" className="flex-1">Laporan Umum</TabsTrigger>
+                <TabsTrigger value="laporan-keuangan" className="flex-1">Laporan Keuangan</TabsTrigger>
                 <TabsTrigger value="laba-rugi" className="flex-1">Laporan Laba Rugi</TabsTrigger>
                 <TabsTrigger value="perubahan-ekuitas" className="flex-1">Laporan Perubahan Ekuitas</TabsTrigger>
                 <TabsTrigger value="posisi-keuangan" className="flex-1">Laporan Posisi Keuangan</TabsTrigger>
-                <TabsTrigger value="arus-kas" className="flex-1">Laporan Arus Kas</TabsTrigger>
+                {/* <TabsTrigger value="arus-kas" className="flex-1">Laporan Arus Kas</TabsTrigger> */}
               </TabsList>
             </div>
 
-            <TabsContent value="laporan-umum">
-              <LaporanUmumSection />
+            <TabsContent value="laporan-keuangan">
+              <LaporanKeuanganSection />
             </TabsContent>
 
             <TabsContent value="laba-rugi">
               <LabaRugiSection />
             </TabsContent>
 
-            <TabsContent value="posisi-keuangan">
-              <PosisiKeuanganSection />
-            </TabsContent>
-
             <TabsContent value="perubahan-ekuitas">
               <PerubahanEkuitasSection />
             </TabsContent>
 
-            <TabsContent value="arus-kas">
-              <ArusKasSection />
+            <TabsContent value="posisi-keuangan">
+              <PosisiKeuanganSection />
             </TabsContent>
+
+            {/* <TabsContent value="arus-kas">
+              <ArusKasSection />
+            </TabsContent> */}
           </Tabs>
         </section>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+

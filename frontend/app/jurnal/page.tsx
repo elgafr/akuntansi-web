@@ -1,12 +1,19 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+} from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { AddTransactionTable } from "@/components/jurnal/AddTransactionTable";
-import axios from "@/lib/axios";
 import { Button } from "@/components/ui/button";
+import { useJurnal, usePostJurnal } from "@/hooks/useJurnal";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePathname, useSearchParams } from "next/navigation";
+import axios from "axios";
 
 interface Transaction {
   id: string;
@@ -22,10 +29,17 @@ interface Transaction {
   sub_akun_id: string | null | undefined;
 }
 
+interface Akun {
+  id: string;
+  kode: number;
+  nama: string;
+  status: string;
+}
+
 interface Profile {
-  user : {
+  user: {
     name: string;
-  }
+  };
 }
 
 interface JurnalResponse {
@@ -51,87 +65,128 @@ interface JurnalEntry {
 }
 
 export default function JurnalPage() {
+  const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { data: jurnalData } = useJurnal();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
   const [profileData, setProfileData] = useState<Profile | null>(null);
 
+  useEffect(() => {
+    // Refetch data when navigating back to jurnal page
+    queryClient.invalidateQueries({ queryKey: ["jurnal"] });
+    queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
+  }, [pathname, searchParams, queryClient]);
+
+  // Transform data dengan pengecekan null/undefined
+  const transformedTransactions: Transaction[] = useMemo(() => {
+    if (!jurnalData) return [];
+
+    return jurnalData
+      .filter((entry) => entry && entry.akun) // Filter data yang tidak valid
+      .map((entry) => ({
+        id: entry.id || "",
+        date: entry.tanggal || "",
+        documentType: entry.bukti || "",
+        description: entry.keterangan || "",
+        namaAkun: entry.akun?.nama || "",
+        kodeAkun: entry.akun?.kode?.toString() || "",
+        akun_id: entry.akun_id || "",
+        debit: entry.debit || 0,
+        kredit: entry.kredit || 0,
+        perusahaan_id: entry.perusahaan_id || "",
+        sub_akun_id: entry.sub_akun_id || null,
+      }));
+  }, [jurnalData]);
+
+  useEffect(() => {
+    setTransactions(transformedTransactions);
+  }, [transformedTransactions]);
 
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const response = await axios.get('/mahasiswa/profile');
+        // Cek cache di localStorage terlebih dahulu
+        const cachedProfile = localStorage.getItem("profileData");
+        if (cachedProfile) {
+          setProfileData(JSON.parse(cachedProfile));
+        }
+
+        // Ambil data terbaru dari API
+        const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
           setProfileData(response.data.data);
-          // Simpan ke localStorage untuk cache
-          localStorage.setItem('profileData', JSON.stringify(response.data.data));
+          localStorage.setItem(
+            "profileData",
+            JSON.stringify(response.data.data)
+          );
         }
       } catch (error) {
-        console.error('Gagal memuat profil:', error);
+        console.error("Gagal memuat profil:", error);
       }
     };
-  
+
     fetchProfileData();
   }, []);
-  
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await axios.get('/mahasiswa/jurnal');
-        if (response.data.success) {
-          const jurnalData: JurnalResponse = response.data.data;
-          const formattedTransactions: Transaction[] = [];
 
-          Object.entries(jurnalData).forEach(([keterangan, entries]) => {
-            entries.forEach(entry => {
-              formattedTransactions.push({
-                id: entry.id,
-                date: entry.tanggal,
-                documentType: entry.bukti,
-                description: entry.keterangan,
-                namaAkun: entry.akun.nama,
-                kodeAkun: entry.akun.kode.toString(),
-                akun_id: entry.akun_id,
-                debit: entry.debit || 0,
-                kredit: entry.kredit || 0,
-                perusahaan_id: entry.perusahaan_id,
-                sub_akun_id: entry.sub_akun_id || null,
-              });
-            });
-          });
-
-          setTransactions(formattedTransactions);
-        }
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-        setError('Gagal memuat data. Silakan periksa koneksi Anda.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Load profile data
-  useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
+  const handleTransactionsChange = async (newTransactions: Transaction[]) => {
+    // Update local state dengan pengecekan
+    if (newTransactions) {
+      // Set data ke cache tanpa invalidasi
+      queryClient.setQueryData(
+        ["jurnal"],
+        newTransactions.map((t) => ({
+          id: t.id,
+          tanggal: t.date,
+          bukti: t.documentType,
+          keterangan: t.description,
+          akun_id: t.akun_id,
+          debit: t.debit,
+          kredit: t.kredit,
+          perusahaan_id: t.perusahaan_id,
+          sub_akun_id: t.sub_akun_id,
+          akun: {
+            id: t.akun_id,
+            kode: parseInt(t.kodeAkun),
+            nama: t.namaAkun,
+            status: "active",
+          },
+        }))
+      );
     }
-  }, []);
-
-  const handleTransactionsChange = (newTransactions: Transaction[]) => {
-    setTransactions(newTransactions);
   };
 
+  // Tampilkan loading state
+  if (isLoading) {
+    return (
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2">Loading...</p>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    );
+  }
+
+  // Tampilkan error state
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <div className="text-red-500">{error}</div>
-        <Button 
-          onClick={() => window.location.reload()}
+        <div className="text-red-500">
+          Gagal memuat data. Silakan periksa koneksi Anda.
+        </div>
+        <Button
+          onClick={() =>
+            queryClient.invalidateQueries({ queryKey: ["jurnal"] })
+          }
           variant="outline"
           size="sm"
         >
@@ -169,7 +224,9 @@ export default function JurnalPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData?.user?.name}</div>
+                  <div className="text-sm font-medium">
+                    {profileData?.user?.name}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -182,6 +239,7 @@ export default function JurnalPage() {
             accounts={[]}
             transactions={transactions}
             onTransactionsChange={handleTransactionsChange}
+            isLoading={isLoading || isPosting}
           />
         </section>
       </SidebarInset>
