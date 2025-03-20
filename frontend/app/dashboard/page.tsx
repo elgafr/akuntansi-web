@@ -56,11 +56,26 @@ interface Company {
   status: "online" | "offline";
 }
 
+interface FinancialRecord {
+  akun_id: string;
+  perusahaan_id: string;
+  debit: number;
+  kredit: number;
+  tanggal: string;
+  sub_akun?: string;
+}
+
 interface Account {
+  id: string;
   nama: string;
   kode: string;
   debit: number;
   kredit: number;
+}
+
+interface ChartDataItem {
+  month: string;
+  [key: string]: number | string;
 }
 
 const formatNumber = (value: number): string => {
@@ -76,6 +91,9 @@ export default function Page() {
     defaultValues: { companyName: "" },
   });
 
+  const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>(
+    []
+  );
   const [companyList, setCompanyList] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -101,7 +119,6 @@ export default function Page() {
           axios.get("/instruktur/akun"),
         ]);
 
-        // Handle perusahaan
         const companiesData = companiesRes.data?.data || [];
         setCompanyList(companiesData);
 
@@ -113,10 +130,7 @@ export default function Page() {
           form.setValue("companyName", onlineCompany.nama);
         }
 
-        // Handle akun
         setAccounts(accountsRes.data?.data || []);
-
-        // Handle profil
         setProfileData(profileRes.data?.data || null);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -128,7 +142,26 @@ export default function Page() {
     fetchData();
   }, []);
 
-  // Handle pencarian perusahaan
+  const fetchFinancialData = async (accountId: string) => {
+    try {
+      const response = await axios.get(`/mahasiswa/keuangan`, {
+        params: {
+          akun_id: accountId,
+          perusahaan_id: selectedCompany?.id,
+        },
+      });
+      setFinancialRecords((prev) => [
+        ...prev,
+        ...response.data.data.map((record: FinancialRecord) => ({
+          ...record,
+          akun_id: accountId,
+        })),
+      ]);
+    } catch (error) {
+      console.error("Gagal mengambil data keuangan:", error);
+    }
+  };
+
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFilteredCompanies([]);
@@ -141,7 +174,6 @@ export default function Page() {
     setFilteredCompanies(results);
   }, [searchTerm, companyList]);
 
-  // Handle submit form
   const onSubmit = async (data: z.infer<typeof FormSchema>) => {
     if (!selectedCompany) {
       const company = companyList.find(
@@ -151,23 +183,18 @@ export default function Page() {
     }
   };
 
-  // Handle pilih perusahaan
-  // Di dalam fungsi handleCompanySelect
   const handleCompanySelect = async (company: Company) => {
     try {
-      // Matikan perusahaan sebelumnya jika ada
       if (selectedCompany) {
         await axios.put(`/mahasiswa/perusahaan/${selectedCompany.id}`, {
           status: "offline",
         });
       }
 
-      // Nyalakan perusahaan baru
       const response = await axios.put(`/mahasiswa/perusahaan/${company.id}`, {
         status: "online",
       });
 
-      // Update state
       setCompanyList((prev) =>
         prev.map((c) => ({
           ...c,
@@ -184,20 +211,44 @@ export default function Page() {
     }
   };
 
-  // Di bagian pembuatan chartData, ubah:
-  const chartData = Array.from({ length: 6 }, (_, bulanIndex) => {
-    const dataPoint: any = { month: `Bulan ${bulanIndex + 1}` };
-  
-    selectedAccounts.forEach((accountCode, idx) => {
-      const account = accounts.find(a => a.kode === accountCode);
-      if (account) {
-        dataPoint[`account${idx + 1}Debit`] = account.debit * (bulanIndex + 1);
-        dataPoint[`account${idx + 1}Kredit`] = account.kredit * (bulanIndex + 1);
+  useEffect(() => {
+    selectedAccounts.forEach((accountId) => {
+      if (accountId && !financialRecords.some((r) => r.akun_id === accountId)) {
+        fetchFinancialData(accountId);
       }
     });
-  
-    return dataPoint;
-  });
+  }, [selectedAccounts, selectedCompany]);
+
+  const generateChartData = (): ChartDataItem[] => {
+    const months = Array.from({ length: 12 }, (_, i) => i);
+
+    return months.map((monthIndex) => {
+      const monthData: ChartDataItem = { month: `Bln ${monthIndex + 1}` };
+
+      selectedAccounts.forEach((accountId, idx) => {
+        if (!accountId) return;
+
+        const monthlyRecords = financialRecords.filter(
+          (record) =>
+            record.akun_id === accountId &&
+            new Date(record.tanggal).getMonth() === monthIndex
+        );
+
+        // Total nilai (debit + kredit) karena salah satu selalu 0
+        const total = monthlyRecords.reduce(
+          (sum, record) => sum + (record.debit + record.kredit),
+          0
+        );
+
+        monthData[`account${idx + 1}`] = total;
+      });
+
+      return monthData;
+    });
+  };
+
+  const chartData = generateChartData();
+  const lineColors = ["#8884d8", "#82ca9d", "#ffc658"];
 
   return (
     <SidebarProvider>
@@ -360,7 +411,7 @@ export default function Page() {
                     <SelectContent>
                       <SelectGroup>
                         {accounts.map((account) => (
-                          <SelectItem key={account.kode} value={account.kode}>
+                          <SelectItem key={account.id} value={account.id}>
                             {account.kode} - {account.nama}
                           </SelectItem>
                         ))}
@@ -377,9 +428,6 @@ export default function Page() {
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
                 <CardTitle className="mb-4 text-gray-500">Buku Besar</CardTitle>
-                <CardDescription className="text-black text-2xl font-bold">
-                  {formatNumber(9846)}
-                </CardDescription>
               </div>
 
               <div className="flex flex-col gap-2 mt-2">
@@ -391,17 +439,11 @@ export default function Page() {
                         className="flex items-center gap-2"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full ${
-                            idx === 0
-                              ? "bg-[#8884d8]"
-                              : idx === 1
-                              ? "bg-[#82ca9d]"
-                              : "bg-[#ffc658]"
-                          }`}
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: lineColors[idx] }}
                         />
                         <span>
-                          {accounts.find((a) => a.kode === account)?.nama ||
-                            "-"}
+                          {accounts.find((a) => a.id === account)?.nama || "-"}
                         </span>
                       </div>
                     )
@@ -411,28 +453,36 @@ export default function Page() {
 
             <CardContent>
               <div className="w-full h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis tickFormatter={formatNumber} />
                     <Tooltip
-                      formatter={(value) => formatNumber(Number(value))}
+                      formatter={(value: number) => [
+                        formatNumber(value),
+                        "Nilai",
+                      ]}
                     />
 
-                    {selectedAccounts.map(
-                      (account, idx) =>
-                        account && (
-                          <Line
-                            key={`chart-line-${account}-${idx}`}
-                            type="monotone"
-                            dataKey={`account${idx + 1}`}
-                            stroke={["#8884d8", "#82ca9d", "#ffc658"][idx]}
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        )
-                    )}
+                    {selectedAccounts.map((accountId, index) => {
+                      if (!accountId) return null;
+
+                      return (
+                        <Line
+                          key={accountId}
+                          type="monotone"
+                          dataKey={`account${index + 1}`}
+                          stroke={lineColors[index]}
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          name={
+                            accounts.find((a) => a.id === accountId)?.nama ||
+                            `Akun ${index + 1}`
+                          }
+                        />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
