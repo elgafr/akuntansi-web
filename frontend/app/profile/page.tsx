@@ -100,11 +100,7 @@ export default function Page() {
     fetchProfile();
   }, []);
 
-  const saveProfileData = async (formData: FormData) => {
-    const updatedData: Partial<ProfileData> = {};
-    formData.forEach((value, key) => {
-      updatedData[key as keyof ProfileData] = value as any;
-    });
+  const saveProfileData = async (updatedData: Partial<ProfileData>) => {
     try {
       const token = localStorage.getItem("token");
       if (!token || !profileData) {
@@ -246,7 +242,7 @@ export default function Page() {
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem>
+              <BreadcrumbItem className="hidden md:block">
                 <h1 className="text-2xl font-bold text-black">Dashboard</h1>
                 <h2 className="text-sm">Let's check your Dashboard today</h2>
               </BreadcrumbItem>
@@ -256,11 +252,7 @@ export default function Page() {
           <div className="flex items-center gap-4">
             <Avatar>
               <AvatarImage
-                src={
-                  profileData?.foto
-                    ? `${process.env.NEXT_PUBLIC_API_URL}/storage/${profileData.foto}`
-                    : "https://github.com/shadcn.png"
-                }
+                src="https://github.com/shadcn.png"
                 alt="Profile"
               />
             </Avatar>
@@ -273,8 +265,8 @@ export default function Page() {
 
         {/* Profile Card */}
         <div className="flex gap-6 px-10 mt-6">
-          <Card className="w-[400px] flex-shrink-0">
-            <div className="flex flex-col items-center gap-10 p-6">
+          <Card className="w-[440px] flex-shrink-0">
+            <div className="flex flex-col items-center gap-8 p-6">
               <Avatar className="h-40 w-40">
                 <AvatarImage src="https://github.com/shadcn.png" />
               </Avatar>
