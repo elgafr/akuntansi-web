@@ -8,7 +8,7 @@ import { LabaRugiSection } from "@/components/laporan/LabaRugiSection";
 import { PosisiKeuanganSection } from "@/components/laporan/PosisiKeuanganSection";
 import { ArusKasSection } from "@/components/laporan/ArusKasSection";
 import { PerubahanEkuitasSection } from "@/components/laporan/PerubahanEkuitasSection";
-import { LaporanUmumSection } from "@/components/laporan/LaporanUmumSection";
+import { LaporanKeuanganSection } from "@/components/laporan/LaporanKeuanganSection";
 
 export default function LaporanPage() {
   return (
@@ -61,7 +61,7 @@ export default function LaporanPage() {
             </div>
 
             <TabsContent value="laporan-keuangan">
-              <LaporanUmumSection />
+              <LaporanKeuanganSection />
             </TabsContent>
 
             <TabsContent value="laba-rugi">

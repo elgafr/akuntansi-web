@@ -9,6 +9,7 @@ import { useTransactions } from "@/contexts/TransactionContext";
 import { Card } from "@/components/ui/card";
 import axios from "@/lib/axios";
 import { useNeracaLajur } from "@/hooks/useNeracaLajur";
+import { useQuery } from '@tanstack/react-query';
 
 // Interface untuk data akun dari API
 interface AkunData {
@@ -52,33 +53,28 @@ export function NeracaLajurTable({ type }: { type: 'before' | 'after' }) {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  // Fetch data dari endpoint yang sesuai dengan tipe neraca lajur
-  useEffect(() => {
-    const fetchNeracaLajurData = async () => {
-      setIsLoading(true);
-      try {
-        // Gunakan endpoint yang sesuai dengan tipe
-        const endpoint = type === 'before' 
-          ? '/mahasiswa/neracalajur/sebelumpenyesuaian'
-          : '/mahasiswa/neracalajur/setelahpenyesuaian';
-        
-        const response = await axios.get<NeracaLajurResponse>(endpoint);
-        
-        if (response.data.success) {
-          console.log(`Neraca Lajur ${type} data loaded:`, response.data.data);
-          setNeracaLajurData(response.data.data);
-        } else {
-          console.error(`Failed to fetch Neraca Lajur ${type} data:`, response.data);
-        }
-      } catch (error) {
-        console.error(`Error fetching Neraca Lajur ${type} data:`, error);
-      } finally {
-        setIsLoading(false);
+  const { data, isLoading: queryLoading, isError, error } = useQuery({
+    queryKey: ['neracaLajur', type],
+    queryFn: async () => {
+      const endpoint = type === 'before' 
+        ? '/mahasiswa/neracalajur/sebelumpenyesuaian'
+        : '/mahasiswa/neracalajur/setelahpenyesuaian';
+      
+      const response = await axios.get<NeracaLajurResponse>(endpoint);
+      
+      if (response.data.success) {
+        return response.data.data;
       }
-    };
+      throw new Error('Failed to fetch data');
+    }
+  });
 
-    fetchNeracaLajurData();
-  }, [type]);
+  useEffect(() => {
+    if (data) {
+      setNeracaLajurData(data);
+      setIsLoading(false);
+    }
+  }, [data]);
 
   const calculateTotals = () => {
     return Object.values(neracaLajurData).reduce((acc, curr) => ({
@@ -135,8 +131,12 @@ export function NeracaLajurTable({ type }: { type: 'before' | 'after' }) {
     )
     .sort((a, b) => a.kodeAkun.localeCompare(b.kodeAkun));
 
-  if (isLoading) {
+  if (queryLoading) {
     return <div className="text-center py-4">Loading...</div>;
+  }
+
+  if (isError) {
+    return <div className="text-center py-4">Error: {error?.message}</div>;
   }
 
   return (

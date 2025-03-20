@@ -160,26 +160,10 @@ const fetchPosisiKeuangan = async (): Promise<PosisiKeuanganResponse> => {
   }
 };
 
-// Add a function to fetch data from laporan/keuangan endpoint
-const fetchLaporanKeuangan = async (): Promise<LaporanKeuanganResponse> => {
-  try {
-    const response = await axios.get('/mahasiswa/laporan/keuangan');
-    
-    if (!response.data || !response.data.success) {
-      throw new Error('Invalid response data from laporan/keuangan endpoint');
-    }
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching laporan keuangan data:', error);
-    throw new Error('Failed to fetch company information from laporan keuangan');
-  }
-};
-
 export function PosisiKeuanganSection() {
   const queryClient = useQueryClient();
   
-  // Use React Query for posisi keuangan data
+  // Use React Query for posisi keuangan data - now this will also include company info
   const { 
     data, 
     isLoading, 
@@ -194,17 +178,6 @@ export function PosisiKeuanganSection() {
     refetchOnWindowFocus: true,
   });
   
-  // Add a query for laporan keuangan data to get company and period info
-  const {
-    data: laporanKeuanganData,
-    isLoading: isLoadingLaporanKeuangan,
-    isError: isErrorLaporanKeuangan,
-  } = useQuery({
-    queryKey: ['laporanKeuangan'],
-    queryFn: fetchLaporanKeuangan,
-    staleTime: 10 * 60 * 1000, // Company data changes less frequently
-  });
-
   // Helper functions
   const formatCurrency = (amount: number) => {
     return `Rp ${amount.toLocaleString('id-ID')}`;
@@ -243,7 +216,8 @@ export function PosisiKeuanganSection() {
         'FAST'
       );
 
-      const companyName = laporanKeuanganData?.perusahaan?.nama || 'PERUSAHAAN';
+      // Use data.perusahaan directly
+      const companyName = data?.perusahaan?.nama || 'PERUSAHAAN';
       
       pdf.setProperties({
         title: 'Laporan Posisi Keuangan - ' + companyName,
@@ -262,16 +236,15 @@ export function PosisiKeuanganSection() {
   // Manual refresh function
   const handleRefresh = () => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ['laporanKeuangan'] });
   };
 
   // Render loading state
-  if (isLoading || isLoadingLaporanKeuangan) {
+  if (isLoading) {
     return <div className="bg-white p-6 rounded-lg border text-center">Loading data...</div>;
   }
 
   // Render error state
-  if (isError || isErrorLaporanKeuangan) {
+  if (isError) {
     return (
       <div className="bg-white p-6 rounded-lg border text-center text-red-500">
         {error instanceof Error ? error.message : 'An error occurred while fetching data'}
@@ -317,12 +290,12 @@ export function PosisiKeuanganSection() {
       >
         <div className="text-center mb-8">
           <h2 className="text-xl font-bold mb-1">
-            {laporanKeuanganData?.perusahaan?.nama ? laporanKeuanganData.perusahaan.nama.toUpperCase() : "PERUSAHAAN"}
+            {data.perusahaan?.nama ? data.perusahaan.nama.toUpperCase() : "PERUSAHAAN"}
           </h2>
           <h3 className="text-lg font-semibold">LAPORAN POSISI KEUANGAN</h3>
-          {laporanKeuanganData?.perusahaan?.start_priode && laporanKeuanganData?.perusahaan?.end_priode && (
+          {data.perusahaan?.start_priode && data.perusahaan?.end_priode && (
             <p className="text-sm mt-1">
-              Periode {formatDate(laporanKeuanganData.perusahaan.start_priode)} s/d {formatDate(laporanKeuanganData.perusahaan.end_priode)}
+              Periode {formatDate(data.perusahaan.start_priode)} s/d {formatDate(data.perusahaan.end_priode)}
             </p>
           )}
         </div>
