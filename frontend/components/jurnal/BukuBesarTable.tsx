@@ -1,5 +1,25 @@
+
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+
+// Misalnya, definisikan tipe Transaction dan props-nya
+interface Transaction {
+  id: string;
+  // properti lainnya...
+}
+
+interface BukuBesarTableProps {
+  transactions: Transaction[];
+}
+
 export function BukuBesarTable({ transactions }: BukuBesarTableProps) {
   // ... existing state and other code ...
+
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handlePageSizeChange = (value: string) => {
     if (!value) return; // Guard against empty values
@@ -45,3 +65,7 @@ export function BukuBesarTable({ transactions }: BukuBesarTableProps) {
     </div>
   );
 } 
+
+function setPageSize(arg0: number) {
+  throw new Error("Function not implemented.");
+}

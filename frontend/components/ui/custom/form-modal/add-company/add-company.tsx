@@ -22,7 +22,7 @@ interface FormModalProps {
   title?: string;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: { name: string; category: string; alamat: string; tahunBerdiri: number; start_priode: Date; end_priode: Date }) => void;
+  onSave?: (data: { name: string; category: string; alamat: string; tahunBerdiri: number; start_priode: string; end_priode: string }) => void;
   krsId: string; // Tambahkan prop untuk krs_id
 }
 

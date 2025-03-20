@@ -18,8 +18,11 @@ export const AccountForm = ({
   const [formData, setFormData] = useState<Transactions>({
     namaAkun: "",
     kodeAkun: "",
-    debit: "",
-    kredit: "",
+    debit: 0,
+    kredit: 0,
+    date: new Date().toISOString(),
+    documentType: "",
+    description: "",
   });
 
   return (
@@ -58,7 +61,7 @@ export const AccountForm = ({
         <label className="text-red-500">Debit</label>
         <Input
           value={formData.debit}
-          onChange={(e) => setFormData({ ...formData, debit: e.target.value })}
+          onChange={(e) => setFormData({ ...formData, debit: parseFloat(e.target.value) || 0 })}
           className="rounded-xl h-12"
           placeholder="Rp."
         />
@@ -68,7 +71,7 @@ export const AccountForm = ({
         <label className="text-red-500">Kredit</label>
         <Input
           value={formData.kredit}
-          onChange={(e) => setFormData({ ...formData, kredit: e.target.value })}
+          onChange={(e) => setFormData({ ...formData, kredit: parseFloat(e.target.value) || 0 })}
           className="rounded-xl h-12"
           placeholder="Rp."
         />
@@ -82,8 +85,11 @@ export const AccountForm = ({
             setFormData({
               namaAkun: "",
               kodeAkun: "",
-              debit: "",
-              kredit: "",
+              debit: 0,
+              kredit: 0,
+              date: new Date().toISOString(),
+              documentType: "",
+              description: "",
             })
           }
         >

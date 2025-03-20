@@ -6,7 +6,7 @@ export interface Transaction {
   namaAkun: string;
   kodeAkun: string;
   akun_id: string;
-  sub_akun_id: string | null | undefined;
+  sub_akun_id: string | null;
   perusahaan_id: string;
   debit: number;
   kredit: number;

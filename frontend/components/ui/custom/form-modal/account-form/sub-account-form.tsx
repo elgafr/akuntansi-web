@@ -18,6 +18,8 @@ export const SubAccountForm = ({
   const [formData, setFormData] = useState<SubAccountFormData>({
     ...parentAccount,
     namaSubAkun: "",
+    debit: parentAccount.debit.toString(),
+    kredit: parentAccount.kredit.toString(),
   });
 
   return (

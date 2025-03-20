@@ -59,7 +59,7 @@ export function BukuBesarClient({ initialData }: BukuBesarClientProps) {
         </header>
 
         <section className="p-6">
-          <BukuBesarTable initialData={initialData} />
+          <BukuBesarTable />
         </section>
       </SidebarInset>
     </SidebarProvider>

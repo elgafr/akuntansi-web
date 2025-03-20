@@ -42,7 +42,7 @@ interface Transaction {
   namaAkun: string;
   kodeAkun: string;
   akun_id: string;
-  sub_akun_id: string | null | undefined;
+  sub_akun_id: string | null;
   debit: number;
   kredit: number;
   perusahaan_id: string;

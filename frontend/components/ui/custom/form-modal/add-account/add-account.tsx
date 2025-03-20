@@ -27,10 +27,13 @@ export const AddAccountForm = ({
   const handleAddAccount = () => {
     if (!namaAkun || !kodeAkun || !debit || !kredit) return;
     const newAccount: Transactions = {
+      date,
+      documentType,
+      description,
       namaAkun,
       kodeAkun,
-      debit,
-      kredit,
+      debit: Number(debit),
+      kredit: Number(kredit),
     };
     setAccounts([...accounts, newAccount]);
     setNamaAkun("");

@@ -346,27 +346,27 @@ export default function Page() {
                   <label className="text-sm font-semibold text-destructive">
                     Pilih Akun {index + 1}
                   </label>
-                  <Select
+                    <Select
                     value={selectedAccounts[index]}
-                    onValueChange={(value) => {
-                      const newAccounts = [...selectedAccounts];
+                    onValueChange={(value: string) => {
+                      const newAccounts: string[] = [...selectedAccounts];
                       newAccounts[index] = value;
                       setSelectedAccounts(newAccounts);
                     }}
-                  >
+                    >
                     <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
                       <SelectValue placeholder={`Pilih Akun ${index + 1}`} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.kode} value={account.kode}>
-                            {account.kode} - {account.nama}
-                          </SelectItem>
-                        ))}
+                      {accounts.map((account: Account) => (
+                        <SelectItem key={account.kode} value={account.kode}>
+                        {account.kode} - {account.nama}
+                        </SelectItem>
+                      ))}
                       </SelectGroup>
                     </SelectContent>
-                  </Select>
+                    </Select>
                 </div>
               ))}
             </div>

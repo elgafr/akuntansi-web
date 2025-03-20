@@ -52,7 +52,7 @@ export function AccountDetailModal({
   isOpen,
 }: {
   onClose: () => void;
-  onSave: (data: Transactions & { subAccounts: SubAccountFormData[] }) => void;
+  onSave: (data: { mainAccounts: Transactions[], subAccounts: SubAccountFormData[] }) => void;
   editData?: any;
   isOpen: boolean;
 }) {
@@ -352,7 +352,7 @@ export function AccountDetailModal({
       return;
     }
     onSave({
-      mainAccounts: savedMainAccounts.length > 0 ? savedMainAccounts : [formData],
+      mainAccounts: savedMainAccounts.length > 0 ? savedMainAccounts : [formData], 
       subAccounts,
     });
     localStorage.removeItem('accountDetailFormData'); // Hapus draft setelah berhasil disimpan

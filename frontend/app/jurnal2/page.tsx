@@ -19,6 +19,7 @@ interface Transaction {
   debit: number;
   kredit: number;
   perusahaan_id: string;
+  sub_akun_id: string | null;
 }
 
 interface Akun {
@@ -41,6 +42,7 @@ interface JurnalEntry {
   debit: number | null;
   kredit: number | null;
   perusahaan_id: string;
+  sub_akun_id?: string | null;
   akun: {
     id: string;
     kode: number;
@@ -76,7 +78,8 @@ export default function JurnalPage() {
                 akun_id: entry.akun_id,
                 debit: entry.debit || 0,
                 kredit: entry.kredit || 0,
-                perusahaan_id: entry.perusahaan_id
+                perusahaan_id: entry.perusahaan_id || "",
+                sub_akun_id: entry.sub_akun_id || null,
               });
             });
           });

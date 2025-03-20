@@ -451,7 +451,7 @@ export function AddAccountTable({
                         disabled={!isEffectivelyZero(inlineEditData.kredit)}
                       />
                     ) : (
-                      (parseFloat(account.debit) || 0).toLocaleString()
+                      (parseFloat(account.debit.toString()) || 0).toLocaleString()
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -470,7 +470,7 @@ export function AddAccountTable({
                         disabled={!isEffectivelyZero(inlineEditData.debit)}
                       />
                     ) : (
-                      (parseFloat(account.kredit) || 0).toLocaleString()
+                      (parseFloat(account.kredit.toString()) || 0).toLocaleString()
                     )}
                   </TableCell>
                   <TableCell>
@@ -736,7 +736,6 @@ export function AddAccountTable({
           {editData ? (
             editData.mainAccount && !editData.subAccount ? (
               <SubAccountDetailModal
-                isOpen={isFormModalOpen}
                 onClose={() => {
                   setIsFormModalOpen(false);
                   setEditData(null); // Reset editData saat modal ditutup

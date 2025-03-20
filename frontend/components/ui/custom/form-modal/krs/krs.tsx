@@ -145,7 +145,8 @@ export default function Krs() {
       }
     } catch (error) {
       console.error("Error processing request:", error);
-      alert(`Gagal ${action === "add" ? "menambah" : "menghapus"} kelas: ${error.response?.data?.message || "Terjadi kesTalahan"}`);
+      const errorMessage = (error as any).response?.data?.message || "Terjadi kesTalahan";
+      alert(`Gagal ${action === "add" ? "menambah" : "menghapus"} kelas: ${errorMessage}`);
     } finally {
       setShowConfirmDialog(false);
       setSelectedClass(null);

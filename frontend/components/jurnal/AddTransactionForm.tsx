@@ -198,48 +198,50 @@ export const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ accounts
     const isKreditDisabled = parseFloat(debit) > 0;
 
     const getAllAccounts = () => {
-        const accountsData = contextAccounts || accounts;
+        // Pastikan data akun memiliki tipe yang sesuai
+        const accountsData = (contextAccounts || accounts) as Account[];
+      
         console.log("Using accounts data:", accountsData);
         
         if (!accountsData || accountsData.length === 0) {
-            console.warn("No accounts data available");
-            return [];
+          console.warn("No accounts data available");
+          return [];
         }
-
+      
         const allAccounts: { kodeAkun: string; namaAkun: string }[] = [];
-
+      
         accountsData.forEach(account => {
-            // Add main account - tanpa kode dalam kurung
-            allAccounts.push({
-                kodeAkun: account.kodeAkun,
-                namaAkun: account.namaAkun  // Hapus format (kodeAkun)
+          // Tambahkan akun utama
+          allAccounts.push({
+            kodeAkun: account.kodeAkun,
+            namaAkun: account.namaAkun,
+          });
+      
+          // Tambahkan sub akun jika tersedia
+          if (account.subAccounts?.length) {
+            account.subAccounts.forEach(subAccount => {
+              const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
+              allAccounts.push({
+                kodeAkun: fullKodeAkun,
+                namaAkun: subAccount.namaSubAkun,
+              });
             });
-
-            // Add sub accounts if they exist
-            if (account.subAccounts?.length) {
-                account.subAccounts.forEach(subAccount => {
-                    const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
-                    allAccounts.push({
-                        kodeAkun: fullKodeAkun,
-                        namaAkun: subAccount.namaSubAkun  // Hapus format (kodeAkun)
-                    });
-                });
-            }
+          }
         });
-
-        // Sort accounts berdasarkan kode akun
+      
+        // Sorting akun berdasarkan kode akun
         allAccounts.sort((a, b) => {
-            const [aMain = a.kodeAkun, aSub = '0'] = a.kodeAkun.split(',');
-            const [bMain = b.kodeAkun, bSub = '0'] = b.kodeAkun.split(',');
-            
-            if (aMain !== bMain) {
-                return Number(aMain) - Number(bMain);
-            }
-            return Number(aSub) - Number(bSub);
+          const [aMain = a.kodeAkun, aSub = '0'] = a.kodeAkun.split(',');
+          const [bMain = b.kodeAkun, bSub = '0'] = b.kodeAkun.split(',');
+          
+          if (aMain !== bMain) {
+            return Number(aMain) - Number(bMain);
+          }
+          return Number(aSub) - Number(bSub);
         });
-
+      
         return allAccounts;
-    };
+      };
 
     const handleAccountSelect = (field: 'namaAkun' | 'kodeAkun', value: string) => {
         console.log("Selected value:", value);

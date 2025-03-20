@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import axios from "@/lib/axios"; // Pastikan untuk mengimpor axios yang sudah dikonfigurasi
+import axios from "@/lib/axios";
 
 export function InputOTPControlled() {
   const [value, setValue] = React.useState(""); // Menyimpan nilai OTP yang dimasukkan
@@ -44,13 +44,14 @@ export function InputOTPControlled() {
   const handleResendOTP = async () => {
     setIsResending(true);
     try {
-      const response = await axios.post("/mahasiswa/resendotp", { email: email });
+      const response = await axios.post("/mahasiswa/resendotp", { email });
       console.log(response.data.message);
       setError(""); // Reset error message jika resend berhasil
-    } catch (error) {
-      // Menangani error dan menampilkan pesan
-      console.error(error.response?.data);
-      setError(error.response?.data?.message || "Failed to resend OTP.");
+    } catch (error: unknown) {
+      // Lakukan type assertion untuk error, tanpa menggunakan axios.isAxiosError
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error(err.response?.data);
+      setError(err.response?.data?.message || "Failed to resend OTP.");
     } finally {
       setIsResending(false);
     }

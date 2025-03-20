@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
@@ -26,7 +26,7 @@ interface Transaction {
   debit: number;
   kredit: number;
   perusahaan_id: string;
-  sub_akun_id: string | null | undefined;
+  sub_akun_id: string | null;
 }
 
 interface Akun {
@@ -228,12 +228,14 @@ export default function JurnalPage() {
         </header>
 
         <section className="p-6">
+          <Suspense>
           <AddTransactionTable
             accounts={[]}
             transactions={transactions}
             onTransactionsChange={handleTransactionsChange}
             isLoading={isLoading || isPosting}
           />
+          </Suspense>
         </section>
       </SidebarInset>
     </SidebarProvider>

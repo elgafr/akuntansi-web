@@ -217,7 +217,7 @@ export default function Page() {
         <div className="text-red-500 text-center p-4 max-w-md">
           <h2 className="text-xl font-bold mb-2">⚠️ Terjadi Kesalahan</h2>
           <p className="mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()} variant="outline">
+          <Button onClick={() => window.location.reload()}>
             Coba Lagi
           </Button>
         </div>
