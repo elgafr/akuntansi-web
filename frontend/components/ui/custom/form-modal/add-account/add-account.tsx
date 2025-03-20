@@ -6,16 +6,16 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { X } from "lucide-react";
-import type { AccountFormData } from "@/components/ui/custom/form-modal/account.config";
+import type { Transactions } from "@/components/ui/custom/form-modal/account.config";
 
 export const AddAccountForm = ({
   onClose,
   onSubmit,
 }: {
   onClose: () => void;
-  onSubmit: (data: AccountFormData[]) => void;
+  onSubmit: (data: Transactions[]) => void;
 }) => {
-  const [accounts, setAccounts] = useState<AccountFormData[]>([]);
+  const [accounts, setAccounts] = useState<Transactions[]>([]);
   const [date, setDate] = useState("");
   const [documentType, setDocumentType] = useState("");
   const [description, setDescription] = useState("");
@@ -26,11 +26,14 @@ export const AddAccountForm = ({
 
   const handleAddAccount = () => {
     if (!namaAkun || !kodeAkun || !debit || !kredit) return;
-    const newAccount: AccountFormData = {
+    const newAccount: Transactions = {
+      date,
+      documentType,
+      description,
       namaAkun,
       kodeAkun,
-      debit,
-      kredit,
+      debit: Number(debit),
+      kredit: Number(kredit),
     };
     setAccounts([...accounts, newAccount]);
     setNamaAkun("");

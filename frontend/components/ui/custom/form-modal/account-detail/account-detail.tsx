@@ -8,9 +8,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type {
-  AccountFormData,
+  Transactions,
   SubAccountFormData,
 } from "@/components/ui/custom/form-modal/account.config";
+
+// Removed local declaration of Transactions to avoid conflict with imported one
 
 export const AccountDetailModal = ({
   isOpen,
@@ -19,15 +21,16 @@ export const AccountDetailModal = ({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (
-    data: AccountFormData & { subAccounts: SubAccountFormData[] },
-  ) => void;
+  onSave: (data: Transactions & { subAccounts: SubAccountFormData[] }) => void;
 }) => {
-  const [formData, setFormData] = useState<AccountFormData>({
+  const [formData, setFormData] = useState<Transactions>({
     namaAkun: "Kas Kecil",
     kodeAkun: "11111",
-    debit: "",
-    kredit: "",
+    debit: 0,
+    kredit: 0,
+    date: new Date().toISOString(),
+    documentType: "Invoice",
+    description: "Initial description",
   });
 
   const [subAccounts, setSubAccounts] = useState<SubAccountFormData[]>([]);
@@ -35,14 +38,14 @@ export const AccountDetailModal = ({
   const handleAddSubAccount = () => {
     setSubAccounts([
       ...subAccounts,
-      { namaSubAkun: "", debit: "", kredit: "", namaAkun: "", kodeAkun: "" },
+      { namaSubAkun: "", debit: "", kredit: "", namaAkun: "" },
     ]);
   };
 
   const handleSubAccountChange = (
     index: number,
     field: keyof SubAccountFormData,
-    value: string,
+    value: string
   ) => {
     const newSubAccounts = [...subAccounts];
     newSubAccounts[index][field] = value;
@@ -91,7 +94,7 @@ export const AccountDetailModal = ({
               <Input
                 value={formData.debit}
                 onChange={(e) =>
-                  setFormData({ ...formData, debit: e.target.value })
+                  setFormData({ ...formData, debit: Number(e.target.value) })
                 }
                 className="rounded-xl h-12 text-gray-500 text-base"
               />
@@ -101,7 +104,7 @@ export const AccountDetailModal = ({
               <Input
                 value={formData.kredit}
                 onChange={(e) =>
-                  setFormData({ ...formData, kredit: e.target.value })
+                  setFormData({ ...formData, kredit: Number(e.target.value) })
                 }
                 className="rounded-xl h-12 text-gray-500 text-base"
               />
@@ -121,7 +124,7 @@ export const AccountDetailModal = ({
                         handleSubAccountChange(
                           index,
                           "namaSubAkun",
-                          e.target.value,
+                          e.target.value
                         )
                       }
                     />
@@ -144,7 +147,7 @@ export const AccountDetailModal = ({
                           handleSubAccountChange(
                             index,
                             "kredit",
-                            e.target.value,
+                            e.target.value
                           )
                         }
                       />

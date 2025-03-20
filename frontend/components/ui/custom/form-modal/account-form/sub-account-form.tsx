@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type {
-  AccountFormData,
+  Transactions,
   SubAccountFormData,
 } from "@/components/ui/custom/form-modal/account.config";
 
@@ -11,13 +11,15 @@ export const SubAccountForm = ({
   onSubmit,
   onDelete,
 }: {
-  parentAccount: AccountFormData;
+  parentAccount: Transactions;
   onSubmit: (data: SubAccountFormData) => void;
   onDelete: () => void;
 }) => {
   const [formData, setFormData] = useState<SubAccountFormData>({
     ...parentAccount,
     namaSubAkun: "",
+    debit: parentAccount.debit.toString(),
+    kredit: parentAccount.kredit.toString(),
   });
 
   return (
