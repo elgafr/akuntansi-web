@@ -6,7 +6,7 @@ import { NeracaLajurTable } from "@/components/neraca-lajur/NeracaLajurTable";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 
 interface Profile {
   user : {

@@ -11,35 +11,30 @@ import { PerubahanEkuitasSection } from "@/components/laporan/PerubahanEkuitasSe
 import { LaporanUmumSection } from "@/components/laporan/LaporanUmumSection";
 import { LaporanKeuanganSection } from "@/components/laporan/LaporanKeuanganSection";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 
-interface Profile {
+interface ProfileData {
   user: {
     name: string;
+    nim: string;
   };
 }
 
 export default function LaporanPage() {
 
-  const [profileData, setProfileData] = useState<Profile | null>(null);
-  
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        // Cek cache di localStorage terlebih dahulu
-        const cachedProfile = localStorage.getItem('profileData');
-        if (cachedProfile) {
-          setProfileData(JSON.parse(cachedProfile));
-        }
-
-        // Ambil data terbaru dari API
-        const response = await axios.get('/mahasiswa/profile');
+        const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
           setProfileData(response.data.data);
-          localStorage.setItem('profileData', JSON.stringify(response.data.data));
         }
       } catch (error) {
-        console.error('Gagal memuat profil:', error);
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoadingProfile(false);
       }
     };
 
@@ -74,7 +69,11 @@ export default function LaporanPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData?.user?.name}</div>
+                <div className="text-sm font-medium">
+                  {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.name || "Nama tidak tersedia"}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
