@@ -16,7 +16,6 @@ import axios from "@/lib/axios";
 interface ProfileData {
   user: {
     name: string;
-    nim: string;
   };
 }
 
