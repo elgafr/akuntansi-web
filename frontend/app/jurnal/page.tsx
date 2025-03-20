@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
@@ -29,45 +29,17 @@ interface Transaction {
   sub_akun_id: string | null;
 }
 
-interface Akun {
-  id: string;
-  kode: number;
-  nama: string;
-  status: string;
-}
-
 interface ProfileData {
   user: {
     name: string;
   };
 }
 
-interface JurnalResponse {
-  [key: string]: JurnalEntry[];
-}
-
-interface JurnalEntry {
-  id: string;
-  tanggal: string;
-  bukti: string;
-  keterangan: string;
-  akun_id: string;
-  debit: number | null;
-  kredit: number | null;
-  perusahaan_id: string;
-  sub_akun_id?: string | null;
-  akun: {
-    id: string;
-    kode: number;
-    nama: string;
-    status: string;
-  };
-}
-
 export default function JurnalPage() {
   const queryClient = useQueryClient();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [searchParamsLoaded, setSearchParamsLoaded] = useState(false); // Flag to delay useSearchParams() usage
+  const searchParams = useSearchParams(); // This will be safely used only on the client side
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const { data: jurnalData } = useJurnal();
   const [isLoading, setIsLoading] = useState(true);
@@ -82,32 +54,7 @@ export default function JurnalPage() {
     queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
   }, [pathname, searchParams, queryClient]);
 
-  // Transform data dengan pengecekan null/undefined
-  const transformedTransactions: Transaction[] = useMemo(() => {
-    if (!jurnalData) return [];
-
-    return jurnalData
-      .filter((entry) => entry && entry.akun) // Filter data yang tidak valid
-      .map((entry) => ({
-        id: entry.id || "",
-        date: entry.tanggal || "",
-        documentType: entry.bukti || "",
-        description: entry.keterangan || "",
-        namaAkun: entry.akun?.nama || "",
-        kodeAkun: entry.akun?.kode?.toString() || "",
-        akun_id: entry.akun_id || "",
-        debit: entry.debit || 0,
-        kredit: entry.kredit || 0,
-        perusahaan_id: entry.perusahaan_id || "",
-        sub_akun_id: entry.sub_akun_id || null,
-      }));
-  }, [jurnalData]);
-
-  useEffect(() => {
-    setTransactions(transformedTransactions);
-  }, [transformedTransactions]);
-
-
+  // Fetch profile data
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
@@ -125,10 +72,13 @@ export default function JurnalPage() {
     fetchProfileData();
   }, []);
 
+  // Handle the change in transactions
   const handleTransactionsChange = async (newTransactions: Transaction[]) => {
-    // Update local state dengan pengecekan
     if (newTransactions) {
-      // Set data ke cache tanpa invalidasi
+      // Update transactions in local state
+      setTransactions(newTransactions);
+
+      // Set data to cache without invalidating
       queryClient.setQueryData(
         ["jurnal"],
         newTransactions.map((t) => ({
@@ -152,8 +102,15 @@ export default function JurnalPage() {
     }
   };
 
-  // Tampilkan loading state
-  if (isLoading) {
+  // Delay searchParams until after client-side mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSearchParamsLoaded(true);
+    }
+  }, []);
+
+  // Tampilkan loading state sampai searchParams dimuat
+  if (!searchParamsLoaded) {
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -166,26 +123,6 @@ export default function JurnalPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
-    );
-  }
-
-  // Tampilkan error state
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <div className="text-red-500">
-          Gagal memuat data. Silakan periksa koneksi Anda.
-        </div>
-        <Button
-          onClick={() =>
-            queryClient.invalidateQueries({ queryKey: ["jurnal"] })
-          }
-          variant="outline"
-          size="sm"
-        >
-          Coba Lagi
-        </Button>
-      </div>
     );
   }
 
@@ -218,7 +155,9 @@ export default function JurnalPage() {
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">
-                    {profileData?.user?.name}
+                    {loadingProfile
+                      ? "Loading..."
+                      : profileData?.user?.name || "Nama tidak tersedia"}
                   </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
@@ -228,14 +167,12 @@ export default function JurnalPage() {
         </header>
 
         <section className="p-6">
-          <Suspense>
           <AddTransactionTable
             accounts={[]}
             transactions={transactions}
             onTransactionsChange={handleTransactionsChange}
             isLoading={isLoading || isPosting}
           />
-          </Suspense>
         </section>
       </SidebarInset>
     </SidebarProvider>

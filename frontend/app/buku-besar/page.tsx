@@ -102,7 +102,6 @@ export default function BukuBesarPage() {
         </header>
 
         <section className="p-6">
-          {/* Tampilkan BukuBesarTable hanya setelah searchParams dimuat */}
           <BukuBesarTable />
         </section>
       </SidebarInset>
