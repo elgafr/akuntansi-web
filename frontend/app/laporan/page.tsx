@@ -8,9 +8,44 @@ import { LabaRugiSection } from "@/components/laporan/LabaRugiSection";
 import { PosisiKeuanganSection } from "@/components/laporan/PosisiKeuanganSection";
 import { ArusKasSection } from "@/components/laporan/ArusKasSection";
 import { PerubahanEkuitasSection } from "@/components/laporan/PerubahanEkuitasSection";
+import { LaporanUmumSection } from "@/components/laporan/LaporanUmumSection";
 import { LaporanKeuanganSection } from "@/components/laporan/LaporanKeuanganSection";
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+interface Profile {
+  user: {
+    name: string;
+  };
+}
 
 export default function LaporanPage() {
+
+  const [profileData, setProfileData] = useState<Profile | null>(null);
+  
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        // Cek cache di localStorage terlebih dahulu
+        const cachedProfile = localStorage.getItem('profileData');
+        if (cachedProfile) {
+          setProfileData(JSON.parse(cachedProfile));
+        }
+
+        // Ambil data terbaru dari API
+        const response = await axios.get('/mahasiswa/profile');
+        if (response.data.success) {
+          setProfileData(response.data.data);
+          localStorage.setItem('profileData', JSON.stringify(response.data.data));
+        }
+      } catch (error) {
+        console.error('Gagal memuat profil:', error);
+      }
+    };
+
+    fetchProfileData();
+  }, []);
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -39,7 +74,7 @@ export default function LaporanPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">Arthur</div>
+                  <div className="text-sm font-medium">{profileData?.user?.name}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -76,8 +111,6 @@ export default function LaporanPage() {
               <PosisiKeuanganSection />
             </TabsContent>
 
-            
-
             {/* <TabsContent value="arus-kas">
               <ArusKasSection />
             </TabsContent> */}
@@ -87,3 +120,4 @@ export default function LaporanPage() {
     </SidebarProvider>
   );
 }
+

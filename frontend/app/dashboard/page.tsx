@@ -152,52 +152,52 @@ export default function Page() {
   };
 
   // Handle pilih perusahaan
- // Di dalam fungsi handleCompanySelect
-const handleCompanySelect = async (company: Company) => {
-  try {
-    // Matikan perusahaan sebelumnya jika ada
-    if (selectedCompany) {
-      await axios.put(`/mahasiswa/perusahaan/${selectedCompany.id}`, {
-        status: "offline"
+  // Di dalam fungsi handleCompanySelect
+  const handleCompanySelect = async (company: Company) => {
+    try {
+      // Matikan perusahaan sebelumnya jika ada
+      if (selectedCompany) {
+        await axios.put(`/mahasiswa/perusahaan/${selectedCompany.id}`, {
+          status: "offline",
+        });
+      }
+
+      // Nyalakan perusahaan baru
+      const response = await axios.put(`/mahasiswa/perusahaan/${company.id}`, {
+        status: "online",
       });
+
+      // Update state
+      setCompanyList((prev) =>
+        prev.map((c) => ({
+          ...c,
+          status: c.id === company.id ? "online" : "offline",
+        }))
+      );
+
+      setSelectedCompany(company);
+      form.setValue("companyName", company.nama);
+      setFilteredCompanies([]);
+    } catch (error) {
+      console.error("Gagal memilih perusahaan:", error);
+      alert("Gagal memilih perusahaan");
     }
+  };
 
-    // Nyalakan perusahaan baru
-    const response = await axios.put(`/mahasiswa/perusahaan/${company.id}`, {
-      status: "online"
+  // Di bagian pembuatan chartData, ubah:
+  const chartData = Array.from({ length: 6 }, (_, bulanIndex) => {
+    const dataPoint: any = { month: `Bulan ${bulanIndex + 1}` };
+  
+    selectedAccounts.forEach((accountCode, idx) => {
+      const account = accounts.find(a => a.kode === accountCode);
+      if (account) {
+        dataPoint[`account${idx + 1}Debit`] = account.debit * (bulanIndex + 1);
+        dataPoint[`account${idx + 1}Kredit`] = account.kredit * (bulanIndex + 1);
+      }
     });
-
-    // Update state
-    setCompanyList(prev => 
-      prev.map(c => ({
-        ...c,
-        status: c.id === company.id ? "online" : "offline"
-      }))
-    );
-
-    setSelectedCompany(company);
-    form.setValue("companyName", company.nama);
-    setFilteredCompanies([]);
-    
-  } catch (error) {
-    console.error("Gagal memilih perusahaan:", error);
-    alert("Gagal memilih perusahaan");
-  }
-};
-
-
-  // Generate data chart
-  const chartData = Array.from({ length: 6 }, (_, i) => ({
-    month: `Bulan ${i + 1}`,
-    ...selectedAccounts.reduce(
-      (acc, curr, idx) => ({
-        ...acc,
-        [`account${idx + 1}`]:
-          accounts.find((a) => a.kode === curr)?.debit || 0 * (i + 1),
-      }),
-      {}
-    ),
-  }));
+  
+    return dataPoint;
+  });
 
   return (
     <SidebarProvider>
@@ -360,10 +360,7 @@ const handleCompanySelect = async (company: Company) => {
                     <SelectContent>
                       <SelectGroup>
                         {accounts.map((account) => (
-                          <SelectItem
-                            key={account.kode}
-                            value={account.kode}
-                          >
+                          <SelectItem key={account.kode} value={account.kode}>
                             {account.kode} - {account.nama}
                           </SelectItem>
                         ))}
@@ -376,7 +373,7 @@ const handleCompanySelect = async (company: Company) => {
           </div>
 
           {/* Chart Section */}
-          <Card className="mt-10 w-[174vh] p-4 shadow-md">
+          <Card className="mt-10 w-full p-4 shadow-md">
             <CardHeader className="flex flex-row justify-between items-start">
               <div>
                 <CardTitle className="mb-4 text-gray-500">Buku Besar</CardTitle>
@@ -389,7 +386,10 @@ const handleCompanySelect = async (company: Company) => {
                 {selectedAccounts.map(
                   (account, idx) =>
                     account && (
-                      <div  key={`account-legend-${account}-${idx}`} className="flex items-center gap-2">
+                      <div
+                        key={`account-legend-${account}-${idx}`}
+                        className="flex items-center gap-2"
+                      >
                         <div
                           className={`w-4 h-4 rounded-full ${
                             idx === 0
@@ -424,7 +424,7 @@ const handleCompanySelect = async (company: Company) => {
                       (account, idx) =>
                         account && (
                           <Line
-                          key={`chart-line-${account}-${idx}`}
+                            key={`chart-line-${account}-${idx}`}
                             type="monotone"
                             dataKey={`account${idx + 1}`}
                             stroke={["#8884d8", "#82ca9d", "#ffc658"][idx]}

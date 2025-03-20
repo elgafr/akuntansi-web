@@ -5,12 +5,20 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from 'next/navigation';
+import axios from "axios";
+
+interface Profile {
+  user: {
+    name: string;
+  };
+}
+
 
 export default function BukuBesarPage() {
-  const [profileData, setProfileData] = useState({ fullName: "Guest" });
+  const [profileData, setProfileData] = useState<Profile | null>(null);
   const queryClient = useQueryClient();
   
   const pathname = usePathname();
@@ -24,10 +32,26 @@ export default function BukuBesarPage() {
   }, [pathname, searchParams, queryClient]);
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
+    const fetchProfileData = async () => {
+      try {
+        // Cek cache di localStorage terlebih dahulu
+        const cachedProfile = localStorage.getItem('profileData');
+        if (cachedProfile) {
+          setProfileData(JSON.parse(cachedProfile));
+        }
+
+        // Ambil data terbaru dari API
+        const response = await axios.get('/mahasiswa/profile');
+        if (response.data.success) {
+          setProfileData(response.data.data);
+          localStorage.setItem('profileData', JSON.stringify(response.data.data));
+        }
+      } catch (error) {
+        console.error('Gagal memuat profil:', error);
+      }
+    };
+
+    fetchProfileData();
   }, []);
 
   return (
@@ -58,7 +82,7 @@ export default function BukuBesarPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData.fullName}</div>
+                  <div className="text-sm font-medium">{profileData?.user.name}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>

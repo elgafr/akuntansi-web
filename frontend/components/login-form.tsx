@@ -10,6 +10,7 @@ import { useState } from "react";
 import axios from "@/lib/axios";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function LoginForm({
   className,
@@ -35,11 +36,12 @@ export function LoginForm({
 
       if (response.data.success) {
         // Simpan data sesuai response backend
-        const { token, nama, nim, email } = response.data.data;
-        
+        const { token, nama, nim, email,id } = response.data.data;
+        console.log(response.data)
         // Simpan token dan data user ke localStorage
         localStorage.setItem("token", token);
         localStorage.setItem("userData", JSON.stringify({
+          id,
           nama,
           nim,
           email
@@ -53,8 +55,8 @@ export function LoginForm({
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      setError(
-        error.response?.data?.message || 
+      toast(
+        // error.response?.data?.message || 
         "Login gagal. Periksa NIM dan password Anda"
       );
     } finally {
@@ -71,7 +73,7 @@ export function LoginForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl text-center">
-            Login Mahasiswa
+            Login
           </CardTitle>
         </CardHeader>
         <CardContent>

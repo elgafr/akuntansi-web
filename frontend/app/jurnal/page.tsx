@@ -2,13 +2,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+} from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { AddTransactionTable } from "@/components/jurnal/AddTransactionTable";
 import { Button } from "@/components/ui/button";
 import { useJurnal, usePostJurnal } from "@/hooks/useJurnal";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from "next/navigation";
+import axios from "axios";
 
 interface Transaction {
   id: string;
@@ -24,73 +29,133 @@ interface Transaction {
   sub_akun_id: string | null | undefined;
 }
 
+interface Akun {
+  id: string;
+  kode: number;
+  nama: string;
+  status: string;
+}
+
+interface Profile {
+  user: {
+    name: string;
+  };
+}
+
+interface JurnalResponse {
+  [key: string]: JurnalEntry[];
+}
+
+interface JurnalEntry {
+  id: string;
+  tanggal: string;
+  bukti: string;
+  keterangan: string;
+  akun_id: string;
+  debit: number | null;
+  kredit: number | null;
+  perusahaan_id: string;
+  sub_akun_id?: string | null;
+  akun: {
+    id: string;
+    kode: number;
+    nama: string;
+    status: string;
+  };
+}
+
 export default function JurnalPage() {
-  const [profileData, setProfileData] = useState({ fullName: "Guest" });
   const queryClient = useQueryClient();
-  
-  const { data: jurnalData, isLoading, error } = useJurnal();
-  const { mutate: postJurnal, isPending: isPosting } = usePostJurnal();
-  
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  
-  // Force refetch on navigation
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { data: jurnalData } = useJurnal();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
+  const [profileData, setProfileData] = useState<Profile | null>(null);
+
   useEffect(() => {
     // Refetch data when navigating back to jurnal page
-    queryClient.invalidateQueries({ queryKey: ['jurnal'] });
-    queryClient.invalidateQueries({ queryKey: ['neracaLajur'] });
+    queryClient.invalidateQueries({ queryKey: ["jurnal"] });
+    queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
   }, [pathname, searchParams, queryClient]);
 
   // Transform data dengan pengecekan null/undefined
-  const transactions: Transaction[] = useMemo(() => {
+  const transformedTransactions: Transaction[] = useMemo(() => {
     if (!jurnalData) return [];
-    
+
     return jurnalData
-      .filter(entry => entry && entry.akun) // Filter data yang tidak valid
-      .map(entry => ({
-        id: entry.id || '',
-        date: entry.tanggal || '',
-        documentType: entry.bukti || '',
-        description: entry.keterangan || '',
-        namaAkun: entry.akun?.nama || '',
-        kodeAkun: entry.akun?.kode?.toString() || '',
-        akun_id: entry.akun_id || '',
+      .filter((entry) => entry && entry.akun) // Filter data yang tidak valid
+      .map((entry) => ({
+        id: entry.id || "",
+        date: entry.tanggal || "",
+        documentType: entry.bukti || "",
+        description: entry.keterangan || "",
+        namaAkun: entry.akun?.nama || "",
+        kodeAkun: entry.akun?.kode?.toString() || "",
+        akun_id: entry.akun_id || "",
         debit: entry.debit || 0,
         kredit: entry.kredit || 0,
-        perusahaan_id: entry.perusahaan_id || '',
+        perusahaan_id: entry.perusahaan_id || "",
         sub_akun_id: entry.sub_akun_id || null,
       }));
   }, [jurnalData]);
 
-  // Load profile data
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
+    setTransactions(transformedTransactions);
+  }, [transformedTransactions]);
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        // Cek cache di localStorage terlebih dahulu
+        const cachedProfile = localStorage.getItem("profileData");
+        if (cachedProfile) {
+          setProfileData(JSON.parse(cachedProfile));
+        }
+
+        // Ambil data terbaru dari API
+        const response = await axios.get("/mahasiswa/profile");
+        if (response.data.success) {
+          setProfileData(response.data.data);
+          localStorage.setItem(
+            "profileData",
+            JSON.stringify(response.data.data)
+          );
+        }
+      } catch (error) {
+        console.error("Gagal memuat profil:", error);
+      }
+    };
+
+    fetchProfileData();
   }, []);
 
   const handleTransactionsChange = async (newTransactions: Transaction[]) => {
     // Update local state dengan pengecekan
     if (newTransactions) {
       // Set data ke cache tanpa invalidasi
-      queryClient.setQueryData(['jurnal'], newTransactions.map(t => ({
-        id: t.id,
-        tanggal: t.date,
-        bukti: t.documentType,
-        keterangan: t.description,
-        akun_id: t.akun_id,
-        debit: t.debit,
-        kredit: t.kredit,
-        perusahaan_id: t.perusahaan_id,
-        sub_akun_id: t.sub_akun_id,
-        akun: {
-          id: t.akun_id,
-          kode: parseInt(t.kodeAkun),
-          nama: t.namaAkun,
-          status: "active"
-        }
-      })));
+      queryClient.setQueryData(
+        ["jurnal"],
+        newTransactions.map((t) => ({
+          id: t.id,
+          tanggal: t.date,
+          bukti: t.documentType,
+          keterangan: t.description,
+          akun_id: t.akun_id,
+          debit: t.debit,
+          kredit: t.kredit,
+          perusahaan_id: t.perusahaan_id,
+          sub_akun_id: t.sub_akun_id,
+          akun: {
+            id: t.akun_id,
+            kode: parseInt(t.kodeAkun),
+            nama: t.namaAkun,
+            status: "active",
+          },
+        }))
+      );
     }
   };
 
@@ -115,9 +180,13 @@ export default function JurnalPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <div className="text-red-500">Gagal memuat data. Silakan periksa koneksi Anda.</div>
-        <Button 
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['jurnal'] })}
+        <div className="text-red-500">
+          Gagal memuat data. Silakan periksa koneksi Anda.
+        </div>
+        <Button
+          onClick={() =>
+            queryClient.invalidateQueries({ queryKey: ["jurnal"] })
+          }
           variant="outline"
           size="sm"
         >
@@ -155,7 +224,9 @@ export default function JurnalPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData.fullName}</div>
+                  <div className="text-sm font-medium">
+                    {profileData?.user?.name}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>

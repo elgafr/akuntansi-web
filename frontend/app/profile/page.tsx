@@ -24,6 +24,7 @@ type ProfileData = {
   tanggal_lahir?: string;
   alamat?: string;
   hp?: string;
+  foto?: string;
   user: {
     id: string;
     name: string;
@@ -40,6 +41,8 @@ export default function Page() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+    console.log(userData.id);
 
     // 1. Cek token tanpa redirect langsung
     if (!token) {
@@ -50,21 +53,15 @@ export default function Page() {
     const fetchProfile = async () => {
       try {
         // 2. Validasi token dengan request ke endpoint yang sama
-        const response = await axios.get("/mahasiswa/profile", {
+        const response = await axios.get(`/mahasiswa/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        // 3. Handle response yang tidak valid
-        if (!response.data?.success || !response.data.user) {
-          throw new Error("Invalid session");
-        }
-
-        const currentUser = response.data.user;
-        const userProfile = response.data.data.find(
-          (p: any) => p.user_id === currentUser.id
-        );
+        const currentUser = response.data.data.user;
+        console.log(currentUser);
+        const userProfile = currentUser ? response.data.data : null;
 
         if (userProfile) {
           setProfileData({
@@ -74,6 +71,7 @@ export default function Page() {
             tanggal_lahir: userProfile.tanggal_lahir,
             alamat: userProfile.alamat,
             hp: userProfile.hp,
+            foto: userProfile.foto,
             user: {
               id: currentUser.id,
               name: currentUser.name,
@@ -140,9 +138,10 @@ export default function Page() {
           ...(prev || {}),
           ...response.data.data,
           user: prev?.user || response.data.data.user || {},
+          foto: prev?.foto || response.data.data.foto || {},
         }));
         closeEditModal();
-        alert("Data berhasil diperbarui!");
+        toast("Data berhasil diperbarui!");
       } else {
         throw new Error("Respon server tidak valid");
       }
@@ -150,7 +149,7 @@ export default function Page() {
       // 5. Penanganan error terstruktur
       const errorMessage = getErrorMessage(error);
       console.error("Update Error:", errorMessage);
-      alert(`Gagal menyimpan perubahan: ${errorMessage}`);
+      toast(`Gagal menyimpan perubahan: ${errorMessage}`);
     }
   };
 
@@ -243,7 +242,7 @@ export default function Page() {
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 w-full justify-between">
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem>
+              <BreadcrumbItem className="hidden md:block">
                 <h1 className="text-2xl font-bold text-black">Dashboard</h1>
                 <h2 className="text-sm">Let's check your Dashboard today</h2>
               </BreadcrumbItem>
@@ -252,7 +251,10 @@ export default function Page() {
 
           <div className="flex items-center gap-4">
             <Avatar>
-              <AvatarImage src="https://github.com/shadcn.png" alt="Profile" />
+              <AvatarImage
+                src="https://github.com/shadcn.png"
+                alt="Profile"
+              />
             </Avatar>
             <div>
               <p className="font-medium">{profileData.user?.name}</p>
@@ -263,8 +265,8 @@ export default function Page() {
 
         {/* Profile Card */}
         <div className="flex gap-6 px-10 mt-6">
-          <Card className="w-[400px] flex-shrink-0">
-            <div className="flex flex-col items-center gap-10 p-6">
+          <Card className="w-[440px] flex-shrink-0">
+            <div className="flex flex-col items-center gap-8 p-6">
               <Avatar className="h-40 w-40">
                 <AvatarImage src="https://github.com/shadcn.png" />
               </Avatar>
@@ -346,4 +348,7 @@ export default function Page() {
       </SidebarInset>
     </SidebarProvider>
   );
+}
+function toast(arg0: string) {
+  throw new Error("Function not implemented.");
 }
