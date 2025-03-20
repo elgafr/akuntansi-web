@@ -1,27 +1,15 @@
 "use client";
 
-import { BukuBesarTable } from "@/components/buku-besar/BukuBesarTable";
+import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NeracaLajurTable } from "@/components/neraca-lajur/NeracaLajurTable";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useSearchParams } from 'next/navigation';
 
-export default function BukuBesarPage() {
+export function NeracaLajurClient() {
   const [profileData, setProfileData] = useState({ fullName: "Guest" });
-  const queryClient = useQueryClient();
-  
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  
-  // Force refetch on navigation
-  useEffect(() => {
-    // Refetch data when navigating to buku besar page
-    queryClient.invalidateQueries({ queryKey: ['bukuBesar'] });
-    queryClient.invalidateQueries({ queryKey: ['akunList'] });
-  }, [pathname, searchParams, queryClient]);
 
   useEffect(() => {
     const storedProfile = localStorage.getItem("profileData");
@@ -41,10 +29,10 @@ export default function BukuBesarPage() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6 text-black">
-                    Buku Besar
+                    Neraca Lajur
                   </h1>
                   <h2 className="text-sm ml-6">
-                    Let&apos;s check your Summary today
+                    Let&apos;s check your Neraca Lajur today
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -67,9 +55,26 @@ export default function BukuBesarPage() {
         </header>
 
         <section className="p-6">
-          <BukuBesarTable />
+          <Tabs defaultValue="before" className="w-full">
+            <TabsList className="w-full justify-between bg-muted/50">
+              <TabsTrigger value="before" className="flex-1">
+                Neraca Saldo Sebelum di Penyesuaian
+              </TabsTrigger>
+              <TabsTrigger value="after" className="flex-1">
+                Neraca Saldo Setelah di Penyesuaian
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="before">
+              <NeracaLajurTable type="before" />
+            </TabsContent>
+            
+            <TabsContent value="after">
+              <NeracaLajurTable type="after" />
+            </TabsContent>
+          </Tabs>
         </section>
       </SidebarInset>
     </SidebarProvider>
   );
-}
+} 

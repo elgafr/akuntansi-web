@@ -1,34 +1,65 @@
-"use client";
+'use client';
 
-import { BukuBesarTable } from "@/components/buku-besar/BukuBesarTable";
+import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useSearchParams } from 'next/navigation';
+import { AddTransactionTable } from "@/components/jurnal/AddTransactionTable";
+import { Button } from "@/components/ui/button";
+import { revalidateJurnal } from './actions';
 
-export default function BukuBesarPage() {
+interface Transaction {
+  id: string;
+  date: string;
+  documentType: string;
+  description: string;
+  namaAkun: string;
+  kodeAkun: string;
+  akun_id: string;
+  debit: number;
+  kredit: number;
+  perusahaan_id: string;
+  sub_akun_id: string | null | undefined;
+}
+
+interface JurnalClientProps {
+  initialTransactions: Transaction[];
+}
+
+export function JurnalClient({ initialTransactions }: JurnalClientProps) {
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [error, setError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({ fullName: "Guest" });
-  const queryClient = useQueryClient();
-  
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  
-  // Force refetch on navigation
-  useEffect(() => {
-    // Refetch data when navigating to buku besar page
-    queryClient.invalidateQueries({ queryKey: ['bukuBesar'] });
-    queryClient.invalidateQueries({ queryKey: ['akunList'] });
-  }, [pathname, searchParams, queryClient]);
 
+  // Load profile data
   useEffect(() => {
     const storedProfile = localStorage.getItem("profileData");
     if (storedProfile) {
       setProfileData(JSON.parse(storedProfile));
     }
   }, []);
+
+  const handleTransactionsChange = async (newTransactions: Transaction[]) => {
+    setTransactions(newTransactions);
+    // Revalidate cache setelah perubahan
+    await revalidateJurnal();
+  };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+        <div className="text-red-500">{error}</div>
+        <Button 
+          onClick={() => window.location.reload()}
+          variant="outline"
+          size="sm"
+        >
+          Coba Lagi
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -41,10 +72,10 @@ export default function BukuBesarPage() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-6 text-black">
-                    Buku Besar
+                    Jurnal Umum
                   </h1>
                   <h2 className="text-sm ml-6">
-                    Let&apos;s check your Summary today
+                    Let&apos;s check your Journal today
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -67,9 +98,13 @@ export default function BukuBesarPage() {
         </header>
 
         <section className="p-6">
-          <BukuBesarTable />
+          <AddTransactionTable
+            accounts={[]}
+            transactions={transactions}
+            onTransactionsChange={handleTransactionsChange}
+          />
         </section>
       </SidebarInset>
     </SidebarProvider>
   );
-}
+} 

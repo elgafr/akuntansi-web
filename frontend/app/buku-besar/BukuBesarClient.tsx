@@ -1,28 +1,20 @@
-"use client";
+'use client';
 
+import { useState, useEffect } from "react";
 import { BukuBesarTable } from "@/components/buku-besar/BukuBesarTable";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useSearchParams } from 'next/navigation';
 
-export default function BukuBesarPage() {
+interface BukuBesarClientProps {
+  initialData: any; // Sesuaikan dengan tipe data dari API Anda
+}
+
+export function BukuBesarClient({ initialData }: BukuBesarClientProps) {
   const [profileData, setProfileData] = useState({ fullName: "Guest" });
-  const queryClient = useQueryClient();
-  
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  
-  // Force refetch on navigation
-  useEffect(() => {
-    // Refetch data when navigating to buku besar page
-    queryClient.invalidateQueries({ queryKey: ['bukuBesar'] });
-    queryClient.invalidateQueries({ queryKey: ['akunList'] });
-  }, [pathname, searchParams, queryClient]);
 
+  // Load profile data
   useEffect(() => {
     const storedProfile = localStorage.getItem("profileData");
     if (storedProfile) {
@@ -67,9 +59,9 @@ export default function BukuBesarPage() {
         </header>
 
         <section className="p-6">
-          <BukuBesarTable />
+          <BukuBesarTable initialData={initialData} />
         </section>
       </SidebarInset>
     </SidebarProvider>
   );
-}
+} 

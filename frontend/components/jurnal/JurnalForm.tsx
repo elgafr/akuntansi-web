@@ -24,11 +24,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePostJurnal, useUpdateJurnal } from "@/hooks/useJurnal";
 
 interface JurnalFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Transaction) => void;
+  onSubmit: (data: Transaction | Transaction[]) => void;
   editingTransactions?: Transaction[];
 }
 
@@ -44,6 +46,8 @@ interface Transaction {
   debit: number;
   kredit: number;
   perusahaan_id: string;
+  _optimistic?: boolean;
+  _timestamp?: number;
 }
 
 interface Akun {
@@ -131,6 +135,12 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
 
   const { toast } = useToast();
 
+  const queryClient = useQueryClient();
+
+  // Gunakan hooks mutation
+  const { mutate: postJurnal, isPending: isPosting } = usePostJurnal();
+  const { mutate: updateJurnal, isPending: isUpdating } = useUpdateJurnal();
+
   useEffect(() => {
     const fetchActivePerusahaan = async () => {
       try {
@@ -198,42 +208,46 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
 
   // Update useEffect for handling editingTransactions
   useEffect(() => {
-    if (editingTransactions.length > 0) {
-      setIsEditMode(true);
-      const firstTransaction = editingTransactions[0];
-      
-      setFormData({
-        id: "",
-        date: firstTransaction.date,
-        documentType: firstTransaction.documentType,
-        description: firstTransaction.description,
-        namaAkun: "",
-        kodeAkun: "",
-        akun_id: "",
-        debit: 0,
-        kredit: 0,
-        sub_akun_id: null,
-        perusahaan_id: ""
-      });
+    // Reset state first to prevent data mixing
+    if (isOpen) {
+      // If opening the form for editing, populate with editing data
+      if (editingTransactions.length > 0) {
+        setIsEditMode(true);
+        const firstTransaction = editingTransactions[0];
+        
+        setFormData({
+          id: "",
+          date: firstTransaction.date,
+          documentType: firstTransaction.documentType,
+          description: firstTransaction.description,
+          namaAkun: "",
+          kodeAkun: "",
+          akun_id: "",
+          debit: 0,
+          kredit: 0,
+          sub_akun_id: null,
+          perusahaan_id: firstTransaction.perusahaan_id || ""
+        });
 
-      setTempTransactions(editingTransactions.map(t => ({
-        id: t.id,
-        date: t.date,
-        documentType: t.documentType,
-        description: t.description,
-        namaAkun: t.namaAkun,
-        kodeAkun: t.kodeAkun,
-        akun_id: t.akun_id,
-        debit: t.debit,
-        kredit: t.kredit,
-        sub_akun_id: t.sub_akun_id,
-        perusahaan_id: t.perusahaan_id
-      })));
-    } else {
-      // Clear everything when opening new transaction
-      resetAllState();
+        setTempTransactions(editingTransactions.map(t => ({
+          id: t.id,
+          date: t.date,
+          documentType: t.documentType,
+          description: t.description,
+          namaAkun: t.namaAkun,
+          kodeAkun: t.kodeAkun,
+          akun_id: t.akun_id,
+          debit: t.debit,
+          kredit: t.kredit,
+          sub_akun_id: t.sub_akun_id,
+          perusahaan_id: t.perusahaan_id
+        })));
+      } else {
+        // If opening for a new transaction, ensure state is clean
+        resetAllState();
+      }
     }
-  }, [editingTransactions]);
+  }, [editingTransactions, isOpen]);
 
   // Tambahkan fungsi reset form
   const resetFormData = () => {
@@ -263,6 +277,29 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     );
   };
 
+  // Tambahkan fungsi untuk mendapatkan info akun berdasarkan ID
+  const getAkunInfo = (akun_id: string, sub_akun_id: string | null | undefined) => {
+    if (sub_akun_id) {
+      const subAkun = subAkunList.find(s => s.id === sub_akun_id);
+      if (subAkun) {
+        return {
+          kodeAkun: subAkun.kode.toString(),
+          namaAkun: subAkun.nama
+        };
+      }
+    }
+    
+    const akun = akunList.find(a => a.id === akun_id);
+    if (akun) {
+      return {
+        kodeAkun: akun.kode.toString(),
+        namaAkun: akun.nama
+      };
+    }
+    
+    return { kodeAkun: '', namaAkun: '' };
+  };
+
   // Tambahkan fungsi handleSubmit untuk menangani submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,7 +315,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
         return;
       }
 
-      // Jika sedang edit transaksi
+      // If editing an existing transaction
       if (editingTransactionIndex !== null) {
         const updatedTransactions = [...tempTransactions];
         updatedTransactions[editingTransactionIndex] = {
@@ -287,11 +324,30 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
         setTempTransactions(updatedTransactions);
         setEditingTransactionIndex(null); // Reset editing state
       } else {
-        // Tambah transaksi baru
-        setTempTransactions([...tempTransactions, { ...formData }]);
+        // Add a new transaction
+        const transactionData = { ...formData };
+        
+        // If we're in edit mode (editing an existing event), ensure the new transaction
+        // has the same event details as the existing ones
+        if (isEditMode && tempTransactions.length > 0) {
+          transactionData.date = tempTransactions[0].date;
+          transactionData.documentType = tempTransactions[0].documentType;
+          transactionData.description = tempTransactions[0].description;
+        }
+        
+        // If transaction has a sub_akun_id, ensure kodeAkun and namaAkun are correct
+        if (formData.sub_akun_id) {
+          const subAkun = subAkunList.find(s => s.id === formData.sub_akun_id);
+          if (subAkun) {
+            transactionData.kodeAkun = subAkun.kode.toString();
+            transactionData.namaAkun = subAkun.nama;
+          }
+        }
+        
+        setTempTransactions([...tempTransactions, transactionData]);
       }
 
-      // Reset form tapi pertahankan data kejadian jika sudah ada transaksi
+      // Reset form but maintain event data if there are already transactions
       const eventData = tempTransactions.length > 0 ? {
         date: tempTransactions[0].date,
         documentType: tempTransactions[0].documentType,
@@ -341,6 +397,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
 
   // Tambahkan fungsi untuk update kejadian
   const handleUpdateEvent = () => {
+    // Update all transactions with the new event information
     const updatedTransactions = tempTransactions.map(transaction => ({
       ...transaction,
       date: formData.date,
@@ -354,18 +411,31 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
   // Tambahkan fungsi untuk handle edit transaksi
   const handleEditTransaction = (index: number) => {
     const transactionToEdit = tempTransactions[index];
+    
+    // Pastikan kodeAkun dan namaAkun yang benar
+    let editData = { ...transactionToEdit };
+    
+    if (transactionToEdit.sub_akun_id) {
+      const subAkun = subAkunList.find(s => s.id === transactionToEdit.sub_akun_id);
+      if (subAkun) {
+        editData.kodeAkun = subAkun.kode.toString();
+        editData.namaAkun = subAkun.nama;
+      }
+    }
+    
     setFormData({
-      ...transactionToEdit,
-      id: transactionToEdit.id || "",
-      sub_akun_id: transactionToEdit.sub_akun_id || "",
-      perusahaan_id: transactionToEdit.perusahaan_id || ""
-    } as Transaction); // Add type assertion here
+      ...editData,
+      id: editData.id || "",
+      sub_akun_id: editData.sub_akun_id || null,
+      perusahaan_id: editData.perusahaan_id || ""
+    } as Transaction);
+    
     setEditingTransactionIndex(index);
   };
 
   // Tambahkan fungsi handleSubmitAll untuk menyimpan semua transaksi
   const handleSubmitAll = async () => {
-    // Validasi data sebelum dikirim
+    // Validasi dasar tetap diperlukan
     if (tempTransactions.length === 0) {
       toast({
         variant: "destructive",
@@ -376,6 +446,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     }
 
     if (!perusahaanId) {
+      console.error("ID Perusahaan tidak ditemukan");
       toast({
         variant: "destructive",
         title: "Error",
@@ -385,60 +456,98 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     }
 
     try {
-      if (editingTransactions.length > 0) {
-        // Handle update
-        await Promise.all(
-          tempTransactions.map(async (transaction, index) => {
-            const originalTransaction = editingTransactions[index];
-            if (originalTransaction?.id) {
-              await axios.put(`/mahasiswa/jurnal/${originalTransaction.id}`, {
+      // Log for debugging
+      console.log("Submitting transactions:", tempTransactions);
+      
+      // Create a copy of transactions for optimistic update
+      const transactionsForOptimisticUpdate: Transaction[] = tempTransactions.map(t => ({
+        id: t.id || "",
+        date: t.date,
+        documentType: t.documentType,
+        description: t.description,
+        namaAkun: t.namaAkun,
+        kodeAkun: t.kodeAkun,
+        akun_id: t.akun_id,
+        debit: t.debit,
+        kredit: t.kredit,
+        perusahaan_id: t.perusahaan_id || perusahaanId || "",
+        sub_akun_id: t.sub_akun_id || null,
+        _optimistic: true,
+        _timestamp: Date.now()
+      }));
+
+      // First, perform complete state reset to ensure no data leaks
+      resetAllState();
+      
+      // Then close the form
+      onClose();
+      
+      // Submit the optimistic update
+      onSubmit(transactionsForOptimisticUpdate);
+      
+      // If we are editing existing transactions
+      if (isEditMode) {
+        // Separate existing transactions and new transactions
+        const existingTransactions = tempTransactions.filter(t => t.id);
+        const newTransactions = tempTransactions.filter(t => !t.id);
+        
+        // Update existing transactions
+        for (const transaction of existingTransactions) {
+          if (transaction.id) {
+            console.log("Updating transaction:", transaction.id);
+            await updateJurnal({
+              id: transaction.id,
+              data: {
                 tanggal: transaction.date,
                 bukti: transaction.documentType,
                 keterangan: transaction.description,
                 akun_id: transaction.akun_id,
                 debit: transaction.debit || null,
                 kredit: transaction.kredit || null,
-                perusahaan_id: perusahaanId,
+                perusahaan_id: perusahaanId || "",
                 sub_akun_id: transaction.sub_akun_id || null
-              });
-            }
-          })
-        );
-        
-        toast({
-          title: "Berhasil",
-          description: "Data berhasil diupdate"
-        });
-
-        // Hard refresh ke halaman jurnal
-        window.location.href = '/jurnal';
-        
-      } else {
-        // Format data untuk create - kirim satu per satu
-        await Promise.all(
-          tempTransactions.map(async (t) => {
-            await axios.post('/mahasiswa/jurnal', {
-              tanggal: t.date,
-              bukti: t.documentType,
-              keterangan: t.description,
-              akun_id: t.akun_id,
-              debit: t.debit || null,
-              kredit: t.kredit || null,
-              perusahaan_id: perusahaanId,
-              sub_akun_id: t.sub_akun_id || null
+              }
             });
-          })
-        );
-
-        toast({
-          title: "Berhasil",
-          description: "Data berhasil disimpan"
-        });
-
-        // Hard refresh ke halaman jurnal
-        window.location.href = '/jurnal';
+          }
+        }
+        
+        // Create new transactions with the same event details
+        for (const transaction of newTransactions) {
+          console.log("Creating new transaction in existing event:", transaction);
+          await postJurnal({
+            tanggal: transaction.date,
+            bukti: transaction.documentType,
+            keterangan: transaction.description,
+            akun_id: transaction.akun_id,
+            debit: transaction.debit || null,
+            kredit: transaction.kredit || null,
+            perusahaan_id: perusahaanId || "",
+            sub_akun_id: transaction.sub_akun_id || null
+          });
+        }
+      } else {
+        // For new events, create all transactions
+        for (const transaction of tempTransactions) {
+          console.log("Creating new transaction:", transaction);
+          await postJurnal({
+            tanggal: transaction.date,
+            bukti: transaction.documentType,
+            keterangan: transaction.description,
+            akun_id: transaction.akun_id,
+            debit: transaction.debit || null,
+            kredit: transaction.kredit || null,
+            perusahaan_id: perusahaanId || "",
+            sub_akun_id: transaction.sub_akun_id || null
+          });
+        }
       }
-
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: isEditMode ? "Transaksi berhasil diperbarui" : "Transaksi berhasil ditambahkan",
+      });
+      
     } catch (error: any) {
       console.error('Error detail:', {
         message: error.message,
@@ -464,7 +573,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     }).replace(/-/g, '/');
   };
 
-  // Add state reset function
+  // Update the resetAllState function to be more comprehensive
   const resetAllState = () => {
     resetFormData();
     setTempTransactions([]);
@@ -473,14 +582,40 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
     setIsEditingEvent(false);
   };
 
+  // Add cleanup effect
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      resetAllState();
+    };
+  }, []);
+
+  // Add effect to clean state when form is closed
+  useEffect(() => {
+    if (!isOpen) {
+      // Small delay to ensure animations complete before resetting state
+      const timer = setTimeout(() => {
+        resetAllState();
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   return (
     <>
       <Dialog 
         open={isOpen} 
         onOpenChange={(open) => {
           if (!open) {
-            resetAllState(); // Use new reset function
+            // When closing the dialog, reset all state
+            resetAllState();
             onClose();
+          } else {
+            // When opening the dialog, reset if not in edit mode
+            if (!editingTransactions.length) {
+              resetAllState();
+            }
           }
         }}
       >
@@ -493,6 +628,18 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
           <div className="flex gap-6">
             {/* Left side - Form */}
             <form onSubmit={handleSubmit} className="space-y-4 w-[400px]">
+              {/* Container for Reset Transaksi button aligned to the right */}
+              <div className="flex justify-end">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={resetAllState}
+                  className="hover:bg-gray-100 text-gray-800"
+                >
+                  Reset Transaksi
+                </Button>
+              </div>
+
               <div className="grid gap-4">
                 {/* Form fields untuk event (tanggal, bukti, keterangan) */}
                 <div className="grid gap-2">
@@ -586,59 +733,12 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
 
                 <div className="grid gap-2">
                   <label>Nama Akun</label>
-                  <Select
+                  <Input
                     value={formData.namaAkun}
-                    onValueChange={(value) => {
-                      const selectedAkun = akunList.find(a => a.nama === value);
-                      const selectedSubAkun = subAkunList.find(s => s.nama === value);
-                      
-                      if (selectedAkun) {
-                        setFormData({
-                          ...formData,
-                          kodeAkun: selectedAkun.kode.toString(),
-                          namaAkun: selectedAkun.nama,
-                          akun_id: selectedAkun.id,
-                          sub_akun_id: null
-                        });
-                      } else if (selectedSubAkun) {
-                        setFormData({
-                          ...formData,
-                          kodeAkun: selectedSubAkun.kode.toString(),
-                          namaAkun: selectedSubAkun.nama,
-                          akun_id: selectedSubAkun.akun.id,
-                          sub_akun_id: selectedSubAkun.id
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Nama Akun"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Akun</SelectLabel>
-                        {akunList.map((akun) => (
-                          <SelectItem 
-                            key={`main-nama-${akun.id}`}
-                            value={akun.nama}
-                          >
-                            {`${akun.nama} (${akun.kode})`}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Sub Akun</SelectLabel>
-                        {subAkunList.map((subAkun) => (
-                          <SelectItem 
-                            key={`sub-nama-${subAkun.id}`}
-                            value={subAkun.nama}
-                          >
-                            {`${subAkun.nama} (${subAkun.kode})`}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    disabled={true}
+                    readOnly
+                    className="bg-gray-50"
+                  />
                 </div>
 
                 <div className="grid gap-2">
@@ -676,8 +776,11 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                 <Button type="button" variant="outline" onClick={onClose}>
                   Batal
                 </Button>
-                <Button type="submit">
-                  {editingTransactionIndex !== null ? 'Update Transaksi' : 'Tambah ke Ringkasan'}
+                <Button
+                  type="submit"
+                  className="w-full bg-[#E11D48] hover:bg-[#F43F5E] text-white"
+                >
+                  Tambah Transaksi
                 </Button>
               </div>
             </form>
@@ -723,8 +826,8 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                           className="mt-1"
                         />
                       ) : (
-                        <p className="text-base font-medium mt-1">{formatDate(tempTransactions[0].date)}</p>
-                      )}
+                          <p className="text-base font-medium mt-1">{formatDate(tempTransactions[0].date)}</p>
+                        )}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-600">Bukti</p>
@@ -768,43 +871,57 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                       </tr>
                     </thead>
                     <tbody>
-                      {tempTransactions.map((transaction, index) => (
-                        <tr 
-                          key={index} 
-                          className={`border-t hover:bg-gray-50 ${
-                            editingTransactionIndex === index ? 'bg-yellow-50' : ''
-                          }`}
-                        >
-                          <td className="px-4 py-2">{transaction.kodeAkun}</td>
-                          <td className="px-4 py-2">{transaction.namaAkun}</td>
-                          <td className="px-4 py-2 text-right">
-                            {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
-                          </td>
-                          <td className="px-4 py-2 text-right">
-                            {transaction.kredit ? `Rp ${transaction.kredit.toLocaleString()}` : '-'}
-                          </td>
-                          <td className="px-4 py-2">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditTransaction(index)}
-                                className="h-8 w-8 p-0 hover:bg-gray-100"
-                              >
-                                <Pencil className="h-4 w-4 text-gray-500" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteTransaction(index)}
-                                className="h-8 w-8 p-0 hover:bg-gray-100"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {tempTransactions.map((transaction, index) => {
+                        // Jika memiliki sub_akun_id, dapatkan informasi sub akun
+                        let displayKodeAkun = transaction.kodeAkun;
+                        let displayNamaAkun = transaction.namaAkun;
+                        
+                        if (transaction.sub_akun_id) {
+                          const subAkun = subAkunList.find(s => s.id === transaction.sub_akun_id);
+                          if (subAkun) {
+                            displayKodeAkun = subAkun.kode.toString();
+                            displayNamaAkun = subAkun.nama;
+                          }
+                        }
+                        
+                        return (
+                          <tr 
+                            key={index} 
+                            className={`border-t hover:bg-gray-50 ${
+                              editingTransactionIndex === index ? 'bg-yellow-50' : ''
+                            }`}
+                          >
+                            <td className="px-4 py-2">{displayKodeAkun}</td>
+                            <td className="px-4 py-2">{displayNamaAkun}</td>
+                            <td className="px-4 py-2 text-right">
+                              {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {transaction.kredit ? `Rp ${transaction.kredit.toLocaleString()}` : '-'}
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditTransaction(index)}
+                                  className="h-8 w-8 p-0 hover:bg-gray-100"
+                                >
+                                  <Pencil className="h-4 w-4 text-gray-500" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteTransaction(index)}
+                                  className="h-8 w-8 p-0 hover:bg-gray-100"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot className="bg-gray-50 font-medium">
                       <tr>
@@ -885,7 +1002,10 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                     type="button"
                     className="w-full bg-[#E11D48] hover:bg-[#F43F5E] text-white"
                     onClick={handleSubmitAll}
-                    disabled={calculateTotals().totalDebit !== calculateTotals().totalKredit}
+                    disabled={
+                      tempTransactions.length === 0 || 
+                      calculateTotals().totalDebit !== calculateTotals().totalKredit
+                    }
                   >
                     {editingTransactions.length > 0 ? 'Update Jurnal' : 'Simpan ke Jurnal'}
                   </Button>
@@ -896,22 +1016,22 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showSuccessAlert} onOpenChange={setShowSuccessAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Notifikasi</AlertDialogTitle>
-            <AlertDialogDescription>{successMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button onClick={() => {
-              setShowSuccessAlert(false);
-              onClose();
-            }}>
-              OK
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+    <AlertDialog open={showSuccessAlert} onOpenChange={setShowSuccessAlert}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Notifikasi</AlertDialogTitle>
+          <AlertDialogDescription>{successMessage}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button onClick={() => {
+            setShowSuccessAlert(false);
+            onClose();
+          }}>
+            OK
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
+);
 } 

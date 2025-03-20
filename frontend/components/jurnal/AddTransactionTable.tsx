@@ -34,16 +34,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useJurnal, useDeleteJurnal } from "@/hooks/useJurnal";
+import { useQueryClient } from "@tanstack/react-query";
+
+// Extend Transaction interface untuk menampung properti optimistic
+declare module '@/types/transaction' {
+  interface Transaction {
+    _optimistic?: boolean;
+    _groupId?: string;
+    _originalDescription?: string;
+    _updatedAt?: number;
+    sub_akun_id: string | null;
+  }
+}
 
 interface SubAkun {
   id: string;
-  kode: number;
+  kode: string;
   nama: string;
-  akun: {
-    id: string;
-    kode: number;
-    nama: string;
-  };
+  akun_id: string;
 }
 
 interface JurnalData {
@@ -66,7 +75,11 @@ interface JurnalEntry {
     nama: string;
     status: string;
   };
-  sub_akun: any | null;
+  sub_akun: {
+    id: string;
+    kode: number;
+    nama: string;
+  } | null;
   perusahaan: {
     id: string;
     nama: string;
@@ -80,21 +93,50 @@ interface AddTransactionTableProps {
   accounts: Account[];
   transactions: Transaction[];
   onTransactionsChange: (transactions: Transaction[]) => void;
+  isLoading?: boolean;
 }
 
-// Add this function near the top of the file
+// Update formatJurnalResponse function
 const formatJurnalResponse = (jurnalData: JurnalData): Transaction[] => {
+  console.log("Formatting jurnal data:", jurnalData);
+  
+  // Jika jurnalData adalah array, berarti format responsnya berbeda
+  if (Array.isArray(jurnalData)) {
+    console.log("jurnalData is an array, using different format");
+    return jurnalData.map(entry => ({
+      id: entry.id,
+      date: entry.tanggal,
+      documentType: entry.bukti,
+      description: entry.keterangan,
+      namaAkun: entry.sub_akun ? entry.sub_akun.nama : entry.akun.nama,
+      // Use sub-account code if available, otherwise use main account code
+      kodeAkun: entry.sub_akun ? entry.sub_akun.kode.toString() : entry.akun.kode.toString(),
+      akun_id: entry.akun_id,
+      debit: entry.debit || 0,
+      kredit: entry.kredit || 0,
+      perusahaan_id: entry.perusahaan_id,
+      sub_akun_id: entry.sub_akun_id
+    }));
+  }
+  
+  // Format standar (object dengan key keterangan)
   const formattedTransactions: Transaction[] = [];
   
   Object.entries(jurnalData).forEach(([keterangan, entries]) => {
+    if (!Array.isArray(entries)) {
+      console.warn(`Entries for ${keterangan} is not an array:`, entries);
+      return;
+    }
+    
     entries.forEach(entry => {
       formattedTransactions.push({
         id: entry.id,
         date: entry.tanggal,
         documentType: entry.bukti,
         description: entry.keterangan,
-        namaAkun: entry.akun.nama,
-        kodeAkun: entry.akun.kode.toString(),
+        namaAkun: entry.sub_akun ? entry.sub_akun.nama : entry.akun.nama,
+        // Use sub-account code if available, otherwise use main account code
+        kodeAkun: entry.sub_akun ? entry.sub_akun.kode.toString() : entry.akun.kode.toString(),
         akun_id: entry.akun_id,
         debit: entry.debit || 0,
         kredit: entry.kredit || 0,
@@ -110,7 +152,8 @@ const formatJurnalResponse = (jurnalData: JurnalData): Transaction[] => {
 export function AddTransactionTable({ 
   accounts = [], 
   transactions = [], 
-  onTransactionsChange 
+  onTransactionsChange,
+  isLoading = false 
 }: AddTransactionTableProps) {
   const { accounts: contextAccounts } = useAccounts();
   const { setTransactions } = useTransactions();
@@ -122,7 +165,6 @@ export function AddTransactionTable({
   const [inlineEditData, setInlineEditData] = useState<Transaction | null>(null);
   const ITEMS_PER_PAGE = 10;
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [akunList, setAkunList] = useState<Account[]>([]);
@@ -134,10 +176,33 @@ export function AddTransactionTable({
   } | null>(null);
   const [isJurnalFormOpen, setIsJurnalFormOpen] = useState(false);
   const [editingTransactions, setEditingTransactions] = useState<Transaction[]>([]);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const { toast } = useToast();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction[]>([]);
+  const [localLoading, setLocalLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { mutate: deleteJurnal } = useDeleteJurnal();
+  const [refreshingRows, setRefreshingRows] = useState<string[]>([]);
+  const [styleSheet, setStyleSheet] = useState<HTMLStyleElement | null>(null);
+  const [loadingToast, setLoadingToast] = useState<any>(null);
+  const [updatingTransaction, setUpdatingTransaction] = useState<string | null>(null);
+  const [lastUpdatedDescription, setLastUpdatedDescription] = useState<string | null>(null);
+  const [isAwaitingRefresh, setIsAwaitingRefresh] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [operationType, setOperationType] = useState<'update' | 'delete' | null>(null);
+  const [forceRefreshCounter, setForceRefreshCounter] = useState(0);
+  const [pendingOperations, setPendingOperations] = useState<any[]>([]);
+  const [optimisticUpdates, setOptimisticUpdates] = useState<{
+    description: string;
+    timestamp: number;
+    transactions: Transaction[];
+  }[]>([]);
+  const [awaitingServerConfirmation, setAwaitingServerConfirmation] = useState(false);
+  const [prioritizedTransactions, setPrioritizedTransactions] = useState<Transaction[]>([]);
+  const [disableServerFetch, setDisableServerFetch] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [hasAttemptedInitialLoad, setHasAttemptedInitialLoad] = useState(false);
+  const { toast } = useToast();
+  const [highlightedEvents, setHighlightedEvents] = useState<Set<string>>(new Set());
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -158,9 +223,19 @@ export function AddTransactionTable({
     setNewTransactions([...newTransactions, { ...emptyTransaction }]);
   };
 
+  // Helper function untuk menangani string field assignment
+  const updateTransactionField = (transaction: Transaction, field: string, value: string) => {
+    // Safe way to set string properties with TypeScript
+    return {
+      ...transaction,
+      [field]: value
+    };
+  };
+
+  // Update handleNewTransactionChange
   const handleNewTransactionChange = (index: number, field: keyof Transaction, value: string | number) => {
     const updatedTransactions = [...newTransactions];
-    const transaction = { ...updatedTransactions[index] };
+    let transaction = { ...updatedTransactions[index] };
 
     // Handle numeric fields
     if (field === 'debit' || field === 'kredit') {
@@ -174,8 +249,8 @@ export function AddTransactionTable({
         transaction.debit = 0;
       }
     } else {
-      // Handle string fields with type assertion
-      transaction[field as keyof Omit<Transaction, 'debit' | 'kredit'>] = value as string;
+      // Handle string fields using the safe helper
+      transaction = updateTransactionField(transaction, field, value as string);
     }
 
     updatedTransactions[index] = transaction;
@@ -200,10 +275,10 @@ export function AddTransactionTable({
         account.subAccounts.forEach((subAccount: SubAccount) => {
           if (subAccount.kodeAkunInduk && subAccount.kodeSubAkun && subAccount.namaSubAkun) {
             const fullKodeAkun = `${subAccount.kodeAkunInduk},${subAccount.kodeSubAkun}`;
-            allAccounts.push({
-              kodeAkun: fullKodeAkun,
+          allAccounts.push({
+            kodeAkun: fullKodeAkun,
               namaAkun: subAccount.namaSubAkun
-            });
+          });
           }
         });
       }
@@ -270,9 +345,10 @@ export function AddTransactionTable({
     setEditingIndex(null);
   };
 
+  // Update handleEditChange with the same approach
   const handleEditChange = (index: number, field: keyof Transaction, value: string | number) => {
     const updatedTransactions = [...transactions];
-    const transaction = { ...updatedTransactions[index] };
+    let transaction = { ...updatedTransactions[index] };
 
     // Handle numeric fields
     if (field === 'debit' || field === 'kredit') {
@@ -286,8 +362,8 @@ export function AddTransactionTable({
         transaction.debit = 0;
       }
     } else {
-      // Handle string fields with type assertion
-      transaction[field as keyof Omit<Transaction, 'debit' | 'kredit'>] = value as string;
+      // Handle string fields using the safe helper
+      transaction = updateTransactionField(transaction, field, value as string);
     }
 
     updatedTransactions[index] = transaction;
@@ -298,18 +374,36 @@ export function AddTransactionTable({
     t.namaAkun.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Tambahkan fungsi handleExportCSV
+  // Update the handleExportCSV function to properly handle sub-accounts
   const handleExportCSV = () => {
-    const csvData = transactions.map(t => ({
-      Tanggal: t.date,
-      Bukti: t.documentType,
-      Keterangan: t.description,
-      'Kode Akun': t.kodeAkun,
-      'Nama Akun': t.namaAkun,
-      Debit: t.debit,
-      Kredit: t.kredit
-    }));
+    // Prepare data for CSV export with correct sub-account handling
+    const csvData = transactions.map(t => {
+      // Get the proper code and name for the account (considering sub-accounts)
+      let displayKodeAkun = t.kodeAkun;
+      let displayNamaAkun = t.namaAkun;
+      
+      // If transaction has a sub_akun_id, get the sub-account code and name
+      if (t.sub_akun_id && subAkunList && subAkunList.length > 0) {
+        const subAkun = subAkunList.find(sa => sa.id === t.sub_akun_id);
+        if (subAkun) {
+          displayKodeAkun = subAkun.kode; // Use sub-account code
+          displayNamaAkun = subAkun.nama;  // Use sub-account name
+        }
+      }
+      
+      // Return the row with correct values
+      return {
+        Tanggal: formatDate(t.date),
+        Bukti: t.documentType,
+        Keterangan: t.description,
+        'Kode Akun': displayKodeAkun,
+        'Nama Akun': displayNamaAkun,
+        Debit: t.debit ? t.debit : '',
+        Kredit: t.kredit ? t.kredit : ''
+      };
+    });
 
+    // Generate the CSV
     const csv = Papa.unparse(csvData);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -394,150 +488,603 @@ export function AddTransactionTable({
     setShowDeleteAlert(true);
   };
 
-  const confirmDelete = async () => {
+  // Update fetchLatestData to prevent unwanted transitions
+  const fetchLatestData = async () => {
+    console.log("Fetching latest data...");
     try {
-      const transactionIds = transactionToDelete
-        .filter(t => t.description === transactionToDelete[0].description)
-        .map(t => t.id);
-
-      await Promise.all(
-        transactionIds.map(id => axios.delete(`/mahasiswa/jurnal/${id}`))
-      );
-
-      toast({
-        title: "Berhasil",
-        description: "Data berhasil dihapus"
+      // Tampilkan status awal
+      console.log("Current state:", {
+        transactions: transactions.length,
+        optimisticUpdates: optimisticUpdates.length,
+        disableServerFetch
       });
       
-      // Refresh after 2 seconds
-      setTimeout(() => {
-        window.location.href = '/jurnal';
-      }, 2000);
-
+      // Jika disabled, log dan hentikan
+      if (disableServerFetch) {
+        console.log("Server fetch disabled, skipping fetch");
+        return;
+      }
+      
+      // If we have optimistic updates that are recent (less than 5 seconds old), skip fetching
+      const hasRecentOptimisticUpdates = optimisticUpdates.some(
+        update => Date.now() - update.timestamp < 5000
+      );
+      
+      if (hasRecentOptimisticUpdates) {
+        console.log("Recent optimistic updates exist, skipping fetch to avoid UI flicker");
+        return;
+      }
+      
+      // Fetch data dari server
+      console.log("Calling API...");
+      const jurnalResponse = await axios.get('/mahasiswa/jurnal');
+      console.log("API Response:", jurnalResponse.data);
+      
+      if (jurnalResponse.data.success) {
+        const jurnalData: JurnalData = jurnalResponse.data.data;
+        // Periksa apakah data jurnal kosong
+        if (Object.keys(jurnalData).length === 0) {
+          console.log("API returned empty jurnal data");
+        }
+        
+        const serverTransactions = formatJurnalResponse(jurnalData);
+        console.log("Formatted transactions:", serverTransactions.length);
+        
+        // If we have optimistic updates, we need to merge them with server data
+        if (optimisticUpdates.length > 0) {
+          console.log("Merging optimistic updates with server data");
+          
+          // Create a map of server transactions for quick lookup
+          const serverTransactionMap = new Map();
+          serverTransactions.forEach(t => {
+            if (!serverTransactionMap.has(t.description)) {
+              serverTransactionMap.set(t.description, []);
+            }
+            serverTransactionMap.get(t.description).push(t);
+          });
+          
+          // Make a copy of server transactions
+          let mergedTransactions = [...serverTransactions];
+          
+          // Add any optimistic transactions that don't exist on server yet
+          optimisticUpdates.forEach(update => {
+            const hasServerVersion = serverTransactionMap.has(update.description);
+            
+            // If this is a very recent update (less than 2 seconds old), keep the optimistic version
+            if (!hasServerVersion || Date.now() - update.timestamp < 2000) {
+              // Find and remove any server transactions with this description
+              mergedTransactions = mergedTransactions.filter(t => 
+                t.description !== update.description
+              );
+              
+              // Add our optimistic version
+              mergedTransactions.push(...update.transactions);
+            }
+          });
+          
+          // Update UI with merged transactions
+          onTransactionsChange(mergedTransactions);
+        } else {
+          // No optimistic updates, just update with server data
+          onTransactionsChange(serverTransactions);
+        }
+      } else {
+        console.error("API returned success: false");
+      }
     } catch (error) {
+      console.error('Error fetching latest data:', error);
+      // Tambahkan toast untuk memberi tahu user
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Gagal memuat data jurnal. Silakan refresh halaman."
+      });
+    }
+  };
+
+  // Perbaiki checkServerUpdates untuk lebih cerdas menangani optimistic update
+  const checkServerUpdates = async () => {
+    // Jika disabled, jangan fetch
+    if (disableServerFetch) {
+      console.log("Server fetch disabled, skipping check");
+      return;
+    }
+    
+    try {
+      const jurnalResponse = await axios.get('/mahasiswa/jurnal');
+      
+      if (jurnalResponse.data.success) {
+        const jurnalData: JurnalData = jurnalResponse.data.data;
+        const serverTransactions = formatJurnalResponse(jurnalData);
+        
+        // Jika tidak ada optimistic updates, langsung update UI
+        if (optimisticUpdates.length === 0) {
+          onTransactionsChange(serverTransactions);
+          return;
+        }
+        
+        // Periksa apakah ada kecocokan antara server transactions dan optimistic updates
+        const optimisticDescriptions = optimisticUpdates.map(u => u.description);
+        const matchingServerTransactions = serverTransactions.filter(st => 
+          optimisticDescriptions.includes(st.description)
+        );
+        
+        if (matchingServerTransactions.length > 0) {
+          console.log("Found matching transactions on server, confirming updates");
+          
+          // Hapus optimistic updates yang sudah terkonfirmasi server
+          const confirmedDescriptions = matchingServerTransactions.map(t => t.description);
+          setOptimisticUpdates(prev => 
+            prev.filter(u => !confirmedDescriptions.includes(u.description))
+          );
+          
+          // Reset flag menunggu konfirmasi
+          setAwaitingServerConfirmation(false);
+          
+          // Buat map untuk lookup cepat transaksi server
+          const serverTransactionMap = new Map();
+          serverTransactions.forEach(t => {
+            const key = t.description;
+            if (!serverTransactionMap.has(key)) {
+              serverTransactionMap.set(key, []);
+            }
+            serverTransactionMap.get(key).push(t);
+          });
+          
+          // Pembersihan optimistic updates yang tersisa dari UI
+          // Copy transaksi saat ini
+          const currentTransactions = [...transactions];
+          
+          // Hapus semua transaksi optimistic yang sudah terkonfirmasi
+          const cleanedTransactions = currentTransactions.filter(t => 
+            !t._optimistic || !confirmedDescriptions.includes(t.description)
+          );
+          
+          // Tambahkan transaksi server untuk yang sudah terkonfirmasi
+          confirmedDescriptions.forEach(desc => {
+            if (serverTransactionMap.has(desc)) {
+              // Temukan indeks untuk menambahkan transaksi ini
+              const index = currentTransactions.findIndex(t => t.description === desc);
+              if (index !== -1) {
+                // Hapus di posisi ini dan tambahkan transaksi server
+                cleanedTransactions.splice(index, 0, ...serverTransactionMap.get(desc));
+              } else {
+                // Jika tidak ditemukan, tambahkan di akhir
+                cleanedTransactions.push(...serverTransactionMap.get(desc));
+              }
+            }
+          });
+          
+          // Update UI
+          onTransactionsChange(cleanedTransactions);
+        } else if (Date.now() - optimisticUpdates[0]?.timestamp > 8000) {
+          // Jika sudah lebih dari 8 detik dan belum ada konfirmasi, 
+          // mungkin update gagal. Clear flag dan update UI
+          console.log("No confirmation after extended timeout, clearing optimistic updates");
+          setAwaitingServerConfirmation(false);
+          setOptimisticUpdates([]);
+          onTransactionsChange(serverTransactions);
+        } else {
+          // Masih dalam window waktu, tetap pertahankan optimistic updates
+          console.log("Still within time window, keeping optimistic updates");
+          
+          // Jadwalkan pemeriksaan lagi dengan interval yang meningkat
+          const nextCheckDelay = Math.min(
+            2000 * Math.log(1 + (Date.now() - optimisticUpdates[0]?.timestamp) / 1000),
+            3000
+          );
+          setTimeout(() => {
+            checkServerUpdates();
+          }, nextCheckDelay);
+        }
+        }
+      } catch (error) {
+      console.error('Error checking server updates:', error);
+      // Jika error, reset flag untuk memungkinkan update berikutnya
+      setAwaitingServerConfirmation(false);
+    }
+  };
+
+  // Update the performOptimisticUpdate function to be more stable
+  const performOptimisticUpdate = (newTransactionOrTransactions: Transaction | Transaction[]) => {
+    // Konversi ke array jika belum
+    const newTransactions = Array.isArray(newTransactionOrTransactions) 
+      ? newTransactionOrTransactions 
+      : [newTransactionOrTransactions];
+    
+    if (newTransactions.length === 0) return false;
+    
+    // Timestamp untuk tracking
+    const timestamp = Date.now();
+    const operationId = `temp-${timestamp}`;
+    
+    // Tentukan deskripsi target yang sedang diedit
+    const targetDescription = editingTransactions.length > 0
+      ? editingTransactions[0].description
+      : newTransactions[0].description; // Untuk kasus input baru dari JurnalForm
+    
+    // Buat salinan transaksi saat ini
+    const currentTransactions = [...transactions];
+    
+    // Persiapkan optimistic transactions yang telah ditandai
+    const optimisticTransactions = newTransactions.map((t, idx) => ({
+      ...t,
+      id: t.id && !t.id.startsWith('temp-') ? t.id : `${operationId}-${idx}`,
+      _optimistic: true,
+      _timestamp: timestamp
+    }));
+
+    let updatedTransactions = [];
+    
+    // Jika ini update untuk transaksi yang sudah ada
+    if (targetDescription && editingTransactions.length > 0) {
+      // Temukan indeks grup di array
+      const firstIndex = currentTransactions.findIndex(
+        t => t.description === targetDescription
+      );
+      
+      if (firstIndex !== -1) {
+        // Buat salinan array dan hapus transaksi lama
+        const filteredTransactions = currentTransactions.filter(
+          t => t.description !== targetDescription
+        );
+        
+        // Sisipkan transaksi baru pada posisi yang sama
+        filteredTransactions.splice(firstIndex, 0, ...optimisticTransactions);
+        updatedTransactions = filteredTransactions;
+        
+        // Simpan optimistic update dalam state untuk referensi
+        setOptimisticUpdates(prev => [
+          ...prev.filter(u => u.description !== targetDescription),
+          {
+            description: optimisticTransactions[0].description,
+            timestamp,
+            transactions: optimisticTransactions
+          }
+        ]);
+      } else {
+        // Jika target tidak ditemukan, tambahkan di akhir
+        updatedTransactions = [...currentTransactions, ...optimisticTransactions];
+        
+        // Simpan optimistic update dalam state
+        setOptimisticUpdates(prev => [
+          ...prev,
+          {
+            description: optimisticTransactions[0].description,
+            timestamp,
+            transactions: optimisticTransactions
+          }
+        ]);
+      }
+    } else {
+      // Untuk kasus transaksi baru, periksa apakah ada transaksi dengan deskripsi yang sama
+      const existingIndex = currentTransactions.findIndex(
+        t => t.description === newTransactions[0].description
+      );
+      
+      if (existingIndex !== -1) {
+        // Jika deskripsi sudah ada, ini mungkin update dari transaksi yang sudah ada
+        // Hapus transaksi lama
+        const filteredTransactions = currentTransactions.filter(
+          t => t.description !== newTransactions[0].description
+        );
+        
+        // Sisipkan transaksi baru pada posisi yang sama
+        filteredTransactions.splice(existingIndex, 0, ...optimisticTransactions);
+        updatedTransactions = filteredTransactions;
+      } else {
+        // Benar-benar transaksi baru
+        updatedTransactions = [...currentTransactions, ...optimisticTransactions];
+      }
+      
+      // Simpan optimistic update dalam state
+      setOptimisticUpdates(prev => [
+        ...prev.filter(u => u.description !== newTransactions[0].description),
+        {
+          description: optimisticTransactions[0].description,
+          timestamp,
+          transactions: optimisticTransactions
+        }
+      ]);
+    }
+    
+    // Temporarily disable server fetches to prevent the UI from flickering
+    setDisableServerFetch(true);
+    
+    // Set flag untuk menunggu konfirmasi server
+    setAwaitingServerConfirmation(true);
+    
+    // Update state
+    onTransactionsChange(updatedTransactions);
+    
+    // For a smoother experience, don't fetch data automatically for a while
+    // This gives time for the backend to process before we try to fetch latest data
+    setTimeout(() => {
+      setDisableServerFetch(false);
+    }, 3000); // Keep disabled for 3 seconds
+    
+    return true;
+  };
+
+  // Also update the handleJurnalFormSubmit to better manage the state transitions
+  const handleJurnalFormSubmit = async (newTransactionOrTransactions: Transaction | Transaction[]) => {
+    // Tutup form dulu
+    setIsJurnalFormOpen(false);
+    
+    // Track description for coloring
+    const transactions = Array.isArray(newTransactionOrTransactions) 
+      ? newTransactionOrTransactions 
+      : [newTransactionOrTransactions];
+
+    if (transactions.length > 0) {
+      const eventDescription = transactions[0].description;
+      
+      // Clear all previous highlights and set only the current one
+      setHighlightedEvents(new Set([eventDescription]));
+      
+      // Perform optimistic update for immediate UI feedback
+      performOptimisticUpdate(newTransactionOrTransactions);
+      
+      // Instead of making immediate API call and causing flickering,
+      // use a background invalidation without immediate refetch
+      queryClient.invalidateQueries({ 
+        queryKey: ['jurnal'],
+        // Don't refetch immediately - we'll let the optimistic update show first
+        refetchType: 'none'
+      });
+      
+      // After a reasonable delay, allow the server to refresh data
+      // but only if the user hasn't done any other actions
+      setTimeout(() => {
+        if (highlightedEvents.has(eventDescription)) {
+          // Only re-enable server fetch if this is still the highlighted event
+          setDisableServerFetch(false);
+        }
+      }, 2000);
+    }
+  };
+
+  // Pastikan handleJurnalFormClosing tidak mereset refreshingRows terlalu cepat
+  const handleJurnalFormClosing = () => {
+    setIsJurnalFormOpen(false);
+    setEditingTransactions([]);
+    
+    // Jangan reset refreshingRows di sini, biarkan fetchLatestData menanganinya
+    // Jangan panggil fetchLatestData di sini jika form ditutup tanpa submit
+  };
+
+  // Tambahkan cleanup handler yang akan dijalankan saat component unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup saat component unmount
+      setRefreshingRows([]);
+      setUpdatingTransaction(null);
+    };
+  }, []);
+
+  // Perbaiki useEffect untuk initial data load - tambahkan logging lebih detail
+  useEffect(() => {
+    const loadInitialData = async () => {
+      console.log("Starting initial data load...");
+      setIsInitialLoading(true);
+      
+      try {
+        console.log("Loading initial jurnal data...");
+        const response = await axios.get('/mahasiswa/jurnal');
+        console.log("Initial jurnal response status:", response.status);
+        console.log("Initial jurnal response data:", response.data);
+        
+        if (response.data.success) {
+          const jurnalData = response.data.data;
+          console.log("Jurnal data before formatting:", jurnalData);
+          
+          const formattedTransactions = formatJurnalResponse(jurnalData);
+          console.log("Initial transactions formatted:", formattedTransactions);
+          
+          // Update state
+          onTransactionsChange(formattedTransactions);
+          console.log("Transactions state updated");
+        } else {
+          console.error("Initial load returned success: false");
+        }
+      } catch (error) {
+        console.error("Error during initial data load:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Gagal memuat data jurnal awal"
+        });
+      } finally {
+        console.log("Setting isInitialLoading to false");
+        setIsInitialLoading(false);
+        setHasAttemptedInitialLoad(true);
+      }
+    };
+    
+    loadInitialData();
+  }, []);
+
+  // Fungsi helper untuk parsing tanggal dari berbagai format
+  const parseDate = (dateString: string): Date => {
+    console.log("Parsing date:", dateString);
+    
+    // Jika dateString kosong, kembalikan tanggal sekarang
+    if (!dateString) return new Date();
+    
+    let parsedDate: Date;
+    
+    // Format ISO (YYYY-MM-DD)
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      parsedDate = new Date(year, month - 1, day);
+    } 
+    // Format DD/MM/YYYY
+    else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [day, month, year] = dateString.split('/').map(Number);
+      parsedDate = new Date(year, month - 1, day);
+    }
+    // Format YYYY/MM/DD
+    else if (dateString.match(/^\d{4}\/\d{2}\/\d{2}$/)) {
+      const [year, month, day] = dateString.split('/').map(Number);
+      parsedDate = new Date(year, month - 1, day);
+    }
+    // Coba dengan Date constructor jika format lain
+    else {
+      parsedDate = new Date(dateString);
+    }
+    
+    // Validasi hasil parsing
+    if (isNaN(parsedDate.getTime())) {
+      console.error("Invalid date parsed:", dateString);
+      return new Date(); // Fallback ke tanggal sekarang
+    }
+    
+    console.log("Date parsed as:", parsedDate.toISOString());
+    return parsedDate;
+  };
+
+  // Perbaiki formatDate untuk menampilkan dengan konsisten di UI
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    try {
+      const date = parseDate(dateString);
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error, dateString);
+      return dateString; // Kembalikan string asli jika gagal
+    }
+  };
+
+  // Update confirmDelete to clear highlights for deleted events
+  const confirmDelete = async () => {
+    if (!transactionToDelete || transactionToDelete.length === 0) {
+      setShowDeleteAlert(false);
+      return;
+    }
+    
+    // Ambil description dari transaksi yang akan dihapus
+    const targetDescription = transactionToDelete[0].description;
+    console.log(`Deleting transactions with description: ${targetDescription}`);
+    
+    // Tutup dialog konfirmasi
+    setShowDeleteAlert(false);
+    
+    // Lakukan optimistic delete - hapus dari UI dulu
+    const currentTransactions = [...transactions];
+    const remainingTransactions = currentTransactions.filter(
+      t => t.description !== targetDescription
+    );
+    
+    // Update UI untuk menghapus transaksi secara optimistic
+    onTransactionsChange(remainingTransactions);
+    
+    try {
+      // Kumpulkan semua ID yang valid untuk dihapus
+      const transactionIds = transactionToDelete
+        .filter(t => t.id && !t.id.startsWith('temp-'))
+        .map(t => t.id);
+      
+      console.log(`Deleting ${transactionIds.length} transactions from server`);
+      
+      // Panggil API delete untuk setiap ID
+      if (transactionIds.length > 0) {
+        await Promise.all(transactionIds.map(id => deleteJurnal(id)));
+        console.log("Delete API calls completed successfully");
+      }
+      
+      // Refresh data di background
+      queryClient.invalidateQueries({ queryKey: ['jurnal'] });
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      
       toast({
         variant: "destructive",
         title: "Error",
         description: "Gagal menghapus data"
       });
+      
+      // Kembalikan data asli jika gagal
+      await fetchLatestData();
     }
-    setShowDeleteAlert(false);
+
+    // Clean up highlight state when deleting an event
+    setHighlightedEvents(prev => {
+      const updated = new Set(prev);
+      updated.delete(targetDescription);
+      return updated;
+    });
   };
 
-  // Update handleJurnalFormSubmit
-  const handleJurnalFormSubmit = async (newTransaction: Transaction) => {
-    // Refresh data without page reload
-    try {
-      const response = await axios.get('/mahasiswa/jurnal');
-      if (response.data.success) {
-        const formattedTransactions = formatJurnalResponse(response.data.data);
-        onTransactionsChange(formattedTransactions);
-      }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    }
-  };
-
-  // Update useEffect untuk fetch jurnal data
+  // Tambahkan useEffect untuk fetching data sub akun
   useEffect(() => {
-    const fetchJurnal = async () => {
-      setIsLoading(true);
+    const fetchSubAkun = async () => {
       try {
-        const response = await axios.get('/mahasiswa/jurnal');
+        console.log("Fetching sub akun data...");
+        const response = await axios.get('/mahasiswa/subakun');
+        console.log("Sub akun response:", response.data);
+        
         if (response.data.success) {
-          const jurnalData: JurnalData = response.data.data;
-          const formattedTransactions: Transaction[] = [];
-
-          Object.entries(jurnalData).forEach(([keterangan, entries]) => {
-            entries.forEach(entry => {
-              formattedTransactions.push({
-                id: entry.id,
-                date: entry.tanggal,
-                documentType: entry.bukti,
-                description: entry.keterangan,
-                namaAkun: entry.akun.nama,
-                kodeAkun: entry.akun.kode.toString(),
-                akun_id: entry.akun_id,
-                debit: entry.debit || 0,
-                kredit: entry.kredit || 0,
-                perusahaan_id: entry.perusahaan_id,
-                sub_akun_id: entry.sub_akun_id
-              });
-            });
-          });
-
-          // Tidak perlu sorting di sini, langsung gunakan data dari API
-          onTransactionsChange(formattedTransactions);
+          setSubAkunList(response.data.data);
         }
       } catch (error) {
-        console.error('Error fetching jurnal:', error);
-        setError('Gagal memuat data jurnal');
-      } finally {
-        setIsLoading(false);
+        console.error("Error fetching sub akun data:", error);
       }
     };
-
-    fetchJurnal();
-  }, []);
-
-  // Update groupedTransactions untuk menggunakan data tanpa sorting
-  const groupedTransactions = useMemo(() => {
-    const groups: { [key: string]: Transaction[] } = {};
     
-    // Langsung gunakan transactions tanpa sorting
-    transactions.forEach(transaction => {
-      const eventKey = `${transaction.date}_${transaction.documentType}_${transaction.description}`;
-      if (!groups[eventKey]) {
-        groups[eventKey] = [];
-      }
-      groups[eventKey].push(transaction);
-    });
+    fetchSubAkun();
+  }, []); // Fetch sekali saat komponen dimount
 
-    return Object.values(groups);
-  }, [transactions]);
-
-  // Update handleSort untuk menangani sorting
-  const handleSort = () => {
-    const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-    setSortDirection(newDirection);
-    
-    const sortedTransactions = [...transactions].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return newDirection === 'asc' 
-        ? dateA - dateB  // Ascending (terlama ke terbaru)
-        : dateB - dateA; // Descending (terbaru ke terlama)
-    });
-
-    onTransactionsChange(sortedTransactions);
-  };
-
-  // Tambahkan fungsi format tanggal
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).replace(/-/g, '/');
-  };
-
-  // Update renderTableRow untuk menggunakan format tanggal
+  // Update renderTableRow to use yellow highlighting
   const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
     const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
     const isPartOfGroup = index > 0 && transaction.description === array[index - 1].description;
     const groupTransactions = array.filter(t => t.description === transaction.description);
+    
+    // Get proper kode and nama based on sub_akun_id
+    let displayKodeAkun = transaction.kodeAkun;
+    let displayNamaAkun = transaction.namaAkun;
+
+    console.log("Transaction sub_akun_id:", transaction.sub_akun_id);
+    console.log("Available subAkuns:", subAkunList);
+
+    // Jika transaction memiliki sub_akun_id, cari kode dan nama dari subAkunList
+    if (transaction.sub_akun_id && subAkunList && subAkunList.length > 0) {
+      const subAkun = subAkunList.find(sa => sa.id === transaction.sub_akun_id);
+      if (subAkun) {
+        console.log("Found matching subAkun:", subAkun);
+        displayKodeAkun = subAkun.kode; // Gunakan kode sub akun, misal 2111.1
+        displayNamaAkun = subAkun.nama;  // Gunakan nama sub akun
+      } else {
+        console.log("No matching subAkun found for id:", transaction.sub_akun_id);
+      }
+    } else {
+      console.log("No sub_akun_id or subAkunList is empty");
+    }
+
+    // Check if this event is highlighted
+    const isHighlighted = highlightedEvents.has(transaction.description);
+    
+    // Change color to yellow for highlighted rows
+    const rowBgClass = isHighlighted 
+      ? 'bg-yellow-50 hover:bg-yellow-100 border-l-4 border-yellow-400' 
+      : 'bg-white hover:bg-gray-50';
 
     return (
       <TableRow 
-        key={transaction.id}
-        className={isPartOfGroup ? 'bg-gray-50/50' : ''}
+        key={`tr-${transaction.id || index}-${Date.now()}`}
+        data-description={transaction.description}
+        className={rowBgClass}
       >
         <TableCell>{isFirstInGroup ? formatDate(transaction.date) : ''}</TableCell>
         <TableCell>{isFirstInGroup ? transaction.documentType : ''}</TableCell>
         <TableCell>{isFirstInGroup ? transaction.description : ''}</TableCell>
-        <TableCell>{transaction.kodeAkun}</TableCell>
-        <TableCell>{transaction.namaAkun}</TableCell>
+        <TableCell>{displayKodeAkun}</TableCell>
+        <TableCell>{displayNamaAkun}</TableCell>
         <TableCell className="text-right">
           {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
         </TableCell>
@@ -570,16 +1117,23 @@ export function AddTransactionTable({
     );
   };
 
-  // Add loading state
-  if (isLoading) {
+  // Add a function to clear all highlights
+  const clearAllHighlights = () => {
+    setHighlightedEvents(new Set());
+  };
+
+  // Pastikan semua kode kondisional berada di bawah hooks
+  if (isLoading || localLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+      <div className="flex items-center justify-center py-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  // Update tampilan error
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
@@ -595,8 +1149,37 @@ export function AddTransactionTable({
     );
   }
 
+  if (isInitialLoading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2">Loading jurnal data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasAttemptedInitialLoad && transactions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <div className="text-center">
+          <p className="text-xl font-medium">Jurnal Kosong</p>
+          <p className="text-gray-500 mt-2">Belum ada transaksi jurnal yang dibuat.</p>
+        </div>
+        <Button 
+          onClick={() => setIsJurnalFormOpen(true)}
+          className="bg-red-500 hover:bg-red-600 text-white"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Tambah Transaksi Pertama
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
+    <div className="space-y-4 bg-gray-50 p-6 rounded-xl relative">
       {/* Header Section with Totals */}
       <div className="flex gap-4 mb-6">
         {/* Debit & Kredit Container */}
@@ -666,23 +1249,11 @@ export function AddTransactionTable({
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <div 
-                  className="flex items-center gap-2 cursor-pointer hover:text-gray-700"
-                  onClick={handleSort}
-                >
-                  Tanggal
-                  {sortDirection === 'asc' ? (
-                    <ArrowUp className="h-4 w-4" />
-                  ) : (
-                    <ArrowDown className="h-4 w-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead>Bukti</TableHead>
+        <Table className="relative">
+        <TableHeader>
+          <TableRow>
+              <TableHead>Tanggal</TableHead>
+            <TableHead>Bukti</TableHead>
               <TableHead>Keterangan</TableHead>
               <TableHead>Kode Akun</TableHead>
             <TableHead>Nama Akun</TableHead>
@@ -699,12 +1270,29 @@ export function AddTransactionTable({
       </Table>
       </div>
 
+      {highlightedEvents.size > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600 p-2 bg-white border rounded-lg">
+          <div className="flex items-center gap-4">
+            <span className="font-medium">Keterangan:</span>
+            <div className="flex items-center">
+              <div className="w-3 h-3 rounded-sm bg-yellow-50 border-l-2 border-yellow-400 mr-1"></div>
+              <span>Transaksi yang ditambah/diperbarui pada sesi ini</span>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={clearAllHighlights}
+            className="text-xs"
+          >
+            Hapus penanda
+          </Button>
+        </div>
+      )}
+
       <JurnalForm
         isOpen={isJurnalFormOpen}
-        onClose={() => {
-          setIsJurnalFormOpen(false);
-          setEditingTransactions([]);
-        }}
+        onClose={handleJurnalFormClosing}
         onSubmit={handleJurnalFormSubmit}
         editingTransactions={editingTransactions}
       />
