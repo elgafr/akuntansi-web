@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useJurnal, usePostJurnal } from "@/hooks/useJurnal";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
-import axios from "axios";
+import axios from "@/lib/axios";
 
 interface Transaction {
   id: string;
@@ -36,7 +36,7 @@ interface Akun {
   status: string;
 }
 
-interface Profile {
+interface ProfileData {
   user: {
     name: string;
   };
@@ -73,7 +73,8 @@ export default function JurnalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
-  const [profileData, setProfileData] = useState<Profile | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
 
   useEffect(() => {
     // Refetch data when navigating back to jurnal page
@@ -106,26 +107,18 @@ export default function JurnalPage() {
     setTransactions(transformedTransactions);
   }, [transformedTransactions]);
 
+
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        // Cek cache di localStorage terlebih dahulu
-        const cachedProfile = localStorage.getItem("profileData");
-        if (cachedProfile) {
-          setProfileData(JSON.parse(cachedProfile));
-        }
-
-        // Ambil data terbaru dari API
         const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
           setProfileData(response.data.data);
-          localStorage.setItem(
-            "profileData",
-            JSON.stringify(response.data.data)
-          );
         }
       } catch (error) {
-        console.error("Gagal memuat profil:", error);
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoadingProfile(false);
       }
     };
 
