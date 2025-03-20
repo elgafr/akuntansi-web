@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
@@ -16,11 +16,8 @@ interface ProfileData {
   };
 }
 
-export default function BukuBesarPage() {
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
-  const [searchParamsLoaded, setSearchParamsLoaded] = useState(false);
-
+// Komponen terpisah untuk konten yang menggunakan searchParams
+function BukuBesarContent() {
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -30,6 +27,13 @@ export default function BukuBesarPage() {
     queryClient.invalidateQueries({ queryKey: ['bukuBesar'] });
     queryClient.invalidateQueries({ queryKey: ['akunList'] });
   }, [pathname, searchParams, queryClient]);
+
+  return <BukuBesarTable />;
+}
+
+export default function BukuBesarPage() {
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
 
   // Fetching profile data
   useEffect(() => {
@@ -48,18 +52,6 @@ export default function BukuBesarPage() {
 
     fetchProfileData();
   }, []);
-
-  // Tunda penggunaan searchParams() dengan useEffect
-  useEffect(() => {
-    // Pastikan kode ini hanya dijalankan di client-side setelah komponen dimuat
-    if (typeof window !== "undefined") {
-      setSearchParamsLoaded(true);
-    }
-  }, []);
-
-  if (!searchParamsLoaded) {
-    return <div>Loading...</div>;
-  }
 
   return (
     <SidebarProvider>
@@ -101,10 +93,13 @@ export default function BukuBesarPage() {
           </div>
         </header>
 
-        <section className="p-6">
-          <BukuBesarTable />
-        </section>
+        <Suspense fallback={<div>Memuat data...</div>}>
+          <BukuBesarContent />
+        </Suspense>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+
+// Force halaman untuk selalu di-render secara dinamis
+export const dynamic = 'force-dynamic';

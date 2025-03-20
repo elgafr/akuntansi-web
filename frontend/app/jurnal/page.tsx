@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
@@ -35,50 +35,25 @@ interface ProfileData {
   };
 }
 
-export default function JurnalPage() {
+// Komponen terpisah untuk menangani searchParams
+function JurnalContent() {
   const queryClient = useQueryClient();
   const pathname = usePathname();
-  const [searchParamsLoaded, setSearchParamsLoaded] = useState(false); // Flag to delay useSearchParams() usage
-  const searchParams = useSearchParams(); // This will be safely used only on the client side
+  const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const { data: jurnalData } = useJurnal();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
 
   useEffect(() => {
-    // Refetch data when navigating back to jurnal page
     queryClient.invalidateQueries({ queryKey: ["jurnal"] });
     queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
   }, [pathname, searchParams, queryClient]);
 
-  // Fetch profile data
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const response = await axios.get("/mahasiswa/profile");
-        if (response.data.success) {
-          setProfileData(response.data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching profile data:", error);
-      } finally {
-        setLoadingProfile(false);
-      }
-    };
-
-    fetchProfileData();
-  }, []);
-
-  // Handle the change in transactions
   const handleTransactionsChange = async (newTransactions: Transaction[]) => {
     if (newTransactions) {
-      // Update transactions in local state
       setTransactions(newTransactions);
-
-      // Set data to cache without invalidating
       queryClient.setQueryData(
         ["jurnal"],
         newTransactions.map((t) => ({
@@ -102,29 +77,36 @@ export default function JurnalPage() {
     }
   };
 
-  // Delay searchParams until after client-side mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setSearchParamsLoaded(true);
-    }
-  }, []);
+  return (
+    <AddTransactionTable
+      accounts={[]}
+      transactions={transactions}
+      onTransactionsChange={handleTransactionsChange}
+      isLoading={isLoading || isPosting}
+    />
+  );
+}
 
-  // Tampilkan loading state sampai searchParams dimuat
-  if (!searchParamsLoaded) {
-    return (
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <div className="flex items-center justify-center h-screen">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2">Loading...</p>
-            </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    );
-  }
+export default function JurnalPage() {
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        const response = await axios.get("/mahasiswa/profile");
+        if (response.data.success) {
+          setProfileData(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfileData();
+  }, []);
 
   return (
     <SidebarProvider>
@@ -167,14 +149,13 @@ export default function JurnalPage() {
         </header>
 
         <section className="p-6">
-          <AddTransactionTable
-            accounts={[]}
-            transactions={transactions}
-            onTransactionsChange={handleTransactionsChange}
-            isLoading={isLoading || isPosting}
-          />
+          <Suspense fallback={<div>Memuat transaksi...</div>}>
+            <JurnalContent />
+          </Suspense>
         </section>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+
+export const dynamic = 'force-dynamic';
