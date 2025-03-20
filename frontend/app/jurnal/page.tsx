@@ -41,8 +41,8 @@ function JurnalContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const { data: jurnalData } = useJurnal();
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: jurnalData, isLoading: jurnalLoading } = useJurnal();
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
 
@@ -50,6 +50,27 @@ function JurnalContent() {
     queryClient.invalidateQueries({ queryKey: ["jurnal"] });
     queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
   }, [pathname, searchParams, queryClient]);
+
+  useEffect(() => {
+    if (jurnalData) {
+      const formattedTransactions = Array.isArray(jurnalData) 
+        ? jurnalData.map(t => ({
+            id: t.id,
+            date: t.tanggal,
+            documentType: t.bukti,
+            description: t.keterangan,
+            namaAkun: t.akun?.nama || '',
+            kodeAkun: t.akun?.kode?.toString() || '',
+            akun_id: t.akun_id,
+            debit: t.debit || 0,
+            kredit: t.kredit || 0,
+            perusahaan_id: t.perusahaan_id,
+            sub_akun_id: t.sub_akun_id || null
+          }))
+        : [];
+      setTransactions(formattedTransactions);
+    }
+  }, [jurnalData]);
 
   const handleTransactionsChange = async (newTransactions: Transaction[]) => {
     if (newTransactions) {
@@ -82,7 +103,7 @@ function JurnalContent() {
       accounts={[]}
       transactions={transactions}
       onTransactionsChange={handleTransactionsChange}
-      isLoading={isLoading || isPosting}
+      isLoading={jurnalLoading || isPosting}
     />
   );
 }
