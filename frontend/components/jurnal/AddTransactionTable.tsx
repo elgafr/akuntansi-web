@@ -203,6 +203,7 @@ export function AddTransactionTable({
   const [hasAttemptedInitialLoad, setHasAttemptedInitialLoad] = useState(false);
   const { toast } = useToast();
   const [highlightedEvents, setHighlightedEvents] = useState<Set<string>>(new Set());
+  const [uiShellRendered, setUiShellRendered] = useState(false);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -1122,62 +1123,12 @@ export function AddTransactionTable({
     setHighlightedEvents(new Set());
   };
 
-  // Pastikan semua kode kondisional berada di bawah hooks
-  if (isLoading || localLoading) {
-    return (
-      <div className="flex items-center justify-center py-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Set UI shell as rendered on first render
+  useEffect(() => {
+    setUiShellRendered(true);
+  }, []);
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="text-red-500">{error}</div>
-        <Button 
-          onClick={() => window.location.reload()}
-          variant="outline"
-          size="sm"
-        >
-          Coba Lagi
-        </Button>
-      </div>
-    );
-  }
-
-  if (isInitialLoading) {
-    return (
-      <div className="flex items-center justify-center py-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2">Loading jurnal data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (hasAttemptedInitialLoad && transactions.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="text-center">
-          <p className="text-xl font-medium">Jurnal Kosong</p>
-          <p className="text-gray-500 mt-2">Belum ada transaksi jurnal yang dibuat.</p>
-        </div>
-        <Button 
-          onClick={() => setIsJurnalFormOpen(true)}
-          className="bg-red-500 hover:bg-red-600 text-white"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Tambah Transaksi Pertama
-        </Button>
-      </div>
-    );
-  }
-
+  // Render the UI shell immediately, even when data is loading
   return (
     <div className="space-y-4 bg-gray-50 p-6 rounded-xl relative">
       {/* Header Section with Totals */}
@@ -1187,20 +1138,28 @@ export function AddTransactionTable({
           {/* Debit Card */}
           <Card className="bg-red-400 p-4 rounded-r-none rounded-l-xl flex-1 border-r-0">
             <div className="bg-white/10 backdrop-blur-sm p-4 rounded-l-xl rounded-r-none h-full">
-              <p className="text-sm text-white/90">Debit</p>
-              <p className="text-lg font-medium text-white">
-                Rp {getTotalDebit().toLocaleString()}
-              </p>
+              <div className="text-sm text-white/90">Debit</div>
+              <div className="text-lg font-medium text-white">
+                {isLoading ? (
+                  <span className="inline-block h-6 w-24 bg-white/20 animate-pulse rounded"></span>
+                ) : (
+                  `Rp ${getTotalDebit().toLocaleString()}`
+                )}
+              </div>
             </div>
           </Card>
 
           {/* Kredit Card */}
           <Card className="bg-red-400 p-4 rounded-l-none rounded-r-xl flex-1 border-l-0">
             <div className="bg-white/10 backdrop-blur-sm p-4 rounded-l-none rounded-r-xl h-full">
-              <p className="text-sm text-white/90">Kredit</p>
-              <p className="text-lg font-medium text-white">
-                Rp {getTotalKredit().toLocaleString()}
-              </p>
+              <div className="text-sm text-white/90">Kredit</div>
+              <div className="text-lg font-medium text-white">
+                {isLoading ? (
+                  <span className="inline-block h-6 w-24 bg-white/20 animate-pulse rounded"></span>
+                ) : (
+                  `Rp ${getTotalKredit().toLocaleString()}`
+                )}
+              </div>
             </div>
           </Card>
         </div>
@@ -1208,15 +1167,19 @@ export function AddTransactionTable({
         {/* Unbalanced Card */}
         <Card className="bg-red-400 p-4 rounded-xl w-1/3">
           <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl h-full">
-            <p className="text-sm text-white/90">Unbalanced</p>
-            <p className="text-lg font-medium text-white">
-              Difference: Rp {Math.abs(getTotalDebit() - getTotalKredit()).toLocaleString()}
-            </p>
+            <div className="text-sm text-white/90">Unbalanced</div>
+            <div className="text-lg font-medium text-white">
+              {isLoading ? (
+                <span className="inline-block h-6 w-32 bg-white/20 animate-pulse rounded"></span>
+              ) : (
+                `Difference: Rp ${Math.abs(getTotalDebit() - getTotalKredit()).toLocaleString()}`
+              )}
+            </div>
           </div>
         </Card>
       </div>
 
-      {/* Controls Section */}
+      {/* Controls Section - always render this */}
       <div className="flex justify-between items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Input
@@ -1224,6 +1187,7 @@ export function AddTransactionTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-[300px] rounded-lg border-gray-200"
+            disabled={isLoading}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -1232,6 +1196,7 @@ export function AddTransactionTable({
             size="sm"
             onClick={handleExportCSV}
             className="flex items-center gap-2 rounded-lg border-gray-200"
+            disabled={isLoading}
           >
             <Download className="h-4 w-4" />
             Export CSV
@@ -1240,6 +1205,7 @@ export function AddTransactionTable({
             onClick={() => setIsJurnalFormOpen(true)}
             size="sm"
             className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2"
+            disabled={isLoading}
           >
             <Plus className="h-4 w-4" />
             Tambah Transaksi
@@ -1247,27 +1213,51 @@ export function AddTransactionTable({
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table - Always render the table structure, but show skeletons when loading */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <Table className="relative">
-        <TableHeader>
-          <TableRow>
+          <TableHeader>
+            <TableRow>
               <TableHead>Tanggal</TableHead>
-            <TableHead>Bukti</TableHead>
+              <TableHead>Bukti</TableHead>
               <TableHead>Keterangan</TableHead>
               <TableHead>Kode Akun</TableHead>
-            <TableHead>Nama Akun</TableHead>
+              <TableHead>Nama Akun</TableHead>
               <TableHead className="text-right">Debit</TableHead>
               <TableHead className="text-right">Kredit</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-            {transactions.map((transaction, index, array) => 
-              renderTableRow(transaction, index, array)
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              // Render skeleton loading rows
+              Array(5).fill(0).map((_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  <TableCell><div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-16 bg-gray-200 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-36 bg-gray-200 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 bg-gray-200 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-28 bg-gray-200 animate-pulse rounded"></div></TableCell>
+                  <TableCell className="text-right"><div className="h-4 w-16 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
+                  <TableCell className="text-right"><div className="h-4 w-16 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
+                  <TableCell className="text-right"><div className="h-4 w-12 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
+                </TableRow>
+              ))
+            ) : hasAttemptedInitialLoad && transactions.length === 0 ? (
+              // Show empty state message
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  <p className="text-gray-500">Belum ada transaksi jurnal</p>
+                </TableCell>
+              </TableRow>
+            ) : (
+              // Render actual data rows when available
+              transactions.map((transaction, index, array) => 
+                renderTableRow(transaction, index, array)
+              )
             )}
-        </TableBody>
-      </Table>
+          </TableBody>
+        </Table>
       </div>
 
       {highlightedEvents.size > 0 && (

@@ -144,24 +144,52 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
   useEffect(() => {
     const fetchActivePerusahaan = async () => {
       try {
+        console.log("Fetching active perusahaan...");
         const response = await axios.get('/mahasiswa/perusahaan');
+        console.log("Perusahaan response:", response.data);
+        
         if (response.data.data) {
           if (response.data.data.status === 'online') {
+            console.log("Found online perusahaan with ID:", response.data.data.id);
             setPerusahaanId(response.data.data.id);
           } else if (Array.isArray(response.data.data)) {
             const onlinePerusahaan = response.data.data.find((p: any) => p.status === 'online');
             if (onlinePerusahaan) {
+              console.log("Found online perusahaan in array with ID:", onlinePerusahaan.id);
               setPerusahaanId(onlinePerusahaan.id);
+            } else {
+              // If no online perusahaan found, use the first one as fallback
+              if (response.data.data.length > 0) {
+                console.log("No online perusahaan found, using first one with ID:", response.data.data[0].id);
+                setPerusahaanId(response.data.data[0].id);
+              }
+            }
+          } else {
+            console.warn("Unexpected perusahaan data format:", response.data.data);
+            
+            // Try to extract ID directly if it exists
+            if (response.data.data.id) {
+              console.log("Extracted perusahaan ID directly:", response.data.data.id);
+              setPerusahaanId(response.data.data.id);
             }
           }
+        } else {
+          console.error("No perusahaan data found");
         }
       } catch (error) {
         console.error('Error fetching perusahaan:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Gagal memuat data perusahaan"
+        });
       }
     };
 
-    fetchActivePerusahaan();
-  }, []);
+    if (isOpen) {
+      fetchActivePerusahaan();
+    }
+  }, [isOpen, toast]);
 
   // Fetch data akun dan sub akun
   useEffect(() => {
@@ -445,19 +473,53 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
       return;
     }
 
-    if (!perusahaanId) {
+    // Check if we have a perusahaan ID or try to get one from existing transactions
+    let effectivePerusahaanId = perusahaanId;
+    
+    // If no perusahaanId from state, try to get it from transactions
+    if (!effectivePerusahaanId && tempTransactions.length > 0) {
+      for (const transaction of tempTransactions) {
+        if (transaction.perusahaan_id) {
+          console.log("Using perusahaan_id from transaction:", transaction.perusahaan_id);
+          effectivePerusahaanId = transaction.perusahaan_id;
+          break;
+        }
+      }
+    }
+
+    // If we still don't have an ID, try to fetch it one last time
+    if (!effectivePerusahaanId) {
+      try {
+        console.log("Emergency fetch of perusahaan ID...");
+        const response = await axios.get('/mahasiswa/perusahaan');
+        
+        if (response.data.data) {
+          if (response.data.data.id) {
+            effectivePerusahaanId = response.data.data.id;
+            console.log("Emergency fetch found ID:", effectivePerusahaanId);
+          } else if (Array.isArray(response.data.data) && response.data.data.length > 0) {
+            effectivePerusahaanId = response.data.data[0].id;
+            console.log("Emergency fetch found ID from array:", effectivePerusahaanId);
+          }
+        }
+      } catch (error) {
+        console.error("Emergency fetch of perusahaan ID failed:", error);
+      }
+    }
+
+    if (!effectivePerusahaanId) {
       console.error("ID Perusahaan tidak ditemukan");
       toast({
         variant: "destructive",
         title: "Error",
-        description: "ID Perusahaan tidak ditemukan"
+        description: "ID Perusahaan tidak ditemukan. Coba refresh halaman dan pilih perusahaan aktif."
       });
       return;
     }
 
     try {
       // Log for debugging
-      console.log("Submitting transactions:", tempTransactions);
+      console.log("Submitting transactions with perusahaan ID:", effectivePerusahaanId);
       
       // Create a copy of transactions for optimistic update
       const transactionsForOptimisticUpdate: Transaction[] = tempTransactions.map(t => ({
@@ -470,7 +532,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
         akun_id: t.akun_id,
         debit: t.debit,
         kredit: t.kredit,
-        perusahaan_id: t.perusahaan_id || perusahaanId || "",
+        perusahaan_id: t.perusahaan_id || effectivePerusahaanId,
         sub_akun_id: t.sub_akun_id || null,
         _optimistic: true,
         _timestamp: Date.now()
@@ -504,7 +566,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                 akun_id: transaction.akun_id,
                 debit: transaction.debit || null,
                 kredit: transaction.kredit || null,
-                perusahaan_id: perusahaanId || "",
+                perusahaan_id: transaction.perusahaan_id || effectivePerusahaanId,
                 sub_akun_id: transaction.sub_akun_id || null
               }
             });
@@ -521,7 +583,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
             akun_id: transaction.akun_id,
             debit: transaction.debit || null,
             kredit: transaction.kredit || null,
-            perusahaan_id: perusahaanId || "",
+            perusahaan_id: effectivePerusahaanId,
             sub_akun_id: transaction.sub_akun_id || null
           });
         }
@@ -536,7 +598,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
             akun_id: transaction.akun_id,
             debit: transaction.debit || null,
             kredit: transaction.kredit || null,
-            perusahaan_id: perusahaanId || "",
+            perusahaan_id: effectivePerusahaanId,
             sub_akun_id: transaction.sub_akun_id || null
           });
         }

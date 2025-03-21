@@ -19,7 +19,7 @@ import { BukuBesarCard } from "./BukuBesarCard";
 import { Card } from "@/components/ui/card";
 import axios from "@/lib/axios";
 import { Account, SubAccount } from "@/types/account";
-import { revalidateBukuBesar } from '@/app/buku-besar/actions';
+
 import { useBukuBesar, useAkunList } from "@/hooks/useBukuBesar";
 import { useQueryClient } from "@tanstack/react-query";
 
