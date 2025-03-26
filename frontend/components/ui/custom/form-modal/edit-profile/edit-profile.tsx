@@ -26,7 +26,7 @@ interface EditProfileProps {
   isEditModalOpen: boolean;
   closeEditModal: () => void;
   profileData: ProfileData;
-  saveProfileData: (newData: Partial<ProfileData>) => void;
+  saveProfileData: (formData: FormData) => void;
 }
 
 export default function EditProfile({
@@ -35,7 +35,7 @@ export default function EditProfile({
   profileData,
   saveProfileData,
 }: EditProfileProps) {
-  const [formData, setFormData] = useState<Partial<ProfileData>>({
+  const [formData, setFormData] = useState({
     gender: '',
     tanggal_lahir: '',
     alamat: '',
@@ -73,26 +73,31 @@ export default function EditProfile({
     }
 
     setSelectedFile(file);
-    // Hapus preview dan hanya simpan file
   };
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
     
-    // Siapkan payload dengan ID profil
-    const payload = {
-      ...formData,
-      id: profileData.id
-    };
+    const formPayload = new FormData();
     
-    saveProfileData(payload);
+    // Append semua data
+    Object.entries(formData).forEach(([key, value]) => {
+      formPayload.append(key, value);
+    });
+    
+    if (selectedFile) {
+      formPayload.append('foto', selectedFile);
+    }
+    
+    formPayload.append('_method', 'PUT');
+
+    saveProfileData(formPayload);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    // Hapus konversi ke Date dan langsung gunakan nilai dari input
+  
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -200,39 +205,22 @@ export default function EditProfile({
             {/* Bagian Upload File yang dimodifikasi */}
             <div className="space-y-2">
             <Label>Upload Foto Profil</Label>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <Label
-                  htmlFor="fileInput"
-                  className="cursor-pointer bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-center"
-                >
-                  Pilih File
-                </Label>
-                
-                {/* Menampilkan nama file */}
-                {selectedFile ? (
-                  <p className="text-sm text-green-600 break-words">
-                    File terpilih: {selectedFile.name}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Belum ada file yang dipilih
-                  </p>
-                )}
-              </div>
-
-              {/* Notifikasi Persyaratan */}
-              <p className="text-sm text-muted-foreground">
-                Format file: JPG, PNG, JPEG (Maksimal 3MB)
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleFileChange}
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100"
+            />
+            {selectedFile && (
+              <p className="text-sm text-green-600 mt-1">
+                File dipilih: {selectedFile.name}
               </p>
-            </div>
+            )}
           </div>
 
           <DialogFooter className="mt-6">

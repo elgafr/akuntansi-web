@@ -78,6 +78,11 @@ body {
     }
 }
 
+@layer utilities {
+  .object-cover {
+    object-fit: cover;
+  }
+}
 
 @layer base {
   * {

@@ -11,6 +11,7 @@ import axios from "@/lib/axios";
 import { BukuBesarTable } from "@/components/buku-besar/BukuBesarTable";
 
 interface ProfileData {
+  foto?: string
   user: {
     name: string;
   };
@@ -76,7 +77,7 @@ export default function BukuBesarPage() {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage
-                    src="https://github.com/shadcn.png"
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
                     alt="@shadcn"
                   />
                 </Avatar>
