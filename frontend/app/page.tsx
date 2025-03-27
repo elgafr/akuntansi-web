@@ -1,13 +1,9 @@
-import { TestCalendar } from "@/components/test-calendar";
-import { TestChart } from "@/components/test-chart";
-import { Button } from "@/components/ui/button";
-
-
+import { LoginForm } from "@/components/login-form";
 
 export default function Home() {
   return (
     <>
-    
     </>
+    // <LoginForm />
   );
 }
