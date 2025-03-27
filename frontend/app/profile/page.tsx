@@ -52,7 +52,6 @@ export default function Page() {
 
     const fetchProfile = async () => {
       try {
-        // 2. Validasi token dengan request ke endpoint yang sama
         const response = await axios.get(`/mahasiswa/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -60,32 +59,20 @@ export default function Page() {
         });
 
         const currentUser = response.data.data.user;
-        console.log(currentUser);
         const userProfile = currentUser ? response.data.data : null;
 
         if (userProfile) {
           setProfileData({
-            id: userProfile.id,
-            user_id: userProfile.user_id,
-            gender: userProfile.gender,
-            tanggal_lahir: userProfile.tanggal_lahir,
-            alamat: userProfile.alamat,
-            hp: userProfile.hp,
-            foto: userProfile.foto,
+            ...userProfile,
             user: {
-              id: currentUser.id,
-              name: currentUser.name,
-              nim: currentUser.nim,
-              email: currentUser.email,
+              ...currentUser,
             },
+            foto: userProfile.foto
+              ? `${window.location.origin}/storage/${userProfile.foto}`
+              : undefined,
           });
-        } else {
-          setError("Profil belum dibuat");
         }
       } catch (error: any) {
-        console.error("Error:", error);
-
-        // 4. Handle error spesifik untuk invalid token
         if (error.response?.status === 401) {
           localStorage.removeItem("token");
           window.location.href = "/login";
@@ -100,7 +87,7 @@ export default function Page() {
     fetchProfile();
   }, []);
 
-  const saveProfileData = async (updatedData: Partial<ProfileData>) => {
+  const saveProfileData = async (formData: FormData) => {
     try {
       const token = localStorage.getItem("token");
       if (!token || !profileData) {
@@ -109,47 +96,31 @@ export default function Page() {
         return;
       }
 
-      // 1. Validasi data sebelum dikirim
-      const validationErrors = validateProfileData(updatedData);
-      if (validationErrors.length > 0) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-
-      // 2. Format data untuk backend
-      const formattedData = formatProfileData(updatedData);
-
-      // 3. Kirim request
-      const response = await axios.put(
+      const response = await axios.post(
         `/mahasiswa/profile/${profileData.id}`,
-        formattedData,
+        formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
-      // 4. Handle response
-      if (response.data?.success) {
+      if (response.data.success) {
         setProfileData((prev) => ({
-          ...(prev || {}),
+          ...prev!,
           ...response.data.data,
-          user: prev?.user || response.data.data.user || {},
-          foto: prev?.foto || response.data.data.foto || {},
+          foto: response.data.data.foto
+            ? `http://localhost:8000/storage/${response.data.data.foto}`
+            : prev?.foto,
         }));
-        closeEditModal();
-        toast("Data berhasil diperbarui!");
-      } else {
-        throw new Error("Respon server tidak valid");
+        setIsEditModalOpen(false);
+        alert("Data berhasil diperbarui!");
       }
     } catch (error: any) {
-      // 5. Penanganan error terstruktur
-      const errorMessage = getErrorMessage(error);
-      console.error("Update Error:", errorMessage);
-      toast(`Gagal menyimpan perubahan: ${errorMessage}`);
+      console.error("Update Error:", error);
+      alert(`Gagal menyimpan perubahan: ${getErrorMessage(error)}`);
     }
   };
 
@@ -185,19 +156,9 @@ export default function Page() {
   // Fungsi penanganan error terpusat
   const getErrorMessage = (error: any): string => {
     if (error.response) {
-      // Error dari server
-      return (
-        error.response.data?.message ||
-        error.response.data?.errors?.join("\n") ||
-        `Error ${error.response.status}: ${error.response.statusText}`
-      );
-    } else if (error.request) {
-      // Tidak ada response dari server
-      return "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
-    } else {
-      // Error lainnya
-      return error.message || "Terjadi kesalahan tidak terduga";
+      return error.response.data?.message || `Error ${error.response.status}`;
     }
+    return error.message || "Terjadi kesalahan tidak terduga";
   };
 
   const openEditModal = () => setIsEditModalOpen(true);
@@ -217,9 +178,7 @@ export default function Page() {
         <div className="text-red-500 text-center p-4 max-w-md">
           <h2 className="text-xl font-bold mb-2">⚠️ Terjadi Kesalahan</h2>
           <p className="mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>
-            Coba Lagi
-          </Button>
+          <Button onClick={() => window.location.reload()}>Coba Lagi</Button>
         </div>
       </div>
     );
@@ -252,7 +211,7 @@ export default function Page() {
           <div className="flex items-center gap-4">
             <Avatar>
               <AvatarImage
-                src="https://github.com/shadcn.png"
+                src={profileData.foto || "https://github.com/shadcn.png"}
                 alt="Profile"
               />
             </Avatar>
@@ -268,7 +227,11 @@ export default function Page() {
           <Card className="w-[440px] flex-shrink-0">
             <div className="flex flex-col items-center gap-8 p-6">
               <Avatar className="h-40 w-40">
-                <AvatarImage src="https://github.com/shadcn.png" />
+                <AvatarImage
+                  src={profileData.foto || "https://github.com/shadcn.png"}
+                  alt="Profile"
+                  className="object-cover"
+                />
               </Avatar>
               <div className="w-full text-start">
                 <h1 className="text-2xl font-semibold">

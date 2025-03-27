@@ -2,7 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "@/lib/axios";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +38,9 @@ interface ClassItem {
 
 export default function Krs() {
   const [selectedClasses, setSelectedClasses] = useState<KrsItem[]>([]);
-  const [classCategories, setClassCategories] = useState<Record<string, ClassItem[]>>({});
+  const [classCategories, setClassCategories] = useState<
+    Record<string, ClassItem[]>
+  >({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>(""); // userId state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -41,14 +48,12 @@ export default function Krs() {
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
 
   // Fetch profile data and set userId
-  useEffect(() => {
+    useEffect(() => {
     const fetchProfile = async () => {
       try {
         const profileRes = await axios.get("/mahasiswa/profile");
-        console.log("Profile Response:", profileRes.data);
         if (profileRes.data.success) {
-          const userIdFromProfile = profileRes.data.data[0]?.user_id || "";
-          setUserId(userIdFromProfile);
+          setUserId(profileRes.data.data.user_id);
         }
       } catch (error) {
         console.error("Error fetching profile:", error);
@@ -57,37 +62,71 @@ export default function Krs() {
 
     fetchProfile();
   }, []);
-  // Fetch class and KRS data when userId is available
+
+  // Fetch data kelas
   useEffect(() => {
-    if (userId) return;
-
-    const fetchData = async () => {
+    const fetchClasses = async () => {
       try {
-        // Fetch classes and KRS based on userId
-        const [classesRes, krsRes] = await Promise.all([axios.get("/instruktur/kelas"), axios.get(`/mahasiswa/krs/${userId}`)]);
-
-        // Set class categories if classes are fetched successfully
+        const classesRes = await axios.get("/instruktur/kelas");
         if (classesRes.data.success) {
-          const categories = classesRes.data.data.reduce((acc: Record<string, ClassItem[]>, item: ClassItem) => {
-            if (!acc[item.kategori]) acc[item.kategori] = [];
-            acc[item.kategori].push(item);
-            return acc;
-          }, {});
+          const categories = classesRes.data.data.reduce(
+            (acc: Record<string, ClassItem[]>, item: ClassItem) => {
+              if (!acc[item.kategori]) acc[item.kategori] = [];
+              acc[item.kategori].push(item);
+              return acc;
+            },
+            {}
+          );
           setClassCategories(categories);
         }
+      } catch (error) {
+        console.error("Error fetching classes:", error);
+      }
+    };
 
-        // Set selected classes based on user_id
+    fetchClasses();
+  }, []);
+
+  // Fetch data KRS ketika userId tersedia
+  useEffect(() => {
+    const fetchKrs = async () => {
+      if (!userId) return;
+      
+      try {
+        // Perbaikan 2: Gunakan endpoint yang benar dan tambahkan headers
+        const krsRes = await axios.get(`/mahasiswa/krs`, {
+          params: {  // Gunakan query parameter
+            user_id: userId
+          },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`
+          }
+        });
+
         if (krsRes.data.success) {
-          setSelectedClasses(krsRes.data.data);
+          // Perbaikan 3: Handle mapping data lebih aman
+          const mergedKrs = krsRes.data.data.map((krs: any) => ({
+            ...krs,
+            nama: classCategories[krs.kategori]?.find((c: ClassItem) => c.id === krs.kelas_id)?.nama || "Kelas Tidak Ditemukan",
+            kategori: krs.kategori,
+            angkatan: classCategories[krs.kategori]?.find((c: ClassItem) => c.id === krs.kelas_id)?.angkatan || "Unknown"
+          }));
+          
+          setSelectedClasses(mergedKrs);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching KRS:", error);
+        // Tambahkan handling error lebih spesifik
+        if ((error as any).response?.status === 404) {
+          console.log("Data KRS kosong untuk user ini");
+          setSelectedClasses([]);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchKrs();
   }, [userId]);
 
   const handleClassSelection = (classItem: ClassItem) => {
@@ -109,12 +148,10 @@ export default function Krs() {
 
   const handleConfirmAction = async () => {
     const token = localStorage.getItem("token");
-    const userData= JSON.parse(localStorage.getItem("userData") || "{}");
-    const userId = userData.id;
-
     if (!token || !userId || !selectedClass) return;
+
     try {
-      if (action === "add" && selectedClass) {
+      if (action === "add") {
         const response = await axios.post(
           "/mahasiswa/krs",
           {
@@ -128,7 +165,6 @@ export default function Krs() {
             },
           }
         );
-        console.log("response", response);
 
         if (response.data.success) {
           setSelectedClasses((prev) => [
@@ -142,10 +178,17 @@ export default function Krs() {
             },
           ]);
         }
+      } else if (action === "delete" && selectedClass) {
+        await axios.delete(`/mahasiswa/krs/${selectedClass.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setSelectedClasses((prev) => prev.filter((item) => item.id !== selectedClass.id));
       }
     } catch (error) {
       console.error("Error processing request:", error);
-      const errorMessage = (error as any).response?.data?.message || "Terjadi kesTalahan";
+      const errorMessage = (error as any).response?.data?.message || "Terjadi kesalahan";
       alert(`Gagal ${action === "add" ? "menambah" : "menghapus"} kelas: ${errorMessage}`);
     } finally {
       setShowConfirmDialog(false);
@@ -169,7 +212,9 @@ export default function Krs() {
             <Accordion type="single" collapsible>
               {Object.entries(classCategories).map(([category, classes]) => (
                 <AccordionItem key={category} value={category}>
-                  <AccordionTrigger className="font-semibold">{category}</AccordionTrigger>
+                  <AccordionTrigger className="font-semibold">
+                    {category}
+                  </AccordionTrigger>
                   {classes.map((classItem) => (
                     <AccordionContent
                       key={classItem.id}
@@ -179,10 +224,16 @@ export default function Krs() {
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="font-medium">{classItem.nama}</p>
-                          <p className="text-sm text-gray-500">Angkatan {classItem.angkatan}</p>
+                          <p className="text-sm text-gray-500">
+                            Angkatan {classItem.angkatan}
+                          </p>
                         </div>
-                        {selectedClasses.some((c) => c.kelas_id === classItem.id) && (
-                          <span className="text-green-500 text-sm">✓ Terpilih</span>
+                        {selectedClasses.some(
+                          (c) => c.kelas_id === classItem.id
+                        ) && (
+                          <span className="text-green-500 text-sm">
+                            ✓ Terpilih
+                          </span>
                         )}
                       </div>
                     </AccordionContent>
@@ -207,10 +258,18 @@ export default function Krs() {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-lg">{classItem.nama}</h3>
-                          <p className="text-gray-500 text-sm">Angkatan: {classItem.angkatan}</p>
+                          <h3 className="font-semibold text-lg">
+                            {classItem.nama}
+                          </h3>
+                          <p className="text-gray-500 text-sm">
+                            Angkatan: {classItem.angkatan}
+                          </p>
                         </div>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteClass(krsItem.id)}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClass(krsItem.id)}
+                        >
                           Hapus
                         </Button>
                       </div>
@@ -219,7 +278,9 @@ export default function Krs() {
                 ) : null;
               })
             ) : (
-              <div className="text-center py-6 text-gray-500">Belum ada kelas yang dipilih</div>
+              <div className="text-center py-6 text-gray-500">
+                Belum ada kelas yang dipilih
+              </div>
             )}
           </CardContent>
         </Card>
@@ -229,7 +290,11 @@ export default function Krs() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{action === "add" ? "Tambah Kelas ke KRS?" : "Hapus Kelas dari KRS?"}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {action === "add"
+                ? "Tambah Kelas ke KRS?"
+                : "Hapus Kelas dari KRS?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {action === "add"
                 ? "Anda akan menambahkan kelas ini ke Kartu Rencana Studi"
@@ -238,7 +303,9 @@ export default function Krs() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleConfirmAction()}>{action === "add" ? "Tambahkan" : "Hapus"}</AlertDialogAction>
+            <AlertDialogAction onClick={() => handleConfirmAction()}>
+              {action === "add" ? "Tambahkan" : "Hapus"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

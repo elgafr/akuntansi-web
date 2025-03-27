@@ -96,7 +96,7 @@ function hasSubAccounts(account: APIAccount | Account): account is APIAccount & 
 }
 
 interface BukuBesarTableProps {
-  initialData: BukuBesarEntry[] | undefined; // Tambahkan undefined sebagai kemungkinan nilai
+  initialData: BukuBesarEntry[] | undefined;
 }
 
 // Tambahkan interface untuk tipe data akun dan sub akun
