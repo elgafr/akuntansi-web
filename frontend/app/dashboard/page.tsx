@@ -118,26 +118,38 @@ export default function Page() {
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Perubahan pada fungsi calculateRunningSaldo
   const calculateRunningSaldo = (
     entries: Jurnal[],
     account: Account
   ): { tanggal: string; saldo: number }[] => {
     let saldo = 0;
-    return entries
+    const saldoPerTanggal = new Map<string, number>();
+
+    // Urutkan transaksi berdasarkan tanggal
+    const sortedEntries = [...entries].sort(
+      (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
+    );
+
+    // Proses setiap transaksi dan simpan saldo akhir per tanggal
+    sortedEntries.forEach((entry) => {
+      if (account.saldo_normal === "debit") {
+        saldo += entry.debit - entry.kredit;
+      } else {
+        saldo += entry.kredit - entry.debit;
+      }
+
+      // Normalisasi tanggal ke format YYYY-MM-DD
+      const tanggal = new Date(entry.tanggal).toISOString().split("T")[0];
+      saldoPerTanggal.set(tanggal, saldo);
+    });
+
+    // Konversi Map ke array dan urutkan kembali
+    return Array.from(saldoPerTanggal.entries())
+      .map(([tanggal, saldo]) => ({ tanggal, saldo }))
       .sort(
         (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-      )
-      .map((entry) => {
-        if (account.saldo_normal === "debit") {
-          saldo += entry.debit - entry.kredit;
-        } else {
-          saldo += entry.kredit - entry.debit;
-        }
-        return {
-          tanggal: new Date(entry.tanggal).toISOString().split("T")[0],
-          saldo: saldo,
-        };
-      });
+      );
   };
 
   const processChartData = (
@@ -177,22 +189,23 @@ export default function Page() {
         setError(null);
 
         try {
-          // Get active accounts
           const activeAccounts = selectedAccounts
             .filter((acc) => acc !== "")
             .map((acc) => accounts.find((a) => a.kode === acc))
             .filter(Boolean) as Account[];
 
-          // Fetch journal data for each selected account
+          // Ambil data untuk semua akun sekaligus
           const responses = await Promise.all(
             activeAccounts.map((account) =>
               axios.get("/mahasiswa/bukubesar/sort", {
-                params: { akun_id: account.id },
+                params: {
+                  akun_id: account.id,
+                  company_id: selectedCompany.id,
+                },
               })
             )
           );
 
-          // Process responses
           const saldoData: Record<
             string,
             { tanggal: string; saldo: number }[]
@@ -472,94 +485,109 @@ export default function Page() {
           </div>
 
           <Card className="mt-10 w-full p-4 shadow-md">
-          <CardHeader className="flex flex-row justify-between items-start">
-            <div>
-              <CardTitle className="mb-4 text-gray-500">Grafik Buku Besar</CardTitle>
-              <CardDescription className="text-black text-2xl font-bold">
-                {selectedCompany?.nama || 'Perusahaan Belum Dipilih'}
-              </CardDescription>
-            </div>
+            <CardHeader className="flex flex-row justify-between items-start">
+              <div>
+                <CardTitle className="mb-4 text-gray-500">
+                  Grafik Buku Besar
+                </CardTitle>
+                <CardDescription className="text-black text-2xl font-bold">
+                  {selectedCompany?.nama || "Perusahaan Belum Dipilih"}
+                </CardDescription>
+              </div>
 
-            <div className="flex flex-col gap-2 mt-2">
-              {selectedAccounts.map(
-                (accountCode, idx) =>
-                  accountCode && (
-                    <div key={`account-legend-${accountCode}-${idx}`} className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 mt-2">
+                {selectedAccounts.map(
+                  (accountCode, idx) =>
+                    accountCode && (
                       <div
-                        className={`w-4 h-4 rounded-full ${
-                          idx === 0 ? "bg-[#8884d8]" :
-                          idx === 1 ? "bg-[#82ca9d]" : "bg-[#ffc658]"
-                        }`}
+                        key={`account-legend-${accountCode}-${idx}`}
+                        className="flex items-center gap-2"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full ${
+                            idx === 0
+                              ? "bg-[#8884d8]"
+                              : idx === 1
+                              ? "bg-[#82ca9d]"
+                              : "bg-[#ffc658]"
+                          }`}
+                        />
+                        <span>
+                          {accounts.find((a) => a.kode === accountCode)?.nama ||
+                            "-"}
+                        </span>
+                      </div>
+                    )
+                )}
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="w-full h-[300px]">
+                {loadingChart ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                  </div>
+                ) : error ? (
+                  <div className="h-full flex items-center justify-center text-red-500">
+                    {error}
+                  </div>
+                ) : chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="tanggal"
+                        tickFormatter={(date) =>
+                          new Date(date).toLocaleDateString("id-ID")
+                        }
                       />
-                      <span>
-                        {accounts.find(a => a.kode === accountCode)?.nama || "-"}
-                      </span>
-                    </div>
-                  )
-              )}
-            </div>
-          </CardHeader>
+                      <YAxis tickFormatter={formatNumber} />
+                      <Tooltip
+                        formatter={(value: number) => [
+                          `Rp${formatNumber(Number(value))}`,
+                          "Saldo",
+                        ]}
+                        labelFormatter={(label) =>
+                          new Date(label).toLocaleDateString("id-ID", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        }
+                      />
 
-          <CardContent>
-            <div className="w-full h-[300px]">
-              {loadingChart ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                </div>
-              ) : error ? (
-                <div className="h-full flex items-center justify-center text-red-500">
-                  {error}
-                </div>
-              ) : chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="tanggal"
-                      tickFormatter={(date) => new Date(date).toLocaleDateString("id-ID")}
-                    />
-                    <YAxis tickFormatter={formatNumber} />
-                    <Tooltip
-                      formatter={(value: number) => [
-                        `Rp${formatNumber(Number(value))}`,
-                        'Saldo'
-                      ]}
-                      labelFormatter={(label) => 
-                        new Date(label).toLocaleDateString("id-ID", {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })
-                      }
-                    />
-
-                    {selectedAccounts
-                      .filter(acc => acc !== "")
-                      .map((accountCode, idx) => {
-                        const account = accounts.find(a => a.kode === accountCode);
-                        return account ? (
-                          <Line
-                            key={account.id}
-                            type="monotone"
-                            dataKey={account.kode}
-                            name={account.nama}
-                            stroke={["#8884d8", "#82ca9d", "#ffc658"][idx % 3]}
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        ) : null;
-                      })}
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
-                  Tidak ada data untuk ditampilkan
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                      {selectedAccounts
+                        .filter((acc) => acc !== "")
+                        .map((accountCode, idx) => {
+                          const account = accounts.find(
+                            (a) => a.kode === accountCode
+                          );
+                          return account ? (
+                            <Line
+                              key={account.id}
+                              type="monotone"
+                              dataKey={account.kode}
+                              name={account.nama}
+                              stroke={
+                                ["#8884d8", "#82ca9d", "#ffc658"][idx % 3]
+                              }
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          ) : null;
+                        })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Tidak ada data untuk ditampilkan
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </SidebarInset>
     </SidebarProvider>
