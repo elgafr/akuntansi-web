@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Membuat instance axios dengan baseURL
 const instance = axios.create({
-  baseURL: 'https://api.krisnabmntr.my.id/api/',
+  baseURL: 'http://127.0.0.1:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -35,7 +35,7 @@ export default instance;
 export const fetchWithCache = async (url: string) => {
   const response = await fetch(url, {
     next: {
-      revalidate: 300,
+      revalidate: 300, // Cache selama 5 menit
     },
   });
   return response.json();

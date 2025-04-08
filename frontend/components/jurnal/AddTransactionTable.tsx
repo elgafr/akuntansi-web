@@ -371,9 +371,33 @@ export function AddTransactionTable({
     onTransactionsChange(updatedTransactions);
   };
 
-  const filteredTransactions = (transactions || []).filter((t) =>
-    t.namaAkun.toLowerCase().includes(search.toLowerCase())
-  );
+  // Update filteredTransactions untuk mencari berdasarkan keterangan
+  const filteredTransactions = useMemo(() => {
+    if (!search.trim()) {
+      return transactions;
+    }
+
+    const searchLower = search.toLowerCase().trim();
+    
+    // Group transactions by description first
+    const groups = new Map<string, Transaction[]>();
+    
+    transactions.forEach(t => {
+      if (!groups.has(t.description)) {
+        groups.set(t.description, []);
+      }
+      groups.get(t.description)?.push(t);
+    });
+    
+    // Filter groups based on description
+    const filteredGroups = Array.from(groups.entries())
+      .filter(([description]) => 
+        description.toLowerCase().includes(searchLower)
+      );
+    
+    // Flatten the filtered groups back into an array
+    return filteredGroups.flatMap(([_, groupTransactions]) => groupTransactions);
+  }, [transactions, search]);
 
   // Update the handleExportCSV function to properly handle sub-accounts
   const handleExportCSV = () => {
@@ -1243,16 +1267,19 @@ export function AddTransactionTable({
                   <TableCell className="text-right"><div className="h-4 w-12 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
                 </TableRow>
               ))
-            ) : hasAttemptedInitialLoad && transactions.length === 0 ? (
-              // Show empty state message
+            ) : hasAttemptedInitialLoad && filteredTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="h-24 text-center">
-                  <p className="text-gray-500">Belum ada transaksi jurnal</p>
+                  <p className="text-gray-500">
+                    {search.trim() 
+                      ? "Tidak ada transaksi yang sesuai dengan pencarian" 
+                      : "Belum ada transaksi jurnal"}
+                  </p>
                 </TableCell>
               </TableRow>
             ) : (
               // Render actual data rows when available
-              transactions.map((transaction, index, array) => 
+              filteredTransactions.map((transaction, index, array) => 
                 renderTableRow(transaction, index, array)
               )
             )}
