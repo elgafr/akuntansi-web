@@ -10,6 +10,7 @@ import axios from "@/lib/axios";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parse } from "date-fns";
 import { id } from "date-fns/locale";
+import { useRouter } from "next/navigation";
 
 // Create interfaces to match the API response structure
 interface Perusahaan {
@@ -162,6 +163,7 @@ const fetchPosisiKeuangan = async (): Promise<PosisiKeuanganResponse> => {
 
 export function PosisiKeuanganSection() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   
   // Use React Query for posisi keuangan data - now this will also include company info
   const { 
@@ -238,6 +240,12 @@ export function PosisiKeuanganSection() {
     refetch();
   };
 
+  const handleAkunClick = (akunId: string, kodeAkun: string) => {
+    if (akunId && kodeAkun) {
+      router.push(`/buku-besar?kode=${kodeAkun}`);
+    }
+  };
+
   // Render loading state
   if (isLoading) {
     return <div className="bg-white p-6 rounded-lg border text-center">Loading data...</div>;
@@ -311,10 +319,12 @@ export function PosisiKeuanganSection() {
               <div className="space-y-2">
                 {data.aset_lancar?.akun?.map((item, index) => (
                   <div key={`aset-lancar-${index}`} className="flex justify-between py-1">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
-                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
-                    </div>
+                    <span 
+                      className="cursor-pointer hover:text-red-600 hover:underline"
+                      onClick={() => handleAkunClick(item.akun?.id, item.akun?.kode.toString())}
+                    >
+                      {item.akun?.nama || 'Unnamed Account'}
+                    </span>
                     <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
@@ -331,10 +341,12 @@ export function PosisiKeuanganSection() {
               <div className="space-y-2">
                 {data.aset_tetap?.akun && Object.values(data.aset_tetap.akun).map((item, index) => (
                   <div key={`aset-tetap-${index}`} className="flex justify-between py-1">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
-                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
-                    </div>
+                    <span 
+                      className="cursor-pointer hover:text-red-600 hover:underline"
+                      onClick={() => handleAkunClick(item.akun?.id, item.akun?.kode.toString())}
+                    >
+                      {item.akun?.nama || 'Unnamed Account'}
+                    </span>
                     <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
@@ -362,10 +374,12 @@ export function PosisiKeuanganSection() {
               <div className="space-y-2">
                 {data.kewajiban?.akun && Object.values(data.kewajiban.akun).map((item, index) => (
                   <div key={`kewajiban-${index}`} className="flex justify-between py-1">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
-                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
-                    </div>
+                    <span 
+                      className="cursor-pointer hover:text-red-600 hover:underline"
+                      onClick={() => handleAkunClick(item.akun?.id, item.akun?.kode.toString())}
+                    >
+                      {item.akun?.nama || 'Unnamed Account'}
+                    </span>
                     <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}
@@ -382,10 +396,12 @@ export function PosisiKeuanganSection() {
               <div className="space-y-2">
                 {data.ekuitas?.akun && Object.values(data.ekuitas.akun).map((item, index) => (
                   <div key={`ekuitas-${index}`} className="flex justify-between py-1">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 mr-2">{item.akun?.kode}</span>
-                      <span>{item.akun?.nama || 'Unnamed Account'}</span>
-                    </div>
+                    <span 
+                      className="cursor-pointer hover:text-red-600 hover:underline"
+                      onClick={() => handleAkunClick(item.akun?.id, item.akun?.kode.toString())}
+                    >
+                      {item.akun?.nama || 'Unnamed Account'}
+                    </span>
                     <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
                   </div>
                 ))}

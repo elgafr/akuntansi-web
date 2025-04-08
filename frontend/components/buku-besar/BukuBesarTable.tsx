@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+"use client";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,9 @@ import { Account, SubAccount } from "@/types/account";
 
 import { useBukuBesar, useAkunList } from "@/hooks/useBukuBesar";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSelectedAkun } from "@/hooks/useSelectedAkun";
+
 
 interface Transaction {
   date: string;
@@ -38,6 +42,7 @@ interface Akun {
   kode: number;
   nama: string;
   status: string;
+  saldo_normal: 'debit' | 'kredit';
 }
 
 interface SubAkun {
@@ -48,6 +53,7 @@ interface SubAkun {
     id: string;
     kode: number;
     nama: string;
+    saldo_normal: 'debit' | 'kredit';
   };
 }
 
@@ -115,6 +121,7 @@ interface SubAkunItem {
     id: string;
     kode: number;
     nama: string;
+    saldo_normal: 'debit' | 'kredit';
   };
   akun_id: string;
 }
@@ -164,9 +171,29 @@ interface KeuanganInfo {
   sub_akun_id: string | null;
 }
 
+// Tambahkan tipe untuk hasil dari useSelectedAkun
+interface SelectedAkunState {
+  selectedAkunId: string | null;
+  setSelectedAkunId: (id: string) => void;
+}
+
 export function BukuBesarTable() {
+  // Gunakan destructuring dengan tipe yang benar
+  const { selectedAkunId, setSelectedAkunId } = useSelectedAkun() as SelectedAkunState;
+  
+  // Gunakan nullish coalescing untuk memberikan default value
+  const currentAkunId = selectedAkunId ?? '';
+
+  // Gunakan currentAkunId untuk useBukuBesar
+  const { data: bukuBesarData, isLoading: isLoadingBukuBesar } = useBukuBesar(currentAkunId);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // Ambil kode akun dari URL
+  const kodeAkunFromUrl = searchParams.get('kode');
+  
   // 1. State hooks
-  const [selectedAkunId, setSelectedAkunId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(true);
   const [perusahaan, setPerusahaan] = useState<Perusahaan | null>(null);
@@ -175,9 +202,11 @@ export function BukuBesarTable() {
   // Tambahkan state untuk menyimpan saldo awal yang sudah diproses
   const [processedSaldoAwal, setProcessedSaldoAwal] = useState<BukuBesarItem[]>([]);
 
+  // Add this state for search
+  const [searchAkun, setSearchAkun] = useState("");
+
   // 2. Query hooks dengan tipe data yang benar
   const { data: akunListData, isLoading: isLoadingAkun } = useAkunList();
-  const { data: bukuBesarData, isLoading: isLoadingBukuBesar } = useBukuBesar(selectedAkunId);
   const queryClient = useQueryClient();
 
   // 3. Effect hooks
@@ -338,86 +367,26 @@ export function BukuBesarTable() {
 
   // Fungsi untuk menentukan saldo normal dari akun
   const getSaldoNormal = (akunId: string): 'debit' | 'kredit' => {
-    // Tambahkan pengecekan akunId untuk menghindari error
-    if (!akunId) {
-      return 'debit'; // Default jika akunId tidak ada
+    if (!akunId || !akunListData) {
+      return 'debit'; // Default value if no data
     }
 
-    // Ubah pendekatan menjadi lebih langsung dan jelas
-    // Pertama, cek jika ada data transaksi untuk akun ini
-    const akunTransactions = bukuBesarData && Array.isArray(bukuBesarData) 
-      ? bukuBesarData.filter(entry => 
-          entry && entry.akun && entry.akun.id === akunId && !entry.is_saldo_awal
-        )
-      : [];
-    
-    // Cek saldo awal untuk akun ini
-    const saldoAwal = processedSaldoAwal && processedSaldoAwal.length > 0
-      ? processedSaldoAwal.find(entry => 
-          entry && entry.akun && entry.akun.id === akunId && entry.is_saldo_awal
-        )
-      : null;
-    
-    console.log("Saldo Awal untuk akun:", saldoAwal);
-    console.log("Transaksi untuk akun:", akunTransactions);
-    
-    // 1. KASUS 1: Jika saldo awal memiliki nilai debit atau kredit yang signifikan
-    if (saldoAwal && (saldoAwal.debit > 0 || saldoAwal.kredit > 0)) {
-      if (saldoAwal.debit > saldoAwal.kredit) {
-        console.log("Menggunakan saldo awal: DEBIT");
-        return 'debit';
-      } else if (saldoAwal.kredit > saldoAwal.debit) {
-        console.log("Menggunakan saldo awal: KREDIT");
-        return 'kredit';
-      }
+    // First check in main accounts
+    const mainAkun = akunListData.akun.find((a: AkunItem) => a.id === akunId);
+    if (mainAkun && mainAkun.saldo_normal) {
+      console.log(`Found saldo normal for akun ${akunId}: ${mainAkun.saldo_normal}`);
+      return mainAkun.saldo_normal as 'debit' | 'kredit';
     }
-    
-    // 2. KASUS 2: Jika saldo awal sama-sama 0 atau null, cek transaksi pertama
-    if (akunTransactions.length > 0) {
-      // Urutkan berdasarkan tanggal
-      const sortedTransactions = [...akunTransactions].sort((a, b) => {
-        const dateA = new Date(a.tanggal).getTime();
-        const dateB = new Date(b.tanggal).getTime();
-        return dateA - dateB;
-      });
-      
-      const firstTransaction = sortedTransactions[0];
-      console.log("Transaksi pertama untuk menentukan saldo normal:", firstTransaction);
-      
-      // Cek transaksi pertama
-      if (firstTransaction.debit > 0 && firstTransaction.kredit === 0) {
-        console.log("Transaksi pertama: DEBIT");
-        return 'debit';
-      } else if (firstTransaction.kredit > 0 && firstTransaction.debit === 0) {
-        console.log("Transaksi pertama: KREDIT");
-        return 'kredit';
-      } else if (firstTransaction.debit > firstTransaction.kredit) {
-        console.log("Transaksi pertama nilai debit lebih besar: DEBIT");
-        return 'debit';
-      } else if (firstTransaction.kredit > firstTransaction.debit) {
-        console.log("Transaksi pertama nilai kredit lebih besar: KREDIT");
-        return 'kredit';
-      }
+
+    // If not found in main accounts, check in sub accounts
+    const subAkun = akunListData.subAkun.find((s: SubAkunItem) => s.akun.id === akunId);
+    if (subAkun && subAkun.akun.saldo_normal) {
+      console.log(`Found saldo normal for sub akun ${akunId}: ${subAkun.akun.saldo_normal}`);
+      return subAkun.akun.saldo_normal as 'debit' | 'kredit';
     }
-    
-    // 3. KASUS 3: Jika tidak ada transaksi, periksa berdasarkan kode akun
-    if (akunListData && akunListData.akun) {
-      const mainAkun = akunListData.akun.find((a: AkunItem) => a.id === akunId);
-      if (mainAkun) {
-        const kodeAkun = mainAkun.kode.toString();
-        // Cek digit pertama kode akun
-        if (kodeAkun.startsWith('1') || kodeAkun.startsWith('5')) {
-          console.log("Berdasarkan kode akun: DEBIT");
-          return 'debit'; // Aset dan Beban: saldo normal debit
-        } else if (kodeAkun.startsWith('2') || kodeAkun.startsWith('3') || kodeAkun.startsWith('4')) {
-          console.log("Berdasarkan kode akun: KREDIT");
-          return 'kredit'; // Kewajiban, Ekuitas, Pendapatan: saldo normal kredit
-        }
-      }
-    }
-    
-    // Default ke debit jika tidak ada informasi
-    console.log("Default: DEBIT");
+
+    // Default to debit if no saldo_normal is found
+    console.log(`No saldo normal found for akun ${akunId}, defaulting to debit`);
     return 'debit';
   };
 
@@ -459,8 +428,8 @@ export function BukuBesarTable() {
 
   // 5. Derived state
   const isDebitNormal = useMemo(() => {
-    return getSaldoNormal(selectedAkunId) === 'debit';
-  }, [selectedAkunId, akunKeuanganInfo]);
+    return getSaldoNormal(currentAkunId) === 'debit';
+  }, [currentAkunId, akunKeuanganInfo]);
 
   // Modifikasi fungsi calculateRunningSaldo untuk konsistensi display saldo
   const calculateRunningSaldo = (entries: BukuBesarItem[], akunId: string): BukuBesarItem[] => {
@@ -504,11 +473,11 @@ export function BukuBesarTable() {
 
   // Modifikasi getBukuBesarEntries untuk filter saldo awal yang lebih tepat
   const getBukuBesarEntries = useMemo(() => {
-    if (!selectedAkunId || !akunListData) {
+    if (!currentAkunId || !akunListData) {
       return [];
     }
 
-    console.log("Selected Akun ID:", selectedAkunId);
+    console.log("Selected Akun ID:", currentAkunId);
     console.log("Processing bukuBesarData for entries:", bukuBesarData);
     console.log("Processed saldo awal:", processedSaldoAwal);
 
@@ -519,7 +488,7 @@ export function BukuBesarTable() {
     ];
 
     // Cek apakah yang dipilih adalah akun induk
-    const mainAkun = akunListData.akun.find((a: AkunItem) => a.id === selectedAkunId);
+    const mainAkun = akunListData.akun.find((a: AkunItem) => a.id === currentAkunId);
     if (mainAkun) {
       const mainKode = mainAkun.kode.toString();
       
@@ -528,14 +497,14 @@ export function BukuBesarTable() {
         // Filter saldo awal - saldo awal hanya ditampilkan untuk akun yang dipilih
         if (entry.is_saldo_awal) {
           // Jika exact match dengan akun yang dipilih
-          if (entry.akun.id === selectedAkunId) {
+          if (entry.akun.id === currentAkunId) {
             return true;
           }
           
           // Jika ini saldo awal sub akun, cek apakah parent akun-nya adalah akun yang dipilih
           if (entry.sub_akun_id) {
             const subAkun = getSubAkunDetail(entry.sub_akun_id);
-            if (subAkun && subAkun.akun_id === selectedAkunId) {
+            if (subAkun && subAkun.akun_id === currentAkunId) {
               return true;
             }
           }
@@ -595,17 +564,17 @@ export function BukuBesarTable() {
       });
       
       // Hitung saldo berjalan berdasarkan saldo normal akun
-      return calculateRunningSaldo(sortedEntries, selectedAkunId);
+      return calculateRunningSaldo(sortedEntries, currentAkunId);
     }
     
     // Jika yang dipilih adalah sub akun
-    const subAkun = akunListData.subAkun.find((s: SubAkunItem) => s.akun.id === selectedAkunId);
+    const subAkun = akunListData.subAkun.find((s: SubAkunItem) => s.akun.id === currentAkunId);
     if (subAkun) {
       const filteredEntries = combinedData.filter((entry: BukuBesarItem) => {
         // Filter saldo awal - hanya tampilkan saldo awal yang terkait langsung
         if (entry.is_saldo_awal) {
           // Untuk saldo awal, hanya tampilkan jika akun ID sama dengan yang dipilih
-          if (entry.akun.id === selectedAkunId) {
+          if (entry.akun.id === currentAkunId) {
             return true;
           }
           
@@ -641,14 +610,14 @@ export function BukuBesarTable() {
       });
       
       // Hitung saldo berjalan
-      return calculateRunningSaldo(sortedEntries, selectedAkunId);
+      return calculateRunningSaldo(sortedEntries, currentAkunId);
     }
     
     // Default case: Filter untuk semua akun
     // Untuk saldo awal, tambahkan filter untuk hanya menampilkan yang relevan dengan akun yang dipilih
     const filteredByAkun = combinedData.filter((entry: BukuBesarItem) => {
       if (entry.is_saldo_awal) {
-        return entry.akun.id === selectedAkunId;
+        return entry.akun.id === currentAkunId;
       }
       return true; // Tampilkan semua transaksi normal (non-saldo awal)
     });
@@ -665,8 +634,8 @@ export function BukuBesarTable() {
       return dateA - dateB;
     });
     
-    return calculateRunningSaldo(sortedByDate, selectedAkunId);
-  }, [bukuBesarData, selectedAkunId, akunListData, subAkunDetails, akunKeuanganInfo, processedSaldoAwal]);
+    return calculateRunningSaldo(sortedByDate, currentAkunId);
+  }, [bukuBesarData, currentAkunId, akunListData, subAkunDetails, akunKeuanganInfo, processedSaldoAwal]);
 
   // Update totals untuk menggunakan saldo normal yang benar
   const totals = useMemo(() => {
@@ -691,37 +660,91 @@ export function BukuBesarTable() {
     };
   }, [getBukuBesarEntries]);
 
-  // 6. Effect untuk set akun pertama dengan tipe data yang benar
+  // Modifikasi useEffect untuk mengatur akun berdasarkan kode dari URL
   useEffect(() => {
-    if (akunListData?.akun && akunListData.akun.length > 0 && !selectedAkunId) {
-      const sortedAkun = [...akunListData.akun].sort((a: AkunItem, b: AkunItem) => a.kode - b.kode);
-      setSelectedAkunId(sortedAkun[0].id);
+    if (akunListData?.akun && akunListData.akun.length > 0) {
+      if (kodeAkunFromUrl) {
+        // Cari akun berdasarkan kode
+        const akun = akunListData.akun.find(
+          (a: AkunItem) => a.kode.toString() === kodeAkunFromUrl
+        );
+        if (akun) {
+          setSelectedAkunId(akun.id);
+          return;
+        }
+        
+        // Jika tidak ditemukan di akun utama, cari di sub akun
+        const subAkun = akunListData.subAkun.find(
+          (s: SubAkunItem) => s.kode.toString() === kodeAkunFromUrl
+        );
+        if (subAkun) {
+          setSelectedAkunId(subAkun.akun.id);
+          return;
+        }
+      }
+      
+      // Jika tidak ada kode di URL atau kode tidak ditemukan, gunakan akun pertama
+      if (!currentAkunId) {
+        const sortedAkun = [...akunListData.akun].sort((a: AkunItem, b: AkunItem) => a.kode - b.kode);
+        setSelectedAkunId(sortedAkun[0].id);
+        // Update URL dengan kode akun pertama
+        router.push(`/buku-besar?kode=${sortedAkun[0].kode}`);
+      }
     }
-  }, [akunListData, selectedAkunId]);
+  }, [akunListData, kodeAkunFromUrl, currentAkunId]);
 
-  // 7. Memo hooks
-  // const totals = useMemo(() => {
-  //   if (!bukuBesarData || !Array.isArray(bukuBesarData)) {
-  //     return {
-  //       debit: 0,
-  //       kredit: 0,
-  //       saldo: 0
-  //     };
-  //   }
+  // Modifikasi handler untuk select akun
+  const handleAkunChange = (newAkunId: string) => {
+    setSelectedAkunId(newAkunId);
+    // Cari kode akun yang sesuai
+    const akun = akunListData?.akun.find((a: AkunItem) => a.id === newAkunId);
+    if (akun) {
+      router.push(`/buku-besar?kode=${akun.kode}`);
+    } else {
+      const subAkun = akunListData?.subAkun.find((s: SubAkunItem) => s.akun.id === newAkunId);
+      if (subAkun) {
+        router.push(`/buku-besar?kode=${subAkun.kode}`);
+      }
+    }
+  };
 
-  //   return bukuBesarData.reduce((acc, item) => ({
-  //     debit: acc.debit + (item.debit || 0),
-  //     kredit: acc.kredit + (item.kredit || 0),
-  //     saldo: bukuBesarData.length > 0 ? bukuBesarData[bukuBesarData.length - 1].saldo : 0
-  //   }), { debit: 0, kredit: 0, saldo: 0 });
-  // }, [bukuBesarData]);
+  // Update this helper function to make search more flexible
+  const filteredAkun = useMemo(() => {
+    const searchLower = searchAkun.toLowerCase().trim();
+    
+    if (!searchLower) {
+      return {
+        akun: akunListData?.akun || [],
+        subAkun: akunListData?.subAkun || []
+      };
+    }
+
+    // Normalize search terms by replacing multiple spaces and dashes with single space
+    const normalizedSearch = searchLower.replace(/[-\s]+/g, ' ').trim();
+    const searchTerms = normalizedSearch.split(' ').filter(term => term.length > 0);
+
+    return {
+      akun: akunListData?.akun.filter((akun: AkunItem) => {
+        const akunText = `${akun.kode} - ${akun.nama}`.toLowerCase();
+        // Normalize akun text the same way as search terms
+        const normalizedAkunText = akunText.replace(/[-\s]+/g, ' ').trim();
+        return searchTerms.every(term => normalizedAkunText.includes(term));
+      }) || [],
+      subAkun: akunListData?.subAkun.filter((subAkun: SubAkunItem) => {
+        const subAkunText = `${subAkun.kode} - ${subAkun.nama}`.toLowerCase();
+        // Normalize sub akun text the same way as search terms
+        const normalizedSubAkunText = subAkunText.replace(/[-\s]+/g, ' ').trim();
+        return searchTerms.every(term => normalizedSubAkunText.includes(term));
+      }) || []
+    };
+  }, [akunListData, searchAkun]);
 
   // 8. Main render
   if (isLoadingAkun) {
     return <div className="text-center py-4">Loading akun...</div>;
   }
 
-  console.log("Selected Akun ID:", selectedAkunId);
+  console.log("Selected Akun ID:", currentAkunId);
   console.log("Akun List Data:", akunListData);
   console.log("Buku Besar Data:", bukuBesarData);
 
@@ -777,19 +800,19 @@ export function BukuBesarTable() {
       <div className="flex justify-between items-center gap-4 p-4 bg-white rounded-xl shadow-sm">
         <div className="flex items-center gap-4">
           <Select
-            value={selectedAkunId}
-            onValueChange={setSelectedAkunId}
+            value={currentAkunId || ""}
+            onValueChange={handleAkunChange}
           >
             <SelectTrigger className="w-[300px]">
               <SelectValue placeholder="Pilih Akun">
-                {selectedAkunId && akunListData && (
+                {currentAkunId && akunListData && (
                   <>
                     {(() => {
-                      const selectedAkun = akunListData.akun.find((akun: AkunItem) => akun.id === selectedAkunId);
+                      const selectedAkun = akunListData.akun.find((akun: AkunItem) => akun.id === currentAkunId);
                       if (selectedAkun) {
                         return `${selectedAkun.kode} - ${selectedAkun.nama}`;
                       }
-                      const selectedSubAkun = akunListData.subAkun.find((sub: SubAkunItem) => sub.akun.id === selectedAkunId);
+                      const selectedSubAkun = akunListData.subAkun.find((sub: SubAkunItem) => sub.akun.id === currentAkunId);
                       if (selectedSubAkun) {
                         return `${selectedSubAkun.kode} - ${selectedSubAkun.nama}`;
                       }
@@ -799,27 +822,96 @@ export function BukuBesarTable() {
                 )}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Akun</SelectLabel>
-                {akunListData?.akun
-                  .sort((a: AkunItem, b: AkunItem) => a.kode - b.kode)
-                  .map((akun: AkunItem) => (
-                    <SelectItem key={akun.id} value={akun.id}>
-                      {akun.kode} - {akun.nama}
-                    </SelectItem>
-                  ))}
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Sub Akun</SelectLabel>
-                {akunListData?.subAkun
-                  .sort((a: SubAkunItem, b: SubAkunItem) => a.kode - b.kode)
-                  .map((subAkun: SubAkunItem) => (
-                    <SelectItem key={subAkun.id} value={subAkun.akun.id}>
-                      {subAkun.kode} - {subAkun.nama}
-                </SelectItem>
-              ))}
-              </SelectGroup>
+            <SelectContent 
+              onCloseAutoFocus={(e) => e.preventDefault()}
+              className="min-w-[300px]"
+            >
+              <div className="p-2 sticky top-0 bg-white z-10 border-b">
+                <Input
+                  placeholder="Cari akun..."
+                  value={searchAkun}
+                  onChange={(e) => setSearchAkun(e.target.value)}
+                  className="h-8"
+                  onKeyDown={(e) => {
+                    // Prevent default behavior for up/down/enter keys
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter') {
+                      e.stopPropagation();
+                      return;
+                    }
+                    // Allow typing to continue
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    // Prevent closing dropdown when clicking input
+                    e.stopPropagation();
+                  }}
+                  autoComplete="off"
+                  // Keep focus on input
+                  onBlur={(e) => {
+                    e.target.focus();
+                  }}
+                />
+              </div>
+              
+              <div 
+                className="overflow-y-auto max-h-[300px]"
+                onClick={(e) => {
+                  // Prevent losing focus when clicking scroll area
+                  e.stopPropagation();
+                }}
+              >
+                {filteredAkun.akun.length === 0 && filteredAkun.subAkun.length === 0 ? (
+                  <div className="p-2 text-sm text-gray-500 text-center">
+                    Tidak ada akun yang cocok
+                  </div>
+                ) : (
+                  <>
+                    {filteredAkun.akun.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Akun</SelectLabel>
+                        {filteredAkun.akun
+                          .sort((a: AkunItem, b: AkunItem) => a.kode - b.kode)
+                          .map((akun: AkunItem) => (
+                            <SelectItem 
+                              key={akun.id} 
+                              value={akun.id}
+                              onMouseDown={(e) => {
+                                // Allow selection without losing focus
+                                e.preventDefault();
+                                handleAkunChange(akun.id);
+                              }}
+                              className="cursor-pointer hover:bg-gray-100"
+                            >
+                              {`${akun.kode} - ${akun.nama}`}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    )}
+                    
+                    {filteredAkun.subAkun.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Sub Akun</SelectLabel>
+                        {filteredAkun.subAkun
+                          .sort((a: SubAkunItem, b: SubAkunItem) => a.kode - b.kode)
+                          .map((subAkun: SubAkunItem) => (
+                            <SelectItem 
+                              key={subAkun.id} 
+                              value={subAkun.akun.id}
+                              onMouseDown={(e) => {
+                                // Allow selection without losing focus
+                                e.preventDefault();
+                                handleAkunChange(subAkun.akun.id);
+                              }}
+                              className="cursor-pointer hover:bg-gray-100"
+                            >
+                              {`${subAkun.kode} - ${subAkun.nama}`}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                )}
+              </div>
             </SelectContent>
           </Select>
 
@@ -888,7 +980,7 @@ export function BukuBesarTable() {
                 
                 // Jika tidak ada sub akun, gunakan data akun biasa
                 if (!displayKode) {
-                const akunDetails = getAkunDetails(selectedAkunId);
+                const akunDetails = getAkunDetails(currentAkunId);
                   displayKode = entry.kodeAkun || entry.akun?.kode || akunDetails.kode || '';
                   displayNama = entry.namaAkun || entry.akun?.nama || akunDetails.nama || '';
                 }
@@ -935,7 +1027,7 @@ export function BukuBesarTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-4 text-gray-500">
-                  {selectedAkunId ? 'Tidak ada data untuk akun ini' : 'Pilih akun untuk melihat data'}
+                  {currentAkunId ? 'Tidak ada data untuk akun ini' : 'Pilih akun untuk melihat data'}
                 </TableCell>
               </TableRow>
             )}

@@ -9,6 +9,7 @@ import axios from "@/lib/axios";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parse } from "date-fns";
 import { id } from "date-fns/locale";
+import { useRouter } from "next/navigation";
 
 // Create interfaces to match the API response structure
 interface Perusahaan {
@@ -100,6 +101,7 @@ const formatDate = (dateString: string): string => {
 
 export function PerubahanEkuitasSection() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   
   // Use React Query hook
   const { 
@@ -171,6 +173,12 @@ export function PerubahanEkuitasSection() {
   // Manual refresh function
   const handleRefresh = () => {
     refetch();
+  };
+
+  const handleAkunClick = (kodeAkun: number) => {
+    if (kodeAkun) {
+      router.push(`/buku-besar?kode=${kodeAkun}`);
+    }
   };
 
   // Render loading state
@@ -252,7 +260,12 @@ export function PerubahanEkuitasSection() {
           <div>
             {modalAwalItems.map((modalItem, index) => (
               <div key={`modal-${index}`} className="flex justify-between py-1">
-                <span>{modalItem["Nama Akun"]} (awal) per 1 Januari 2025</span>
+                <span 
+                  className="cursor-pointer hover:text-red-600 hover:underline"
+                  onClick={() => handleAkunClick(modalItem["Kode Akun"])}
+                >
+                  {modalItem["Nama Akun"]} (awal) per 1 Januari 2025
+                </span>
                 <span className="tabular-nums">{formatCurrency(modalItem["Saldo Awal per 1 Januari 2025"])}</span>
               </div>
             ))}
@@ -268,9 +281,11 @@ export function PerubahanEkuitasSection() {
             </div>
           )}
 
-          {/* Pembagian Laba */}
-          <div className="pl-4">
-            <div className="font-medium mb-2">Pembagian Laba:</div>
+          {/* Pembagian Laba - Updated */}
+          <div className="border-t pt-4">
+            <div className="flex justify-between py-1">
+              <span>Pembagian Laba:</span>
+            </div>
             {labaModalItems.map((item, index) => {
               const key = Object.keys(item)[0];
               const value = Object.values(item)[0] as number;
@@ -287,7 +302,12 @@ export function PerubahanEkuitasSection() {
           <div>
             {priveItems.map((priveItem, index) => (
               <div key={`prive-${index}`} className="flex justify-between py-1">
-                <span>{priveItem["Nama Akun"]}</span>
+                <span 
+                  className="cursor-pointer hover:text-red-600 hover:underline"
+                  onClick={() => handleAkunClick(priveItem["Kode Akun"])}
+                >
+                  {priveItem["Nama Akun"]}
+                </span>
                 <span className="tabular-nums">{formatCurrency(priveItem["Saldo Awal per 1 Januari 2025"])}</span>
               </div>
             ))}
@@ -296,12 +316,23 @@ export function PerubahanEkuitasSection() {
           {/* Modal Akhir */}
           {dataAkhirItem && (
             <div className="border-t pt-4">
-              {Object.entries(dataAkhirItem["DATA AKHIR"]).map(([name, value], index) => (
-                <div key={`akhir-${index}`} className="flex justify-between py-1 font-medium">
-                  <span>{name}</span>
-                  <span className="tabular-nums">{formatCurrency(value)}</span>
-                </div>
-              ))}
+              {Object.entries(dataAkhirItem["DATA AKHIR"]).map(([name, value], index) => {
+                // Extract kode akun based on name pattern
+                const matchingModal = modalAwalItems.find(item => 
+                  item["Nama Akun"] === name.split(" per ")[0]
+                );
+                return (
+                  <div key={`akhir-${index}`} className="flex justify-between py-1 font-medium">
+                    <span 
+                      className="cursor-pointer hover:text-red-600 hover:underline"
+                      onClick={() => matchingModal && handleAkunClick(matchingModal["Kode Akun"])}
+                    >
+                      {name}
+                    </span>
+                    <span className="tabular-nums">{formatCurrency(value)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
