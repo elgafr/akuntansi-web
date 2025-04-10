@@ -80,6 +80,12 @@ interface BukuBesarItem {
   is_saldo_awal?: boolean;
   debit: number;
   kredit: number;
+  akun?: { saldo_normal: "debit" | "kredit" }; // Added akun property
+}
+
+interface Keuangan {
+  debit: number | null;
+  kredit: number | null;
 }
 
 interface ChartDataItem {
@@ -123,37 +129,44 @@ export default function Page() {
 
   // Perubahan pada fungsi calculateRunningSaldo
   const calculateRunningSaldo = (
-    entries: Jurnal[],
-    account: Account
+    journals: Jurnal[],
+    account: Account,
+    initialSaldo: number
   ): { tanggal: string; saldo: number }[] => {
-    let saldo = 0;
-    const saldoPerTanggal = new Map<string, number>();
-
-    // Urutkan transaksi berdasarkan tanggal
-    const sortedEntries = [...entries].sort(
-      (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
+    // Kelompokkan transaksi per tanggal
+    const groupedByDate = journals.reduce((acc, journal) => {
+      const tanggal = new Date(journal.tanggal).toISOString().split('T')[0];
+      if (!acc[tanggal]) acc[tanggal] = [];
+      acc[tanggal].push(journal);
+      return acc;
+    }, {} as Record<string, Jurnal[]>);
+  
+    // Urutkan tanggal secara kronologis
+    const sortedDates = Object.keys(groupedByDate).sort(
+      (a, b) => new Date(a).getTime() - new Date(b).getTime()
     );
-
-    // Proses setiap transaksi dan simpan saldo akhir per tanggal
-    sortedEntries.forEach((entry) => {
-      if (account.saldo_normal === "debit") {
-        saldo += entry.debit - entry.kredit;
-      } else {
-        saldo += entry.kredit - entry.debit;
-      }
-
-      // Normalisasi tanggal ke format YYYY-MM-DD
-      const tanggal = new Date(entry.tanggal).toISOString().split("T")[0];
-      saldoPerTanggal.set(tanggal, saldo);
-    });
-
-    // Konversi Map ke array dan urutkan kembali
-    return Array.from(saldoPerTanggal.entries())
-      .map(([tanggal, saldo]) => ({ tanggal, saldo }))
-      .sort(
-        (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-      );
+  
+    // Hitung saldo akhir per tanggal
+    let saldo = initialSaldo;
+    const result: { tanggal: string; saldo: number }[] = [];
+  
+    for (const tanggal of sortedDates) {
+      const dailyTransactions = groupedByDate[tanggal];
+      
+      // Proses semua transaksi di tanggal yang sama
+      dailyTransactions.forEach(transaction => {
+        saldo += account.saldo_normal === "debit"
+          ? transaction.debit - transaction.kredit
+          : transaction.kredit - transaction.debit;
+      });
+  
+      // Simpan saldo akhir untuk tanggal ini
+      result.push({ tanggal, saldo });
+    }
+  
+    return result;
   };
+  
 
   const processChartData = (
     saldoData: Record<string, { tanggal: string; saldo: number }[]>
@@ -190,17 +203,25 @@ export default function Page() {
       if (selectedCompany && selectedAccounts.some((acc) => acc !== "")) {
         setLoadingChart(true);
         setError(null);
-
+  
         try {
           const activeAccounts = selectedAccounts
             .filter((acc) => acc !== "")
             .map((acc) => accounts.find((a) => a.kode === acc))
             .filter(Boolean) as Account[];
-
-          // Ambil data untuk semua akun sekaligus
+  
           const responses = await Promise.all(
             activeAccounts.map((account) =>
-              axios.get("/mahasiswa/bukubesar/sort", {
+              axios.get<{
+                success: boolean;
+                data: {
+                  keuangan: Keuangan;
+                  jurnal: Jurnal[];
+                  total: number;
+                  totalDebit: number;
+                  totalKredit: number;
+                };
+              }>("/mahasiswa/bukubesar/sort", {
                 params: {
                   akun_id: account.id,
                   company_id: selectedCompany.id,
@@ -208,23 +229,31 @@ export default function Page() {
               })
             )
           );
-
-          const saldoData: Record<
-            string,
-            { tanggal: string; saldo: number }[]
-          > = {};
-
+  
+          const saldoData: Record<string, { tanggal: string; saldo: number }[]> = {};
+  
           responses.forEach((response, index) => {
             const account = activeAccounts[index];
             if (response.data?.success) {
-              const journals: Jurnal[] = response.data.data;
+              const backendData = response.data.data;
+              
+              // Hitung saldo awal sesuai logika backend
+              let initialSaldo = 0;
+              if (account.saldo_normal === "debit") {
+                initialSaldo = (backendData.keuangan.debit ?? 0) - (backendData.keuangan.kredit ?? 0);
+              } else {
+                initialSaldo = (backendData.keuangan.kredit ?? 0) - (backendData.keuangan.debit ?? 0);
+              }
+  
+              // Proses jurnal dengan saldo awal yang benar
               saldoData[account.kode] = calculateRunningSaldo(
-                journals,
-                account
+                backendData.jurnal || [],
+                account,
+                initialSaldo
               );
             }
           });
-
+  
           setChartData(processChartData(saldoData));
         } catch (err) {
           console.error("Gagal mengambil data:", err);
@@ -234,9 +263,10 @@ export default function Page() {
         }
       }
     };
-
+  
     fetchChartData();
   }, [selectedCompany, selectedAccounts, accounts]);
+  
 
   useEffect(() => {
     const fetchInitialData = async () => {
