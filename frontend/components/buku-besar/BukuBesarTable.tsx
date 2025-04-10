@@ -82,6 +82,7 @@ interface Perusahaan {
   nama: string;
   start_priode: string;
   end_priode: string;
+  status: string;
 }
 
 interface APIAccount {
@@ -177,6 +178,59 @@ interface SelectedAkunState {
   setSelectedAkunId: (id: string) => void;
 }
 
+// Update interface untuk respons API baru
+interface BukuBesarResponse {
+  success: boolean;
+  data: {
+    keuangan: {
+      id: string;
+      akun_id: string;
+      perusahaan_id: string;
+      debit: number;
+      kredit: number;
+      sub_akun_id: string | null;
+      created_at: string;
+      updated_at: string;
+      akun: {
+        id: string;
+        kode: number;
+        nama: string;
+        saldo_normal: 'debit' | 'kredit';
+        status: string;
+        kategori_id: string;
+        created_at: string;
+        updated_at: string;
+      };
+    };
+    jurnal: Array<{
+      id: string;
+      tanggal: string;
+      bukti: string;
+      keterangan: string;
+      akun_id: string;
+      debit: number | null;
+      kredit: number | null;
+      perusahaan_id: string;
+      sub_akun_id: string | null;
+      created_at: string;
+      updated_at: string;
+      akun: {
+        id: string;
+        kode: number;
+        nama: string;
+        saldo_normal: 'debit' | 'kredit';
+        status: string;
+        kategori_id: string;
+        created_at: string;
+        updated_at: string;
+      };
+    }>;
+    total: number;
+    totalDebit: number;
+    totalKredit: number;
+  };
+}
+
 export function BukuBesarTable() {
   // Gunakan destructuring dengan tipe yang benar
   const { selectedAkunId, setSelectedAkunId } = useSelectedAkun() as SelectedAkunState;
@@ -215,8 +269,12 @@ export function BukuBesarTable() {
       try {
         const response = await axios.get('/mahasiswa/perusahaan');
         if (response.data.success && response.data.data.length > 0) {
-          setPerusahaan(response.data.data[0]);
-          console.log("Perusahaan loaded:", response.data.data[0]);
+          // Cari perusahaan dengan status online
+          const onlinePerusahaan = response.data.data.find((p: Perusahaan) => p.status === 'online');
+          if (onlinePerusahaan) {
+            setPerusahaan(onlinePerusahaan);
+            console.log("Online perusahaan loaded:", onlinePerusahaan);
+          }
         }
       } catch (error) {
         console.error('Error fetching perusahaan:', error);
@@ -428,237 +486,129 @@ export function BukuBesarTable() {
 
   // 5. Derived state
   const isDebitNormal = useMemo(() => {
-    return getSaldoNormal(currentAkunId) === 'debit';
-  }, [currentAkunId, akunKeuanganInfo]);
+    if (!bukuBesarData?.data?.keuangan?.akun) return true; // default to debit
+    return bukuBesarData.data.keuangan.akun.saldo_normal === 'debit';
+  }, [bukuBesarData]);
 
   // Modifikasi fungsi calculateRunningSaldo untuk konsistensi display saldo
   const calculateRunningSaldo = (entries: BukuBesarItem[], akunId: string): BukuBesarItem[] => {
     if (!entries || entries.length === 0) return [];
     
-    const saldoNormal = getSaldoNormal(akunId);
-    console.log(`Saldo normal untuk akun ${akunId} adalah ${saldoNormal}`);
+    // Get saldo_normal from the first entry's akun (they all should have the same saldo_normal)
+    const saldoNormal = entries[0]?.akun?.saldo_normal || 'debit';
     
     let runningSaldo = 0;
     
-    // Cari saldo awal jika ada
+    // Calculate initial balance if there's a saldo awal entry
     const saldoAwalEntry = entries.find(entry => entry.is_saldo_awal);
     if (saldoAwalEntry) {
-      // Menentukan saldo awal berdasarkan saldo normal
-      if (saldoNormal === 'debit') {
-        runningSaldo = saldoAwalEntry.debit - saldoAwalEntry.kredit;
-      } else { // saldo normal kredit
-        runningSaldo = saldoAwalEntry.kredit - saldoAwalEntry.debit;
-      }
+      runningSaldo = saldoNormal === 'debit' 
+        ? (saldoAwalEntry.debit - saldoAwalEntry.kredit)
+        : (saldoAwalEntry.kredit - saldoAwalEntry.debit);
     }
     
-    // Hitung saldo berjalan
+    // Calculate running balance for all entries
     return entries.map(entry => {
-      // Skip penghitungan ulang untuk entri saldo awal karena sudah dihitung
       if (!entry.is_saldo_awal) {
-        // Update saldo berdasarkan saldo normal
-        if (saldoNormal === 'debit') {
-          runningSaldo += (entry.debit - entry.kredit);
-        } else {
-          runningSaldo += (entry.kredit - entry.debit);
-        }
+        runningSaldo += saldoNormal === 'debit'
+          ? (entry.debit - entry.kredit)
+          : (entry.kredit - entry.debit);
       }
       
       return {
         ...entry,
         saldo: runningSaldo,
-        isDebitNormal: saldoNormal === 'debit' // Simpan informasi saldo normal
+        isDebitNormal: saldoNormal === 'debit'
       };
     });
   };
 
-  // Modifikasi getBukuBesarEntries untuk filter saldo awal yang lebih tepat
+  // Update getBukuBesarEntries
   const getBukuBesarEntries = useMemo(() => {
-    if (!currentAkunId || !akunListData) {
-      return [];
+    if (!bukuBesarData?.data) return [];
+
+    const entries: BukuBesarItem[] = [];
+    const { keuangan, jurnal } = bukuBesarData.data;
+
+    // Get saldo_normal from the current account
+    const saldoNormal = keuangan?.akun?.saldo_normal || 'debit';
+
+    // Add saldo awal if exists
+    if (keuangan) {
+      entries.push({
+        id: keuangan.id,
+        // Gunakan tanggal dari perusahaan yang online
+        tanggal: perusahaan?.status === 'online' ? perusahaan.start_priode : '',
+        kodeAkun: keuangan.akun.kode.toString(),
+        namaAkun: keuangan.akun.nama,
+        keterangan: "Saldo Awal",
+        debit: keuangan.debit || 0,
+        kredit: keuangan.kredit || 0,
+        saldo: 0, // Will be calculated
+        is_saldo_awal: true,
+        sub_akun_id: keuangan.sub_akun_id,
+        isDebitNormal: saldoNormal === 'debit',
+        akun: {
+          id: keuangan.akun.id,
+          kode: keuangan.akun.kode.toString(),
+          nama: keuangan.akun.nama,
+          status: keuangan.akun.status,
+          saldo_normal: saldoNormal
+        }
+      });
     }
 
-    console.log("Selected Akun ID:", currentAkunId);
-    console.log("Processing bukuBesarData for entries:", bukuBesarData);
-    console.log("Processed saldo awal:", processedSaldoAwal);
-
-    // Gabungkan data buku besar dari API dengan saldo awal yang sudah diproses
-    const combinedData: BukuBesarItem[] = [
-      ...(processedSaldoAwal || []),
-      ...(bukuBesarData && Array.isArray(bukuBesarData) ? bukuBesarData : [])
-    ];
-
-    // Cek apakah yang dipilih adalah akun induk
-    const mainAkun = akunListData.akun.find((a: AkunItem) => a.id === currentAkunId);
-    if (mainAkun) {
-      const mainKode = mainAkun.kode.toString();
-      
-      // Filter semua transaksi berdasarkan kode akun yang dimulai dengan kode akun induk
-      const filteredEntries = combinedData.filter((entry: BukuBesarItem) => {
-        // Filter saldo awal - saldo awal hanya ditampilkan untuk akun yang dipilih
-        if (entry.is_saldo_awal) {
-          // Jika exact match dengan akun yang dipilih
-          if (entry.akun.id === currentAkunId) {
-            return true;
+    // Add journal entries for the selected account
+    if (jurnal && Array.isArray(jurnal)) {
+      jurnal.forEach(j => {
+        entries.push({
+          id: j.id,
+          tanggal: j.tanggal,
+          kodeAkun: j.akun.kode.toString(),
+          namaAkun: j.akun.nama,
+          keterangan: `${j.bukti} - ${j.keterangan}`,
+          debit: j.debit || 0,
+          kredit: j.kredit || 0,
+          saldo: 0, // Will be calculated
+          is_saldo_awal: false,
+          sub_akun_id: j.sub_akun_id,
+          isDebitNormal: saldoNormal === 'debit',
+          akun: {
+            id: j.akun.id,
+            kode: j.akun.kode.toString(),
+            nama: j.akun.nama,
+            status: j.akun.status,
+            saldo_normal: saldoNormal
           }
-          
-          // Jika ini saldo awal sub akun, cek apakah parent akun-nya adalah akun yang dipilih
-          if (entry.sub_akun_id) {
-            const subAkun = getSubAkunDetail(entry.sub_akun_id);
-            if (subAkun && subAkun.akun_id === currentAkunId) {
-              return true;
-            }
-          }
-          
-          return false;
-        }
-        
-        // Filter transaksi normal - tetap tampilkan semua transaksi yang terkait
-        if (entry.sub_akun_id) {
-          const subAkun = getSubAkunDetail(entry.sub_akun_id);
-          if (subAkun) {
-            // Cek apakah kode sub akun dimulai dengan kode akun induk
-            return subAkun.kode.startsWith(mainKode);
-          }
-        }
-        
-        // Jika tidak ada sub_akun_id, gunakan kode akun biasa
-        const entryKode = entry.kodeAkun || entry.akun?.kode || '';
-        return entryKode.toString().startsWith(mainKode);
+        });
       });
-      
-      // Debug entries yang difilter
-      console.log("Filtered entries:", filteredEntries);
-      
-      // Urutkan berdasarkan tanggal dan flag is_saldo_awal (saldo awal selalu tampil pertama)
-      const sortedEntries = filteredEntries.sort((a, b) => {
-        // Saldo awal selalu tampil pertama
-        if (a.is_saldo_awal && !b.is_saldo_awal) return -1;
-        if (!a.is_saldo_awal && b.is_saldo_awal) return 1;
-        
-        // Kemudian sort berdasarkan tanggal
-        const dateA = new Date(a.tanggal).getTime();
-        const dateB = new Date(b.tanggal).getTime();
-        
-        if (dateA !== dateB) {
-          return dateA - dateB; // Ascending by date
-        }
-        
-        // Kemudian sort berdasarkan kode akun jika tanggal sama
-        let kodeA = a.kodeAkun || a.akun?.kode || '';
-        if (a.sub_akun_id) {
-          const subAkunA = getSubAkunDetail(a.sub_akun_id);
-          if (subAkunA) {
-            kodeA = subAkunA.kode;
-          }
-        }
-        
-        let kodeB = b.kodeAkun || b.akun?.kode || '';
-        if (b.sub_akun_id) {
-          const subAkunB = getSubAkunDetail(b.sub_akun_id);
-          if (subAkunB) {
-            kodeB = subAkunB.kode;
-          }
-        }
-        
-        return kodeA.toString().localeCompare(kodeB.toString());
-      });
-      
-      // Hitung saldo berjalan berdasarkan saldo normal akun
-      return calculateRunningSaldo(sortedEntries, currentAkunId);
     }
-    
-    // Jika yang dipilih adalah sub akun
-    const subAkun = akunListData.subAkun.find((s: SubAkunItem) => s.akun.id === currentAkunId);
-    if (subAkun) {
-      const filteredEntries = combinedData.filter((entry: BukuBesarItem) => {
-        // Filter saldo awal - hanya tampilkan saldo awal yang terkait langsung
-        if (entry.is_saldo_awal) {
-          // Untuk saldo awal, hanya tampilkan jika akun ID sama dengan yang dipilih
-          if (entry.akun.id === currentAkunId) {
-            return true;
-          }
-          
-          // Jika entry memiliki sub_akun_id, cek kesesuaian dengan subAkun
-          if (entry.sub_akun_id && entry.sub_akun_id === subAkun.id) {
-            return true;
-          }
-          
-          return false;
-        }
-        
-        // Filter transaksi normal
-        if (entry.sub_akun_id) {
-          const detail = getSubAkunDetail(entry.sub_akun_id);
-          return detail && detail.kode === subAkun.kode.toString();
-        }
-        
-        // Jika tidak ada sub_akun_id, gunakan cara biasa
-        const entryKode = entry.kodeAkun || entry.akun?.kode || '';
-        return entryKode.toString() === subAkun.kode.toString();
-      });
-      
-      // Urutkan berdasarkan tanggal dan flag is_saldo_awal
-      const sortedEntries = filteredEntries.sort((a, b) => {
-        // Saldo awal selalu tampil pertama
-        if (a.is_saldo_awal && !b.is_saldo_awal) return -1;
-        if (!a.is_saldo_awal && b.is_saldo_awal) return 1;
-        
-        // Kemudian sort berdasarkan tanggal
-        const dateA = new Date(a.tanggal).getTime();
-        const dateB = new Date(b.tanggal).getTime();
-        return dateA - dateB; // Ascending by date
-      });
-      
-      // Hitung saldo berjalan
-      return calculateRunningSaldo(sortedEntries, currentAkunId);
-    }
-    
-    // Default case: Filter untuk semua akun
-    // Untuk saldo awal, tambahkan filter untuk hanya menampilkan yang relevan dengan akun yang dipilih
-    const filteredByAkun = combinedData.filter((entry: BukuBesarItem) => {
-      if (entry.is_saldo_awal) {
-        return entry.akun.id === currentAkunId;
-      }
-      return true; // Tampilkan semua transaksi normal (non-saldo awal)
+
+    // Sort entries
+    const sortedEntries = entries.sort((a, b) => {
+      if (a.is_saldo_awal) return -1;
+      if (b.is_saldo_awal) return 1;
+      return new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
     });
-    
-    // Urutkan berdasarkan tanggal dan saldo awal
-    const sortedByDate = filteredByAkun.sort((a, b) => {
-      // Saldo awal selalu tampil pertama
-      if (a.is_saldo_awal && !b.is_saldo_awal) return -1;
-      if (!a.is_saldo_awal && b.is_saldo_awal) return 1;
-      
-      // Kemudian sort berdasarkan tanggal
-      const dateA = new Date(a.tanggal).getTime();
-      const dateB = new Date(b.tanggal).getTime();
-      return dateA - dateB;
-    });
-    
-    return calculateRunningSaldo(sortedByDate, currentAkunId);
-  }, [bukuBesarData, currentAkunId, akunListData, subAkunDetails, akunKeuanganInfo, processedSaldoAwal]);
 
-  // Update totals untuk menggunakan saldo normal yang benar
+    return calculateRunningSaldo(sortedEntries, currentAkunId);
+  }, [bukuBesarData, currentAkunId, perusahaan]);
+
+  // Update totals calculation
   const totals = useMemo(() => {
-    if (!getBukuBesarEntries || getBukuBesarEntries.length === 0) {
-      return {
-        debit: 0,
-        kredit: 0,
-        saldo: 0
-      };
+    if (!bukuBesarData?.data) {
+      return { debit: 0, kredit: 0, saldo: 0 };
     }
 
-    const totalDebit = getBukuBesarEntries.reduce((acc, item) => acc + (item.debit || 0), 0);
-    const totalKredit = getBukuBesarEntries.reduce((acc, item) => acc + (item.kredit || 0), 0);
-    
-    // Ambil saldo dari entry terakhir, karena sudah dihitung dengan benar
-    const lastSaldo = getBukuBesarEntries[getBukuBesarEntries.length - 1].saldo;
+    const { keuangan, jurnal, totalDebit, totalKredit, total } = bukuBesarData.data;
 
+    // Gunakan total yang sudah dihitung dari backend
     return {
-      debit: totalDebit,
-      kredit: totalKredit,
-      saldo: lastSaldo
+      debit: totalDebit || 0,
+      kredit: totalKredit || 0,
+      saldo: total || 0
     };
-  }, [getBukuBesarEntries]);
+  }, [bukuBesarData]);
 
   // Modifikasi useEffect untuk mengatur akun berdasarkan kode dari URL
   useEffect(() => {
@@ -867,11 +817,11 @@ export function BukuBesarTable() {
                 ) : (
                   <>
                     {filteredAkun.akun.length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel>Akun</SelectLabel>
+              <SelectGroup>
+                <SelectLabel>Akun</SelectLabel>
                         {filteredAkun.akun
-                          .sort((a: AkunItem, b: AkunItem) => a.kode - b.kode)
-                          .map((akun: AkunItem) => (
+                  .sort((a: AkunItem, b: AkunItem) => a.kode - b.kode)
+                  .map((akun: AkunItem) => (
                             <SelectItem 
                               key={akun.id} 
                               value={akun.id}
@@ -883,17 +833,17 @@ export function BukuBesarTable() {
                               className="cursor-pointer hover:bg-gray-100"
                             >
                               {`${akun.kode} - ${akun.nama}`}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
                     )}
                     
                     {filteredAkun.subAkun.length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel>Sub Akun</SelectLabel>
+              <SelectGroup>
+                <SelectLabel>Sub Akun</SelectLabel>
                         {filteredAkun.subAkun
-                          .sort((a: SubAkunItem, b: SubAkunItem) => a.kode - b.kode)
-                          .map((subAkun: SubAkunItem) => (
+                  .sort((a: SubAkunItem, b: SubAkunItem) => a.kode - b.kode)
+                  .map((subAkun: SubAkunItem) => (
                             <SelectItem 
                               key={subAkun.id} 
                               value={subAkun.akun.id}
@@ -905,9 +855,9 @@ export function BukuBesarTable() {
                               className="cursor-pointer hover:bg-gray-100"
                             >
                               {`${subAkun.kode} - ${subAkun.nama}`}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
+                </SelectItem>
+              ))}
+              </SelectGroup>
                     )}
                   </>
                 )}
