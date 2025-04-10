@@ -87,6 +87,11 @@ interface ChartDataItem {
   [key: string]: number | string;
 }
 
+interface ProfileData {
+  user: { name: string; nim: string };
+  foto?: string;
+}
+
 const formatNumber = (value: number): string => {
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}M`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}jt`;
@@ -110,9 +115,7 @@ export default function Page() {
     "",
     "",
   ]);
-  const [profileData, setProfileData] = useState<{
-    user: { name: string; nim: string };
-  } | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
@@ -244,6 +247,17 @@ export default function Page() {
           axios.get("/instruktur/akun"),
         ]);
 
+        // Handle profile data dengan konstruksi URL foto
+      const profileData = profileRes.data?.data || null;
+      if (profileData) {
+        setProfileData({
+          ...profileData,
+          foto: profileData.foto 
+            ? `http://127.0.0.1:8000/storage/${profileData.foto}`
+            : undefined,
+        });
+      }
+
         const companiesData = companiesRes.data?.data || [];
         setCompanyList(companiesData);
 
@@ -256,7 +270,7 @@ export default function Page() {
         }
 
         setAccounts(accountsRes.data?.data || []);
-        setProfileData(profileRes.data?.data || null);
+        // setProfileData(profileRes.data?.data || null);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -337,7 +351,7 @@ export default function Page() {
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage
-                  src="https://github.com/shadcn.png"
+                  src={profileData?.foto || "/default-avatar.png"}
                   alt="@shadcn"
                 />
               </Avatar>
@@ -426,7 +440,7 @@ export default function Page() {
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
                 <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
-                  <AvatarImage src="https://randomuser.me/api/portraits/women/79.jpg" />
+                  <AvatarImage  src={profileData?.foto || "/default-avatar.png"} />
                 </Avatar>
                 <div className="text-md w-full">
                   <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">

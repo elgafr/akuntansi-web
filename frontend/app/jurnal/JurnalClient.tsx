@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import axios from "@/lib/axios";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
@@ -23,6 +24,13 @@ interface Transaction {
   sub_akun_id: string | null;
 }
 
+interface ProfileData {
+  user:{
+    name: string;
+  };
+  foto?: string;
+}
+
 interface JurnalClientProps {
   initialTransactions: Transaction[];
 }
@@ -30,14 +38,33 @@ interface JurnalClientProps {
 export function JurnalClient({ initialTransactions }: JurnalClientProps) {
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [error, setError] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState({ fullName: "Guest" });
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
 
-  // Load profile data
   useEffect(() => {
-    const storedProfile = localStorage.getItem("profileData");
-    if (storedProfile) {
-      setProfileData(JSON.parse(storedProfile));
-    }
+    const fetchProfileData = async () => {
+      try {
+        const response = await axios.get("/mahasiswa/profile");
+        if (response.data.success) {
+          const data = response.data.data;
+          const fotoUrl = data.foto
+            ? `http://127.0.0.1:8000/storage/${data.foto}`
+            : undefined;
+          setProfileData({
+            user: {
+              name: data.user.name,
+            },
+            foto: fotoUrl,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfileData();
   }, []);
 
   const handleTransactionsChange = async (newTransactions: Transaction[]) => {
@@ -84,12 +111,12 @@ export function JurnalClient({ initialTransactions }: JurnalClientProps) {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage
-                    src="https://github.com/shadcn.png"
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
                     alt="@shadcn"
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData.fullName}</div>
+                  <div className="text-sm font-medium">{profileData?.user.name}</div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>

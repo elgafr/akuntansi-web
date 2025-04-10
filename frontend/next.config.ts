@@ -10,11 +10,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "https://api.krisnabmntr.my.id/api/:path*",
+        destination: "http://127.0.0.1:8000/api/:path*",
       },
       {
         source: "/storage/:path*",
-        destination: "https://api.krisnabmntr.my.id/storage/:path*",
+        destination: "http://127.0.0.1:8000/storage/:path*",
       }
     ];
   },

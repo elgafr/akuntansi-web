@@ -17,18 +17,29 @@ interface ProfileData {
   user: {
     name: string;
   };
+  foto?: string;
 }
 
 export default function LaporanPage() {
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
         const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
-          setProfileData(response.data.data);
+          const data = response.data.data;
+          const fotoUrl = data.foto
+            ? `http://127.0.0.1:8000/storage/${data.foto}`
+            : undefined;
+          setProfileData({
+            user: {
+              name: data.user.name,
+            },
+            foto: fotoUrl,
+          });
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);
@@ -63,7 +74,7 @@ export default function LaporanPage() {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage
-                    src="https://github.com/shadcn.png"
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
                     alt="@shadcn"
                   />
                 </Avatar>
