@@ -23,7 +23,7 @@ function BukuBesarContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Force refetch on navigation
+  // Force refetch when URL parameters change
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['bukuBesar'] });
     queryClient.invalidateQueries({ queryKey: ['akunList'] });

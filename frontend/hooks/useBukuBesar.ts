@@ -22,7 +22,42 @@ interface BukuBesarItem {
 
 interface BukuBesarResponse {
   success: boolean;
-  data: BukuBesarItem[];
+  data: {
+    keuangan: {
+      id: string;
+      akun_id: string;
+      perusahaan_id: string;
+      debit: number;
+      kredit: number;
+      sub_akun_id: string | null;
+      akun: {
+        id: string;
+        kode: number;
+        nama: string;
+        saldo_normal: 'debit' | 'kredit';
+        status: string;
+      };
+    };
+    jurnal: Array<{
+      id: string;
+      tanggal: string;
+      bukti: string;
+      keterangan: string;
+      debit: number | null;
+      kredit: number | null;
+      sub_akun_id: string | null;
+      akun: {
+        id: string;
+        kode: number;
+        nama: string;
+        saldo_normal: 'debit' | 'kredit';
+        status: string;
+      };
+    }>;
+    total: number;
+    totalDebit: number;
+    totalKredit: number;
+  };
 }
 
 // Fungsi tambahan untuk mendapatkan data akun berdasarkan ID
@@ -39,42 +74,20 @@ async function fetchAkunById(akunId: string) {
   }
 }
 
-export function useBukuBesar(akunId?: string) {
+export function useBukuBesar(akunId: string) {
   return useQuery({
-    queryKey: ['bukuBesar', akunId],
+    queryKey: ['buku-besar', akunId],
     queryFn: async () => {
-      if (!akunId) return [];
-      
-      try {
-        // Fetch buku besar data
-        const response = await axios.get('/mahasiswa/bukubesar/sort', {
-          params: { akun_id: akunId }
-        });
-        
-        if (!response.data.success) return [];
-        
-        // Fetch akun data
-        const akun = await fetchAkunById(akunId);
-        
-        // Log untuk debugging
-        console.log('BukuBesar API response:', response.data.data);
-        console.log('Akun data:', akun);
-        
-        if (!akun) return response.data.data;
-        
-        // Enriched data with akun information
-        return response.data.data.map((item: BukuBesarItem) => ({
-          ...item,
-          kodeAkun: akun.kode?.toString() || '',
-          namaAkun: akun.nama || '',
-        }));
-      } catch (error) {
-        console.error('Error in useBukuBesar:', error);
-        return [];
-      }
+      if (!akunId) return null;
+      const response = await axios.get(`mahasiswa/bukubesar/sort`, {
+        params: {
+          akun_id: akunId
+        }
+      });
+      console.log('Buku Besar Response:', response.data);
+      return response.data;
     },
-    staleTime: 0,
-    enabled: !!akunId,
+    enabled: !!akunId
   });
 }
 

@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NeracaLajurTable } from "@/components/neraca-lajur/NeracaLajurTable";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import axios from "@/lib/axios";
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ProfileData {
   user : {
@@ -15,11 +16,68 @@ interface ProfileData {
   foto?: string;
 }
 
-export default function NeracaLajurPage() {
+// Simple loading component for Suspense
+function NeracaLajurTableSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-6 w-64 bg-gray-200 rounded mb-4"></div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="p-4">
+          {Array(6).fill(0).map((_, i) => (
+            <div key={i} className="flex justify-between py-3 border-b">
+              <div className="flex gap-4">
+                <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                <div className="h-4 w-32 bg-gray-200 rounded"></div>
+              </div>
+              <div className="flex gap-4">
+                <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                <div className="h-4 w-24 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
+export default function NeracaLajurPage() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState('before');
+  const queryClient = useQueryClient();
   
+  // Prefetch all data on component mount
+  useEffect(() => {
+    const prefetchData = async () => {
+      // Prefetch before adjustment data
+      queryClient.prefetchQuery({
+        queryKey: ['neracaLajur', 'before'],
+        queryFn: async () => {
+          const response = await axios.get('/mahasiswa/neracalajur/sebelumpenyesuaian');
+          if (response.data.success) {
+            return response.data.data;
+          }
+          throw new Error('Failed to fetch data');
+        },
+      });
+
+      // Prefetch after adjustment data
+      queryClient.prefetchQuery({
+        queryKey: ['neracaLajur', 'after'],
+        queryFn: async () => {
+          const response = await axios.get('/mahasiswa/neracalajur/setelahpenyesuaian');
+          if (response.data.success) {
+            return response.data.data;
+          }
+          throw new Error('Failed to fetch data');
+        },
+      });
+    };
+
+    prefetchData();
+  }, [queryClient]);
+
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
@@ -45,7 +103,6 @@ export default function NeracaLajurPage() {
 
     fetchProfileData();
   }, []);
-
 
   return (
     <SidebarProvider>
@@ -75,7 +132,9 @@ export default function NeracaLajurPage() {
                   />
                 </Avatar>
                 <div className="text-left mr-12">
-                  <div className="text-sm font-medium">{profileData?.user?.name}</div>
+                  <div className="text-sm font-medium">
+                    {loadingProfile ? "Loading..." : profileData?.user?.name || "Nama tidak tersedia"}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -84,28 +143,36 @@ export default function NeracaLajurPage() {
         </header>
 
         <section className="p-6">
-          
-          
-          <Tabs defaultValue="before" className="w-full">
+          <Tabs 
+            defaultValue="before" 
+            className="w-full"
+            value={activeTab}
+            onValueChange={setActiveTab}
+          >
             <TabsList className="w-full justify-between bg-muted/50">
               <TabsTrigger value="before" className="flex-1">
-                Neraca Saldo Sebelum di Penyesuaian
+                Neraca Lajur Sebelum di Penyesuaian
               </TabsTrigger>
               <TabsTrigger value="after" className="flex-1">
-                Neraca Saldo Setelah di Penyesuaian
+                Neraca Lajur Setelah di Penyesuaian
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="before">
-              <NeracaLajurTable type="before" />
-            </TabsContent>
-            
-            <TabsContent value="after">
-              <NeracaLajurTable type="after" />
-            </TabsContent>
+            {/* Load both tables but hide the inactive one */}
+            <div className="mt-4">
+              <div className={activeTab === 'before' ? 'block' : 'hidden'}>
+                <NeracaLajurTable type="before" />
+              </div>
+              <div className={activeTab === 'after' ? 'block' : 'hidden'}>
+                <NeracaLajurTable type="after" />
+              </div>
+            </div>
           </Tabs>
         </section>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+
+// Make sure the page is always rendered dynamically
+export const dynamic = 'force-dynamic';

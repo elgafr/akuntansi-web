@@ -36,21 +36,45 @@ interface ProfileData {
   foto?: string;
 }
 
-// Komponen terpisah untuk menangani searchParams
+// Component that uses search params (this should be wrapped in Suspense)
 function JurnalContent() {
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const { data: jurnalData } = useJurnal();
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: jurnalData, isLoading: jurnalLoading } = useJurnal();
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: ["jurnal"] });
-    queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
+    // Only invalidate queries when necessary, not on every render
+    if (pathname && searchParams) {
+      queryClient.invalidateQueries({ queryKey: ["jurnal"] });
+      queryClient.invalidateQueries({ queryKey: ["neracaLajur"] });
+    }
   }, [pathname, searchParams, queryClient]);
+
+  useEffect(() => {
+    if (jurnalData) {
+      const formattedTransactions = Array.isArray(jurnalData) 
+        ? jurnalData.map(t => ({
+            id: t.id,
+            date: t.tanggal,
+            documentType: t.bukti,
+            description: t.keterangan,
+            namaAkun: t.akun?.nama || '',
+            kodeAkun: t.akun?.kode?.toString() || '',
+            akun_id: t.akun_id,
+            debit: t.debit || 0,
+            kredit: t.kredit || 0,
+            perusahaan_id: t.perusahaan_id,
+            sub_akun_id: t.sub_akun_id || null
+          }))
+        : [];
+      setTransactions(formattedTransactions);
+    }
+  }, [jurnalData]);
 
   const handleTransactionsChange = async (newTransactions: Transaction[]) => {
     if (newTransactions) {
@@ -83,8 +107,48 @@ function JurnalContent() {
       accounts={[]}
       transactions={transactions}
       onTransactionsChange={handleTransactionsChange}
-      isLoading={isLoading || isPosting}
+      isLoading={jurnalLoading || isPosting}
     />
+  );
+}
+
+// Loading fallback component for suspense
+function JurnalContentLoading() {
+  return (
+    <div className="space-y-4 bg-gray-50 p-6 rounded-xl relative">
+      <div className="flex gap-4 mb-6">
+        {/* Skeleton for cards */}
+        <div className="flex flex-1 flex-grow">
+          <div className="bg-gray-200 animate-pulse p-4 rounded-l-xl flex-1 h-24"></div>
+          <div className="bg-gray-200 animate-pulse p-4 rounded-r-xl flex-1 h-24"></div>
+        </div>
+        <div className="bg-gray-200 animate-pulse p-4 rounded-xl w-1/3 h-24"></div>
+      </div>
+      
+      {/* Skeleton for controls */}
+      <div className="flex justify-between items-center gap-4 mb-6">
+        <div className="h-10 w-[300px] bg-gray-200 animate-pulse rounded-lg"></div>
+        <div className="flex gap-2">
+          <div className="h-10 w-32 bg-gray-200 animate-pulse rounded-lg"></div>
+          <div className="h-10 w-40 bg-gray-200 animate-pulse rounded-lg"></div>
+        </div>
+      </div>
+      
+      {/* Skeleton for table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="p-4">
+          {Array(5).fill(0).map((_, i) => (
+            <div key={i} className="flex py-4 border-b">
+              <div className="h-6 w-1/5 bg-gray-200 animate-pulse rounded mr-4"></div>
+              <div className="h-6 w-1/5 bg-gray-200 animate-pulse rounded mr-4"></div>
+              <div className="h-6 w-1/5 bg-gray-200 animate-pulse rounded mr-4"></div>
+              <div className="h-6 w-1/5 bg-gray-200 animate-pulse rounded mr-4"></div>
+              <div className="h-6 w-1/5 bg-gray-200 animate-pulse rounded"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -122,7 +186,7 @@ export default function JurnalPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        {/* Header Section */}
+        {/* Header Section - Render this immediately */}
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4 w-full justify-between">
             <Breadcrumb>
@@ -159,7 +223,8 @@ export default function JurnalPage() {
         </header>
 
         <section className="p-6">
-          <Suspense fallback={<div>Memuat transaksi...</div>}>
+          {/* Properly wrap JurnalContent with Suspense to fix the error */}
+          <Suspense fallback={<JurnalContentLoading />}>
             <JurnalContent />
           </Suspense>
         </section>
@@ -168,4 +233,5 @@ export default function JurnalPage() {
   );
 }
 
+// Force dynamic rendering to prevent prerendering errors
 export const dynamic = 'force-dynamic';
