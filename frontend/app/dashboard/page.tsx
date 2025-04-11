@@ -117,17 +117,29 @@ export default function Page() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([
-    "",
-    "",
-    "",
-  ]);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selectedAccounts');
+      try {
+        return saved ? JSON.parse(saved) : ["", "", ""];
+      } catch (e) {
+        return ["", "", ""];
+      }
+    }
+    return ["", "", ""];
+  });
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedAccounts', JSON.stringify(selectedAccounts));
+    }
+  }, [selectedAccounts]);
+  
   // Perubahan pada fungsi calculateRunningSaldo
   const calculateRunningSaldo = (
     journals: Jurnal[],
