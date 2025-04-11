@@ -54,6 +54,7 @@ interface Company {
   id: string;
   nama: string;
   status: "online" | "offline";
+  start_priode?: string;
 }
 
 interface Account {
@@ -80,7 +81,7 @@ interface BukuBesarItem {
   is_saldo_awal?: boolean;
   debit: number;
   kredit: number;
-  akun?: { saldo_normal: "debit" | "kredit" }; // Added akun property
+  akun?: { saldo_normal: "debit" | "kredit" };
 }
 
 interface Keuangan {
@@ -131,8 +132,15 @@ export default function Page() {
   const calculateRunningSaldo = (
     journals: Jurnal[],
     account: Account,
-    initialSaldo: number
+    initialSaldo: number,
+    saldoAwalTanggal: string
   ): { tanggal: string; saldo: number }[] => {
+    // Tambahkan entri saldo awal sebagai titik pertama
+    const result: { tanggal: string; saldo: number }[] = [{
+      tanggal: saldoAwalTanggal,
+      saldo: initialSaldo
+    }];
+  
     // Kelompokkan transaksi per tanggal
     const groupedByDate = journals.reduce((acc, journal) => {
       const tanggal = new Date(journal.tanggal).toISOString().split('T')[0];
@@ -148,19 +156,16 @@ export default function Page() {
   
     // Hitung saldo akhir per tanggal
     let saldo = initialSaldo;
-    const result: { tanggal: string; saldo: number }[] = [];
   
     for (const tanggal of sortedDates) {
       const dailyTransactions = groupedByDate[tanggal];
       
-      // Proses semua transaksi di tanggal yang sama
       dailyTransactions.forEach(transaction => {
         saldo += account.saldo_normal === "debit"
           ? transaction.debit - transaction.kredit
           : transaction.kredit - transaction.debit;
       });
   
-      // Simpan saldo akhir untuk tanggal ini
       result.push({ tanggal, saldo });
     }
   
@@ -237,7 +242,6 @@ export default function Page() {
             if (response.data?.success) {
               const backendData = response.data.data;
               
-              // Hitung saldo awal sesuai logika backend
               let initialSaldo = 0;
               if (account.saldo_normal === "debit") {
                 initialSaldo = (backendData.keuangan.debit ?? 0) - (backendData.keuangan.kredit ?? 0);
@@ -245,11 +249,14 @@ export default function Page() {
                 initialSaldo = (backendData.keuangan.kredit ?? 0) - (backendData.keuangan.debit ?? 0);
               }
   
-              // Proses jurnal dengan saldo awal yang benar
+              // Ambil tanggal saldo awal dari perusahaan
+              const saldoAwalTanggal = selectedCompany.start_priode;
+  
               saldoData[account.kode] = calculateRunningSaldo(
                 backendData.jurnal || [],
                 account,
-                initialSaldo
+                initialSaldo,
+                saldoAwalTanggal || ""
               );
             }
           });
