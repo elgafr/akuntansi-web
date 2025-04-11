@@ -54,6 +54,7 @@ interface Company {
   id: string;
   nama: string;
   status: "online" | "offline";
+  start_priode?: string;
 }
 
 interface Account {
@@ -80,11 +81,22 @@ interface BukuBesarItem {
   is_saldo_awal?: boolean;
   debit: number;
   kredit: number;
+  akun?: { saldo_normal: "debit" | "kredit" };
+}
+
+interface Keuangan {
+  debit: number | null;
+  kredit: number | null;
 }
 
 interface ChartDataItem {
   tanggal: string;
   [key: string]: number | string;
+}
+
+interface ProfileData {
+  user: { name: string; nim: string };
+  foto?: string;
 }
 
 const formatNumber = (value: number): string => {
@@ -103,53 +115,77 @@ export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([
-    "",
-    "",
-    "",
-  ]);
-  const [profileData, setProfileData] = useState<{
-    user: { name: string; nim: string };
-  } | null>(null);
+  // const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
+  // const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(["", "", ""]);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("selectedAccounts");
+    try {
+      if (saved) {
+        setSelectedAccounts(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Error parsing selectedAccounts:", e);
+    }
+  }
+}, []);
+
+useEffect(() => {
+  localStorage.setItem("selectedAccounts", JSON.stringify(selectedAccounts));
+}, [selectedAccounts]);
+
   // Perubahan pada fungsi calculateRunningSaldo
   const calculateRunningSaldo = (
-    entries: Jurnal[],
-    account: Account
+    journals: Jurnal[],
+    account: Account,
+    initialSaldo: number,
+    saldoAwalTanggal: string
   ): { tanggal: string; saldo: number }[] => {
-    let saldo = 0;
-    const saldoPerTanggal = new Map<string, number>();
+    // Tambahkan entri saldo awal sebagai titik pertama
+    const result: { tanggal: string; saldo: number }[] = [
+      {
+        tanggal: saldoAwalTanggal,
+        saldo: initialSaldo,
+      },
+    ];
 
-    // Urutkan transaksi berdasarkan tanggal
-    const sortedEntries = [...entries].sort(
-      (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
+    // Kelompokkan transaksi per tanggal
+    const groupedByDate = journals.reduce((acc, journal) => {
+      const tanggal = new Date(journal.tanggal).toISOString().split("T")[0];
+      if (!acc[tanggal]) acc[tanggal] = [];
+      acc[tanggal].push(journal);
+      return acc;
+    }, {} as Record<string, Jurnal[]>);
+
+    // Urutkan tanggal secara kronologis
+    const sortedDates = Object.keys(groupedByDate).sort(
+      (a, b) => new Date(a).getTime() - new Date(b).getTime()
     );
 
-    // Proses setiap transaksi dan simpan saldo akhir per tanggal
-    sortedEntries.forEach((entry) => {
-      if (account.saldo_normal === "debit") {
-        saldo += entry.debit - entry.kredit;
-      } else {
-        saldo += entry.kredit - entry.debit;
-      }
+    // Hitung saldo akhir per tanggal
+    let saldo = initialSaldo;
 
-      // Normalisasi tanggal ke format YYYY-MM-DD
-      const tanggal = new Date(entry.tanggal).toISOString().split("T")[0];
-      saldoPerTanggal.set(tanggal, saldo);
-    });
+    for (const tanggal of sortedDates) {
+      const dailyTransactions = groupedByDate[tanggal];
 
-    // Konversi Map ke array dan urutkan kembali
-    return Array.from(saldoPerTanggal.entries())
-      .map(([tanggal, saldo]) => ({ tanggal, saldo }))
-      .sort(
-        (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-      );
+      dailyTransactions.forEach((transaction) => {
+        saldo +=
+          account.saldo_normal === "debit"
+            ? transaction.debit - transaction.kredit
+            : transaction.kredit - transaction.debit;
+      });
+
+      result.push({ tanggal, saldo });
+    }
+
+    return result;
   };
 
   const processChartData = (
@@ -194,10 +230,18 @@ export default function Page() {
             .map((acc) => accounts.find((a) => a.kode === acc))
             .filter(Boolean) as Account[];
 
-          // Ambil data untuk semua akun sekaligus
           const responses = await Promise.all(
             activeAccounts.map((account) =>
-              axios.get("/mahasiswa/bukubesar/sort", {
+              axios.get<{
+                success: boolean;
+                data: {
+                  keuangan: Keuangan;
+                  jurnal: Jurnal[];
+                  total: number;
+                  totalDebit: number;
+                  totalKredit: number;
+                };
+              }>("/mahasiswa/bukubesar/sort", {
                 params: {
                   akun_id: account.id,
                   company_id: selectedCompany.id,
@@ -214,10 +258,27 @@ export default function Page() {
           responses.forEach((response, index) => {
             const account = activeAccounts[index];
             if (response.data?.success) {
-              const journals: Jurnal[] = response.data.data;
+              const backendData = response.data.data;
+
+              let initialSaldo = 0;
+              if (account.saldo_normal === "debit") {
+                initialSaldo =
+                  (backendData.keuangan.debit ?? 0) -
+                  (backendData.keuangan.kredit ?? 0);
+              } else {
+                initialSaldo =
+                  (backendData.keuangan.kredit ?? 0) -
+                  (backendData.keuangan.debit ?? 0);
+              }
+
+              // Ambil tanggal saldo awal dari perusahaan
+              const saldoAwalTanggal = selectedCompany.start_priode;
+
               saldoData[account.kode] = calculateRunningSaldo(
-                journals,
-                account
+                backendData.jurnal || [],
+                account,
+                initialSaldo,
+                saldoAwalTanggal || ""
               );
             }
           });
@@ -244,6 +305,17 @@ export default function Page() {
           axios.get("/instruktur/akun"),
         ]);
 
+        // Handle profile data dengan konstruksi URL foto
+        const profileData = profileRes.data?.data || null;
+        if (profileData) {
+          setProfileData({
+            ...profileData,
+            foto: profileData.foto
+              ? `http://127.0.0.1:8000/storage/${profileData.foto}`
+              : undefined,
+          });
+        }
+
         const companiesData = companiesRes.data?.data || [];
         setCompanyList(companiesData);
 
@@ -256,7 +328,7 @@ export default function Page() {
         }
 
         setAccounts(accountsRes.data?.data || []);
-        setProfileData(profileRes.data?.data || null);
+        // setProfileData(profileRes.data?.data || null);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -267,17 +339,17 @@ export default function Page() {
     fetchInitialData();
   }, []);
 
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredCompanies([]);
-      return;
-    }
+  // useEffect(() => {
+  //   if (!searchTerm.trim()) {
+  //     setFilteredCompanies([]);
+  //     return;
+  //   }
 
-    const results = companyList.filter((company) =>
-      company.nama.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredCompanies(results);
-  }, [searchTerm, companyList]);
+  //   const results = companyList.filter((company) =>
+  //     company.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  //   );
+  //   setFilteredCompanies(results);
+  // }, [searchTerm, companyList]);
 
   const handleCompanySelect = async (company: Company) => {
     try {
@@ -300,7 +372,7 @@ export default function Page() {
 
       setSelectedCompany(company);
       form.setValue("companyName", company.nama);
-      setFilteredCompanies([]);
+      // setFilteredCompanies([]);
     } catch (error) {
       console.error("Gagal memilih perusahaan:", error);
       alert("Gagal memilih perusahaan");
@@ -337,7 +409,7 @@ export default function Page() {
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage
-                  src="https://github.com/shadcn.png"
+                  src={profileData?.foto || "/default-avatar.png"}
                   alt="@shadcn"
                 />
               </Avatar>
@@ -369,44 +441,53 @@ export default function Page() {
                       <FormItem className="mb-0">
                         <FormControl>
                           <div className="relative">
-                            <Input
-                              placeholder="Cari Perusahaan"
-                              {...field}
-                              className="w-full pl-10 h-10 rounded-xl"
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setSearchTerm(e.target.value);
+                            <Select
+                              value={selectedCompany?.id || ""}
+                              onValueChange={(value) => {
+                                const company = companyList.find(
+                                  (c) => c.id === value
+                                );
+                                if (company) handleCompanySelect(company);
                               }}
-                            />
-                            <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-700" />
-
-                            {searchTerm && filteredCompanies.length > 0 && (
-                              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                                {filteredCompanies.map((company) => (
-                                  <div
-                                    key={company.id}
-                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                    onClick={() => handleCompanySelect(company)}
-                                  >
-                                    {company.nama}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            >
+                              <SelectTrigger className="w-full pl-10 h-10 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                  <FaBuilding className="text-gray-700" />
+                                  <SelectValue
+                                    placeholder="Pilih Perusahaan"
+                                    className="ml-2"
+                                  />
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {companyList.map((company) => (
+                                    <SelectItem
+                                      key={company.id}
+                                      value={company.id}
+                                      className="py-2"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`w-2 h-2 rounded-full ${
+                                            company.status === "online"
+                                              ? "bg-green-500"
+                                              : "bg-gray-400"
+                                          }`}
+                                        ></span>
+                                        {company.nama}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </FormControl>
                       </FormItem>
                     </div>
                   )}
                 />
-
-                <Button
-                  type="submit"
-                  className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8"
-                >
-                  <PlusCircle className="w-6 h-6 text-white" />
-                  Pilih Perusahaan
-                </Button>
               </div>
             </form>
           </Form>
@@ -426,7 +507,9 @@ export default function Page() {
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
                 <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
-                  <AvatarImage src="https://randomuser.me/api/portraits/women/79.jpg" />
+                  <AvatarImage
+                    src={profileData?.foto || "/default-avatar.png"}
+                  />
                 </Avatar>
                 <div className="text-md w-full">
                   <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
@@ -471,11 +554,26 @@ export default function Page() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {accounts.map((account: Account) => (
-                          <SelectItem key={account.kode} value={account.kode}>
-                            {account.kode} - {account.nama}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="none">-- Pilih Akun --</SelectItem>
+                        {accounts
+                          .filter(
+                            (account) =>
+                              !selectedAccounts.some(
+                                (acc, i) =>
+                                  i !== index &&
+                                  acc === account.kode &&
+                                  acc !== "none"
+                              )
+                          )
+                          .map((account: Account) => (
+                            <SelectItem
+                              key={account.kode}
+                              value={account.kode}
+                              disabled={selectedAccounts.includes(account.kode)}
+                            >
+                              {account.kode} - {account.nama}
+                            </SelectItem>
+                          ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>

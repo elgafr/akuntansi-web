@@ -13,6 +13,7 @@ interface ProfileData {
   user : {
     name: string;
   };
+  foto?: string;
 }
 
 // Simple loading component for Suspense
@@ -82,7 +83,16 @@ export default function NeracaLajurPage() {
       try {
         const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
-          setProfileData(response.data.data);
+          const data = response.data.data;
+          const fotoUrl = data.foto
+            ? `http://127.0.0.1:8000/storage/${data.foto}`
+            : undefined;
+          setProfileData({
+            user: {
+              name: data.user.name,
+            },
+            foto: fotoUrl,
+          });
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);
@@ -117,7 +127,7 @@ export default function NeracaLajurPage() {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage
-                    src="https://github.com/shadcn.png"
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
                     alt="@shadcn"
                   />
                 </Avatar>

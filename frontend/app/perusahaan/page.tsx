@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
-import Link from "next/link";
+// import Link from "next/link";
 import FormModal from "@/components/ui/custom/form-modal/add-company/add-company";
 import {
   Card,
@@ -40,8 +40,16 @@ interface Company {
 }
 
 interface ProfileData {
-  fullName: string;
+  user: {
+    name: string;
+    nim: string;
+  };
+  foto?: string;
 }
+
+// interface ProfileData {
+//   fullName: string;
+// }
 
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
@@ -55,13 +63,6 @@ export default function Page() {
   const router = useRouter();
   const [companyData, setCompanyData] = useState<Company | null>(null);
 
-  interface ProfileData {
-    user: {
-      name: string;
-      nim: string;
-    };
-  }
-
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
 
@@ -70,7 +71,17 @@ export default function Page() {
       try {
         const response = await axios.get("/mahasiswa/profile");
         if (response.data.success) {
-          setProfileData(response.data.data);
+          const data = response.data.data;
+          const fotoUrl = data.foto
+            ? `http://127.0.0.1:8000/storage/${data.foto}`
+            : undefined;
+          setProfileData({
+            user: {
+              name: data.user.name,
+              nim: data.user.nim,
+            },
+            foto: fotoUrl,
+          });
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);
@@ -209,7 +220,7 @@ export default function Page() {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage
-                    src="https://github.com/shadcn.png"
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
                     alt="@shadcn"
                   />
                 </Avatar>

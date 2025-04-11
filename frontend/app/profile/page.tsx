@@ -68,7 +68,7 @@ export default function Page() {
               ...currentUser,
             },
             foto: userProfile.foto
-              ? `${window.location.origin}/storage/${userProfile.foto}`
+              ? `http://127.0.0.1:8000/storage/${userProfile.foto}`
               : undefined,
           });
         }
@@ -112,7 +112,7 @@ export default function Page() {
           ...prev!,
           ...response.data.data,
           foto: response.data.data.foto
-            ? `http://localhost:8000/storage/${response.data.data.foto}`
+            ? `http://127.0.0.1:8000/storage/${response.data.data.foto}`
             : prev?.foto,
         }));
         setIsEditModalOpen(false);
