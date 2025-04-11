@@ -136,42 +136,44 @@ export default function Page() {
     saldoAwalTanggal: string
   ): { tanggal: string; saldo: number }[] => {
     // Tambahkan entri saldo awal sebagai titik pertama
-    const result: { tanggal: string; saldo: number }[] = [{
-      tanggal: saldoAwalTanggal,
-      saldo: initialSaldo
-    }];
-  
+    const result: { tanggal: string; saldo: number }[] = [
+      {
+        tanggal: saldoAwalTanggal,
+        saldo: initialSaldo,
+      },
+    ];
+
     // Kelompokkan transaksi per tanggal
     const groupedByDate = journals.reduce((acc, journal) => {
-      const tanggal = new Date(journal.tanggal).toISOString().split('T')[0];
+      const tanggal = new Date(journal.tanggal).toISOString().split("T")[0];
       if (!acc[tanggal]) acc[tanggal] = [];
       acc[tanggal].push(journal);
       return acc;
     }, {} as Record<string, Jurnal[]>);
-  
+
     // Urutkan tanggal secara kronologis
     const sortedDates = Object.keys(groupedByDate).sort(
       (a, b) => new Date(a).getTime() - new Date(b).getTime()
     );
-  
+
     // Hitung saldo akhir per tanggal
     let saldo = initialSaldo;
-  
+
     for (const tanggal of sortedDates) {
       const dailyTransactions = groupedByDate[tanggal];
-      
-      dailyTransactions.forEach(transaction => {
-        saldo += account.saldo_normal === "debit"
-          ? transaction.debit - transaction.kredit
-          : transaction.kredit - transaction.debit;
+
+      dailyTransactions.forEach((transaction) => {
+        saldo +=
+          account.saldo_normal === "debit"
+            ? transaction.debit - transaction.kredit
+            : transaction.kredit - transaction.debit;
       });
-  
+
       result.push({ tanggal, saldo });
     }
-  
+
     return result;
   };
-  
 
   const processChartData = (
     saldoData: Record<string, { tanggal: string; saldo: number }[]>
@@ -208,13 +210,13 @@ export default function Page() {
       if (selectedCompany && selectedAccounts.some((acc) => acc !== "")) {
         setLoadingChart(true);
         setError(null);
-  
+
         try {
           const activeAccounts = selectedAccounts
             .filter((acc) => acc !== "")
             .map((acc) => accounts.find((a) => a.kode === acc))
             .filter(Boolean) as Account[];
-  
+
           const responses = await Promise.all(
             activeAccounts.map((account) =>
               axios.get<{
@@ -234,24 +236,31 @@ export default function Page() {
               })
             )
           );
-  
-          const saldoData: Record<string, { tanggal: string; saldo: number }[]> = {};
-  
+
+          const saldoData: Record<
+            string,
+            { tanggal: string; saldo: number }[]
+          > = {};
+
           responses.forEach((response, index) => {
             const account = activeAccounts[index];
             if (response.data?.success) {
               const backendData = response.data.data;
-              
+
               let initialSaldo = 0;
               if (account.saldo_normal === "debit") {
-                initialSaldo = (backendData.keuangan.debit ?? 0) - (backendData.keuangan.kredit ?? 0);
+                initialSaldo =
+                  (backendData.keuangan.debit ?? 0) -
+                  (backendData.keuangan.kredit ?? 0);
               } else {
-                initialSaldo = (backendData.keuangan.kredit ?? 0) - (backendData.keuangan.debit ?? 0);
+                initialSaldo =
+                  (backendData.keuangan.kredit ?? 0) -
+                  (backendData.keuangan.debit ?? 0);
               }
-  
+
               // Ambil tanggal saldo awal dari perusahaan
               const saldoAwalTanggal = selectedCompany.start_priode;
-  
+
               saldoData[account.kode] = calculateRunningSaldo(
                 backendData.jurnal || [],
                 account,
@@ -260,7 +269,7 @@ export default function Page() {
               );
             }
           });
-  
+
           setChartData(processChartData(saldoData));
         } catch (err) {
           console.error("Gagal mengambil data:", err);
@@ -270,10 +279,9 @@ export default function Page() {
         }
       }
     };
-  
+
     fetchChartData();
   }, [selectedCompany, selectedAccounts, accounts]);
-  
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -285,15 +293,15 @@ export default function Page() {
         ]);
 
         // Handle profile data dengan konstruksi URL foto
-      const profileData = profileRes.data?.data || null;
-      if (profileData) {
-        setProfileData({
-          ...profileData,
-          foto: profileData.foto 
-            ? `http://127.0.0.1:8000/storage/${profileData.foto}`
-            : undefined,
-        });
-      }
+        const profileData = profileRes.data?.data || null;
+        if (profileData) {
+          setProfileData({
+            ...profileData,
+            foto: profileData.foto
+              ? `http://127.0.0.1:8000/storage/${profileData.foto}`
+              : undefined,
+          });
+        }
 
         const companiesData = companiesRes.data?.data || [];
         setCompanyList(companiesData);
@@ -477,7 +485,9 @@ export default function Page() {
             <Card className="w-[485px] h-[230px] p-5 bg-gradient-to-r from-red-500 to-red-700 text-white flex">
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
                 <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
-                  <AvatarImage  src={profileData?.foto || "/default-avatar.png"} />
+                  <AvatarImage
+                    src={profileData?.foto || "/default-avatar.png"}
+                  />
                 </Avatar>
                 <div className="text-md w-full">
                   <div className="grid grid-cols-[auto_20px_1fr] gap-x-4 gap-y-2 items-start">
@@ -522,11 +532,26 @@ export default function Page() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {accounts.map((account: Account) => (
-                          <SelectItem key={account.kode} value={account.kode}>
-                            {account.kode} - {account.nama}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="none">-- Pilih Akun --</SelectItem>
+                        {accounts
+                          .filter(
+                            (account) =>
+                              !selectedAccounts.some(
+                                (acc, i) =>
+                                  i !== index &&
+                                  acc === account.kode &&
+                                  acc !== "none"
+                              )
+                          )
+                          .map((account: Account) => (
+                            <SelectItem
+                              key={account.kode}
+                              value={account.kode}
+                              disabled={selectedAccounts.includes(account.kode)}
+                            >
+                              {account.kode} - {account.nama}
+                            </SelectItem>
+                          ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
