@@ -115,31 +115,32 @@ export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedAccounts');
-      try {
-        return saved ? JSON.parse(saved) : ["", "", ""];
-      } catch (e) {
-        return ["", "", ""];
-      }
-    }
-    return ["", "", ""];
-  });
+  // const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
+  // const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(["", "", ""]);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedAccounts', JSON.stringify(selectedAccounts));
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("selectedAccounts");
+    try {
+      if (saved) {
+        setSelectedAccounts(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Error parsing selectedAccounts:", e);
     }
-  }, [selectedAccounts]);
-  
+  }
+}, []);
+
+useEffect(() => {
+  localStorage.setItem("selectedAccounts", JSON.stringify(selectedAccounts));
+}, [selectedAccounts]);
+
   // Perubahan pada fungsi calculateRunningSaldo
   const calculateRunningSaldo = (
     journals: Jurnal[],
@@ -338,17 +339,17 @@ export default function Page() {
     fetchInitialData();
   }, []);
 
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredCompanies([]);
-      return;
-    }
+  // useEffect(() => {
+  //   if (!searchTerm.trim()) {
+  //     setFilteredCompanies([]);
+  //     return;
+  //   }
 
-    const results = companyList.filter((company) =>
-      company.nama.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredCompanies(results);
-  }, [searchTerm, companyList]);
+  //   const results = companyList.filter((company) =>
+  //     company.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  //   );
+  //   setFilteredCompanies(results);
+  // }, [searchTerm, companyList]);
 
   const handleCompanySelect = async (company: Company) => {
     try {
@@ -371,7 +372,7 @@ export default function Page() {
 
       setSelectedCompany(company);
       form.setValue("companyName", company.nama);
-      setFilteredCompanies([]);
+      // setFilteredCompanies([]);
     } catch (error) {
       console.error("Gagal memilih perusahaan:", error);
       alert("Gagal memilih perusahaan");
@@ -440,44 +441,53 @@ export default function Page() {
                       <FormItem className="mb-0">
                         <FormControl>
                           <div className="relative">
-                            <Input
-                              placeholder="Cari Perusahaan"
-                              {...field}
-                              className="w-full pl-10 h-10 rounded-xl"
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setSearchTerm(e.target.value);
+                            <Select
+                              value={selectedCompany?.id || ""}
+                              onValueChange={(value) => {
+                                const company = companyList.find(
+                                  (c) => c.id === value
+                                );
+                                if (company) handleCompanySelect(company);
                               }}
-                            />
-                            <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-700" />
-
-                            {searchTerm && filteredCompanies.length > 0 && (
-                              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                                {filteredCompanies.map((company) => (
-                                  <div
-                                    key={company.id}
-                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                    onClick={() => handleCompanySelect(company)}
-                                  >
-                                    {company.nama}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            >
+                              <SelectTrigger className="w-full pl-10 h-10 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                  <FaBuilding className="text-gray-700" />
+                                  <SelectValue
+                                    placeholder="Pilih Perusahaan"
+                                    className="ml-2"
+                                  />
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {companyList.map((company) => (
+                                    <SelectItem
+                                      key={company.id}
+                                      value={company.id}
+                                      className="py-2"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`w-2 h-2 rounded-full ${
+                                            company.status === "online"
+                                              ? "bg-green-500"
+                                              : "bg-gray-400"
+                                          }`}
+                                        ></span>
+                                        {company.nama}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </FormControl>
                       </FormItem>
                     </div>
                   )}
                 />
-
-                <Button
-                  type="submit"
-                  className="flex items-center gap-2 flex-shrink-0 rounded-xl h-10 mr-8"
-                >
-                  <PlusCircle className="w-6 h-6 text-white" />
-                  Pilih Perusahaan
-                </Button>
               </div>
             </form>
           </Form>
