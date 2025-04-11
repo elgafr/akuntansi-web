@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/card";
 import axios from "@/lib/axios";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface Company {
   id: string;
@@ -178,7 +179,7 @@ export default function Page() {
         setFilteredCompanyList(updatedCompanies);
 
         // Tampilkan pesan sukses (opsional)
-        alert("Perusahaan berhasil dihapus");
+        toast("Perusahaan berhasil dihapus");
       } else {
         // Tampilkan pesan error jika penghapusan gagal
         alert("Gagal menghapus perusahaan");

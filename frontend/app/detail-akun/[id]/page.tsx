@@ -89,40 +89,51 @@ export default function Page() {
 
   const fetchAccounts = async (perusahaanId: string) => {
     try {
-      const [keuanganResponse, subakunResponse] = await Promise.all([
-        axios.get(`/mahasiswa/keuangan`, { params: { perusahaan_id: perusahaanId } }),
-        axios.get(`/mahasiswa/subakun`, { params: { perusahaan_id: perusahaanId } })
-      ]);
-  
-      const accountsMap = keuanganResponse.data.data.reduce((acc: any, entry: any) => {
-        const akun = entry.akun;
-        if (!acc[akun.id]) {
-          acc[akun.id] = {
-            ...akun,
-            debit: entry.debit,
-            kredit: entry.kredit,
-            subakun: [],
-            keuanganId: entry.id
-          };
-        }
-        return acc;
-      }, {});
-  
-      subakunResponse.data.data.forEach((sub: any) => {
-        if (accountsMap[sub.akun_id]) {
-          const existing = accountsMap[sub.akun_id].subakun.find((s: any) => s.id === sub.id);
-          if (!existing) {
-            accountsMap[sub.akun_id].subakun.push({
-              ...sub,
-              debit: 0,
-              kredit: 0,
-              keuanganId: ""
-            });
-          }
-        }
+      const [akunResponse, keuanganResponse, subakunResponse] =
+        await Promise.all([
+          axios.get("/instruktur/akun"),
+          axios.get(`/mahasiswa/keuangan`, {
+            params: {
+              perusahaan_id: perusahaanId,
+              with: ["akun"],
+            },
+          }),
+          axios.get(`/mahasiswa/subakun`, {
+            params: {
+              perusahaan_id: perusahaanId,
+              with: ["keuangan"],
+            },
+          }),
+        ]);
+
+      const allAccounts = akunResponse.data.data.map((akun: any) => {
+        const keuangan = keuanganResponse.data.data.find(
+          (k: any) => k.akun_id === akun.id && k.perusahaan_id === perusahaanId
+        );
+
+        const subakun = subakunResponse.data.data
+          .filter(
+            (sub: any) =>
+              sub.akun_id === akun.id && sub.perusahaan_id === perusahaanId
+          )
+          .map((sub: any) => ({
+            ...sub,
+            debit: sub.keuangan?.debit || 0,
+            kredit: sub.keuangan?.kredit || 0,
+            keuanganId: sub.keuangan?.id || null,
+          }));
+
+        return {
+          ...akun,
+          debit: keuangan?.debit || 0,
+          kredit: keuangan?.kredit || 0,
+          keuanganId: keuangan?.id || null,
+          subakun,
+          isEditing: false,
+        };
       });
-  
-      setAccounts(Object.values(accountsMap));
+
+      setAccounts(allAccounts);
     } catch (error) {
       toast.error("Gagal memuat data terbaru");
     }
