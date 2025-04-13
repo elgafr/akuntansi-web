@@ -409,8 +409,8 @@ useEffect(() => {
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage
-                  src={profileData?.foto || "/default-avatar.png"}
-                  alt="@shadcn"
+                  src={profileData?.foto || "https://github.com/shadcn.png"}
+                  alt="Profile Picture"
                 />
               </Avatar>
               <div className="text-left mr-8">

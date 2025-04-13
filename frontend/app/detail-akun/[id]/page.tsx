@@ -70,10 +70,11 @@ interface SubAccount {
   keuanganId: string;
 }
 
-interface Profile {
-  user:{
+interface ProfileData {
+  user: {
     name: string;
-  }
+  };
+  foto?: string;
 }
 
 export default function Page() {
@@ -82,9 +83,10 @@ export default function Page() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingSubAccountIndex, setAddingSubAccountIndex] = useState<
-  number | null
+    number | null
   >(null);
-  const [profileData, setProfileData] = useState<Profile | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
   const { id } = useParams();
 
   const fetchAccounts = async (perusahaanId: string) => {
@@ -139,18 +141,39 @@ export default function Page() {
     }
   };
 
+    useEffect(() => {
+      const fetchProfileData = async () => {
+        try {
+          const response = await axios.get("/mahasiswa/profile");
+          if (response.data.success) {
+            const data = response.data.data;
+            const fotoUrl = data.foto
+              ? `http://127.0.0.1:8000/storage/${data.foto}`
+              : undefined;
+            setProfileData({
+              user: {
+                name: data.user.name,
+              },
+              foto: fotoUrl,
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching profile data:", error);
+        } finally {
+          setLoadingProfile(false);
+        }
+      };
+  
+      fetchProfileData();
+    }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [companyRes, categoriesRes,profileRes] = await Promise.all([
+        const [companyRes, categoriesRes] = await Promise.all([
           axios.get(`/mahasiswa/perusahaan/${id}`),
           axios.get("/instruktur/kategori"),
-          axios.get("/mahasiswa/profile")
         ]);
-
-        if (profileRes.data.success) {
-          setProfileData(profileRes.data.data);
-        }
 
         if (companyRes.data.success) {
           setCompany(companyRes.data.data);
@@ -203,13 +226,13 @@ export default function Page() {
       kredit: 0,
       keuanganId: "",
     };
-    
+
     // Tambahkan di akhir array
     updatedAccounts[accountIndex].subakun = [
       ...updatedAccounts[accountIndex].subakun,
-      newSub
+      newSub,
     ];
-    
+
     setAccounts(updatedAccounts);
   };
 
@@ -217,12 +240,12 @@ export default function Page() {
     try {
       const account = accounts[accountIndex];
       const subAccount = account.subakun[subIndex];
-  
+
       if (!subAccount.nama || !subAccount.kode) {
         toast.error("Nama dan kode sub akun harus diisi");
         return;
       }
-  
+
       // 1. Simpan sub akun
       const subResponse = await axios.post("/mahasiswa/subakun", {
         nama: subAccount.nama,
@@ -230,7 +253,7 @@ export default function Page() {
         akun_id: account.id,
         perusahaan_id: company?.id,
       });
-  
+
       // 2. Update state optimis
       const updatedAccounts = [...accounts];
       const newSub = {
@@ -239,15 +262,15 @@ export default function Page() {
         isNew: false,
         debit: 0,
         kredit: 0,
-        keuanganId: ""
+        keuanganId: "",
       };
-      
+
       updatedAccounts[accountIndex].subakun[subIndex] = newSub;
       setAccounts(updatedAccounts);
-  
+
       // 3. Refresh data dari server
       await fetchAccounts(company?.id!);
-  
+
       toast.success("Sub akun berhasil ditambahkan!");
     } catch (error) {
       console.error("Gagal menyimpan sub akun:", error);
@@ -398,12 +421,16 @@ export default function Page() {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
+                    alt="Profile Picture"
                   />
                 </Avatar>
-                <div className="text-left">
-                  <div className="text-sm font-medium">{profileData?.user.name}</div>
+                <div className="text-left mr-12">
+                <div className="text-sm font-medium">
+                  {loadingProfile
+                        ? "Loading..."
+                        : profileData?.user?.name || "Nama tidak tersedia"}
+                  </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
               </div>
@@ -421,7 +448,7 @@ export default function Page() {
         </div>
 
         <div className="mt-10 ml-10 flex gap-x-6">
-          <Card className="w-[800px]">
+          <Card className="w-full">
             <CardHeader>
               <CardTitle className="text-5xl text-primary py-2 mb-4">
                 {company.nama}
@@ -518,7 +545,7 @@ export default function Page() {
                         <TableRow key={`${account.id}-${subAccount.id}`}>
                           <TableCell></TableCell>
 
-                          <TableCell>
+                          <TableCell className="w-40">
                             {subAccount.isNew ? (
                               <Input
                                 value={subAccount.nama}
@@ -536,7 +563,7 @@ export default function Page() {
                             )}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className="w-40">
                             {subAccount.isNew ? (
                               <Input
                                 value={subAccount.kode}
@@ -624,7 +651,7 @@ export default function Page() {
             </CardContent>
           </Card>
 
-          <Card className="w-[400px]">
+          <Card className="mr-10">
             <CardHeader>
               <CardTitle className="text-primary text-3xl">
                 Detail Perusahaan

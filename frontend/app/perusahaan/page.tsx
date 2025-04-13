@@ -48,9 +48,6 @@ interface ProfileData {
   foto?: string;
 }
 
-// interface ProfileData {
-//   fullName: string;
-// }
 
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
@@ -222,7 +219,7 @@ export default function Page() {
                 <Avatar>
                   <AvatarImage
                     src={profileData?.foto || "https://github.com/shadcn.png"}
-                    alt="@shadcn"
+                    alt="Profile Picture"
                   />
                 </Avatar>
                 <div className="text-left mr-12">
