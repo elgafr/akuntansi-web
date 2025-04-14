@@ -61,8 +61,12 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="text-2xl font-bold text-center">
-        LoremLpsum
+      <SidebarHeader className="flex items-center justify-center px-4 border-b border-slate-200 dark:border-slate-700">
+        <img
+          src="/assets/image/Logo.png"
+          alt="Company Logo"
+          className="w-full"
+        />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
