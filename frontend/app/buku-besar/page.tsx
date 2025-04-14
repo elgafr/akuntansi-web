@@ -87,7 +87,7 @@ export default function BukuBesarPage() {
                 <Avatar>
                   <AvatarImage
                     src={profileData?.foto || "https://github.com/shadcn.png"}
-                    alt="@shadcn"
+                    alt="Profile Picture"
                   />
                 </Avatar>
                 <div className="text-left mr-12">

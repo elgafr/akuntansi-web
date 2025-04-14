@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/card";
 import axios from "@/lib/axios";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface Company {
   id: string;
@@ -47,9 +48,6 @@ interface ProfileData {
   foto?: string;
 }
 
-// interface ProfileData {
-//   fullName: string;
-// }
 
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
@@ -178,7 +176,7 @@ export default function Page() {
         setFilteredCompanyList(updatedCompanies);
 
         // Tampilkan pesan sukses (opsional)
-        alert("Perusahaan berhasil dihapus");
+        toast("Perusahaan berhasil dihapus");
       } else {
         // Tampilkan pesan error jika penghapusan gagal
         alert("Gagal menghapus perusahaan");
@@ -221,7 +219,7 @@ export default function Page() {
                 <Avatar>
                   <AvatarImage
                     src={profileData?.foto || "https://github.com/shadcn.png"}
-                    alt="@shadcn"
+                    alt="Profile Picture"
                   />
                 </Avatar>
                 <div className="text-left mr-12">
