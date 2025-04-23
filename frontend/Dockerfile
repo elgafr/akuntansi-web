@@ -9,7 +9,8 @@ RUN apt-get -y update && \
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
+RUN bun install 
 RUN bun install --frozen-lockfile
 
 # Build the app
