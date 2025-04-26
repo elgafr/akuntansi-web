@@ -11,7 +11,7 @@ export function useSelectedAkun() {
     },
     initialData: "",
     staleTime: Infinity,
-    cacheTime: Infinity,
+    gcTime: Infinity,
   });
 
   const setSelectedAkunId = (newAkunId: string) => {
