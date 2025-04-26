@@ -67,7 +67,7 @@ export default function Page() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
+        const response = await axios.get( `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`);
         if (response.data.success) {
           const data = response.data.data;
           const fotoUrl = data.foto
@@ -95,7 +95,7 @@ export default function Page() {
   useEffect(() => {
     const fetchKrsId = async () => {
       try {
-        const response = await axios.get("/mahasiswa/krs");
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/krs`);
         if (response.data.success && response.data.data.length > 0) {
           setKrsId(response.data.data[0].id);
         }
@@ -111,7 +111,7 @@ export default function Page() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await axios.get("/mahasiswa/perusahaan");
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`);
         if (response.data.success) {
           const companies = response.data.data.map((item: any) => ({
             id: item.id,
@@ -137,7 +137,7 @@ export default function Page() {
 
   const refreshCompanyList = async () => {
     try {
-      const response = await axios.get("/mahasiswa/perusahaan");
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`);
       if (response.data.success) {
         const companies = response.data.data.map((item: any) => ({
           id: item.id,

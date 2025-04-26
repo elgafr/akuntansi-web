@@ -29,7 +29,7 @@ export function LoginForm({
     setError("");
 
     try {
-      const response = await axios.post("/mahasiswa/login", {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/login `, {
         nim: nim.trim(),
         password
       });

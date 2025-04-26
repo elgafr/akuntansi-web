@@ -91,14 +91,14 @@ export default function Page() {
   const fetchAccounts = async (perusahaanId: string) => {
     try {
       const [akunResponse, keuanganResponse, subakunResponse] = await Promise.all([
-        axios.get("/instruktur/akun"),
-        axios.get(`/mahasiswa/keuangan`, {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/instruktur/akun`),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/keuangan`, {
           params: {
             perusahaan_id: perusahaanId,
             with: ["akun"],
           },
         }),
-        axios.get(`/mahasiswa/subakun`, {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/subakun`, {
           params: {
             perusahaan_id: perusahaanId,
             with: ["keuangan"],
@@ -142,7 +142,7 @@ export default function Page() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`);
         if (response.data.success) {
           const data = response.data.data;
           const fotoUrl = data.foto
@@ -169,8 +169,8 @@ export default function Page() {
     const fetchData = async () => {
       try {
         const [companyRes, categoriesRes] = await Promise.all([
-          axios.get(`/mahasiswa/perusahaan/${id}`),
-          axios.get("/instruktur/kategori"),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan/${id}`),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/instruktur/kategori`),
         ]);
 
         if (companyRes.data.success) {
@@ -243,7 +243,7 @@ export default function Page() {
         return;
       }
 
-      const subResponse = await axios.post("/mahasiswa/subakun", {
+      const subResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/subakun`, {
         nama: subAccount.nama,
         kode: subAccount.kode,
         akun_id: account.id,

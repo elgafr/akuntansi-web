@@ -54,7 +54,7 @@ export default function NeracaLajurPage() {
       queryClient.prefetchQuery({
         queryKey: ['neracaLajur', 'before'],
         queryFn: async () => {
-          const response = await axios.get('/mahasiswa/neracalajur/sebelumpenyesuaian');
+          const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/neracalajur/sebelumpenyesuaian`);
           if (response.data.success) {
             return response.data.data;
           }
@@ -66,7 +66,7 @@ export default function NeracaLajurPage() {
       queryClient.prefetchQuery({
         queryKey: ['neracaLajur', 'after'],
         queryFn: async () => {
-          const response = await axios.get('/mahasiswa/neracalajur/setelahpenyesuaian');
+          const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/neracalajur/setelahpenyesuaian`);
           if (response.data.success) {
             return response.data.data;
           }
@@ -81,7 +81,7 @@ export default function NeracaLajurPage() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`);
         if (response.data.success) {
           const data = response.data.data;
           const fotoUrl = data.foto

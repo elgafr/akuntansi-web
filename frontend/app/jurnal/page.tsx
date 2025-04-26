@@ -159,7 +159,7 @@ export default function JurnalPage() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const response = await axios.get("/mahasiswa/profile");
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`);
         if (response.data.success) {
           const data = response.data.data;
           const fotoUrl = data.foto
