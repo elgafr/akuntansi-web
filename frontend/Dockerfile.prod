@@ -1,52 +1,41 @@
+# 1. Dependencies & build dengan Bun
 FROM imbios/bun-node:18-slim AS deps
 ARG DEBIAN_FRONTEND=noninteractive
 
-# I use Asia/Jakarta as my timezone, you can change it to your timezone
 RUN apt-get -y update && \
   apt-get install -yq openssl git ca-certificates tzdata && \
   ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
   dpkg-reconfigure -f noninteractive tzdata
+
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json bun.lock ./
-RUN bun install 
+COPY package.json bun.lock ./  
 RUN bun install --frozen-lockfile
 
-# Build the app
+# 2. Builder image (copy source & build)
 FROM deps AS builder
 WORKDIR /app
 COPY . .
 
+# Pastikan next.config.js mengandung `output: 'standalone'`
 RUN bun run build
 
-
-# Production image, copy all the files and run next
+# 3. Production image (minimal, hanya hasil build + dep)
 FROM node:18-slim AS runner
 WORKDIR /app
 
-# ARG CONFIG_FILE
-# COPY $CONFIG_FILE /app/.env
-ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV PORT=3002
 
-# COPY --from=builder /app/.next/standalone ./
-# COPY --from=builder /app/public ./public
-# COPY --from=builder /app/.next/static ./.next/static
+# Copy hasil `next build` dengan output standalone
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
-# COPY --from=builder /app/node_modules ./node_modules
-# COPY --from=builder /app/package.json ./package.json
-# COPY --from=builder /app/.next ./.next
-
-
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Salin juga node_modules agar runtime bisa berjalan
+# Tambahkan dep yang dibutuhkan oleh runtime
 COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 3001
+COPY --from=builder /app/package.json ./package.json
 
-ENV PORT 3001
+EXPOSE 3002
 
 CMD ["node", "server.js"]

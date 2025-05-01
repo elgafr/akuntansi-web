@@ -27,10 +27,7 @@ services:
         - NEXT_PUBLIC_STORAGE_URL=${NEXT_PUBLIC_STORAGE_URL}
     ports:
       - "3001:3001"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
+
 
 volumes:
   node_modules:
