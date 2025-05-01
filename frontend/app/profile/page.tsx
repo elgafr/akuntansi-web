@@ -52,7 +52,7 @@ export default function Page() {
 
     const fetchProfile = async () => {
       try {
-        const response = await axios.get(`/mahasiswa/profile`, {
+        const response = await axios.get( `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -68,9 +68,10 @@ export default function Page() {
               ...currentUser,
             },
             foto: userProfile.foto
-              ? `http://127.0.0.1:8000/storage/${userProfile.foto}`
+              ? `${process.env.NEXT_PUBLIC_STORAGE_URL}/${userProfile.foto}`
               : undefined,
           });
+          console.log("Profile Data:", userProfile);
         }
       } catch (error: any) {
         if (error.response?.status === 401) {
@@ -97,7 +98,7 @@ export default function Page() {
       }
 
       const response = await axios.post(
-        `/mahasiswa/profile/${profileData.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile/${profileData.id}`,
         formData,
         {
           headers: {
@@ -112,7 +113,7 @@ export default function Page() {
           ...prev!,
           ...response.data.data,
           foto: response.data.data.foto
-            ? `http://127.0.0.1:8000/storage/${response.data.data.foto}`
+            ? `${process.env.NEXT_PUBLIC_STORAGE_URL}/${response.data.data.foto}`
             : prev?.foto,
         }));
         setIsEditModalOpen(false);

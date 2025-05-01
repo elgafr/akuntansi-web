@@ -28,7 +28,7 @@ export function RegisterForm({
   
     try {
       // Kirim request POST ke backend dengan data registrasi
-      const response = await axios.post("/mahasiswa/register", {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/register`, {
         name,
         email,
         nim,

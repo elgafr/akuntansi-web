@@ -300,9 +300,9 @@ useEffect(() => {
     const fetchInitialData = async () => {
       try {
         const [profileRes, companiesRes, accountsRes] = await Promise.all([
-          axios.get("/mahasiswa/profile"),
-          axios.get("/mahasiswa/perusahaan"),
-          axios.get("/instruktur/akun"),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/instruktur/akun`),
         ]);
 
         // Handle profile data dengan konstruksi URL foto

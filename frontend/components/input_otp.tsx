@@ -26,7 +26,7 @@ export function InputOTPControlled() {
     if (value.length === 6) {
       setIsVerifying(true); // Set status verifikasi ke true
       try {
-        const response = await axios.post("/mahasiswa/verifikasi", { kode: value });
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/verifikasi`, { kode: value });
         console.log(response.data.message);
         // Redirect ke halaman setelah OTP berhasil diverifikasi
         window.location.href = "/success";
@@ -44,7 +44,7 @@ export function InputOTPControlled() {
   const handleResendOTP = async () => {
     setIsResending(true);
     try {
-      const response = await axios.post("/mahasiswa/resendotp", { email });
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/resendotp`, { email });
       console.log(response.data.message);
       setError(""); // Reset error message jika resend berhasil
     } catch (error: unknown) {
