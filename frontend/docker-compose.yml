@@ -8,23 +8,29 @@ services:
     container_name: akuntansi-client-v1-dev
     environment:
       - WATCHPACK_POLLING=true
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_STORAGE_URL=${NEXT_PUBLIC_STORAGE_URL}
     volumes:
       - .:/app
       - /app/node_modules
       - /app/.next
     ports:
-      - "3001:3001"
-    env_file:
-      - .env
+      - "3002:3002"
+ 
   prod:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    container_name:  akuntansi-client-v1-prodcution
+    container_name:  akuntansi-client-v1-production
+    environment:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_STORAGE_URL=${NEXT_PUBLIC_STORAGE_URL}
     ports:
       - "3001:3001"
-    env_file:
-      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
 
 volumes:
   node_modules:

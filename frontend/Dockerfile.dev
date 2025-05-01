@@ -40,8 +40,8 @@ COPY --from=builder /app/.next ./.next
 # COPY --from=builder /app/src ./src
 COPY --from=builder /app .
 
-EXPOSE 3001
+EXPOSE 3002
 
-ENV PORT 3001
+ENV PORT 3002
 
 CMD ["node", "server.js"]
