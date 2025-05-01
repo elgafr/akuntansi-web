@@ -1,34 +1,46 @@
-# Base image with Bun
-FROM oven/bun:1.1.10 AS base
+FROM imbios/bun-node:18-slim AS deps
+ARG DEBIAN_FRONTEND=noninteractive
 
+# I use Asia/Jakarta as my timezone, you can change it to your timezone
+RUN apt-get -y update && \
+  apt-get install -yq openssl git ca-certificates tzdata && \
+  ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
+  dpkg-reconfigure -f noninteractive tzdata
 WORKDIR /app
 
-# Copy only the lockfile and package manifest first for caching
-COPY bun.lock package.json ./
-
-# Install dependencies
-RUN bun install
-
-# Copy the rest of the project files
-COPY . .
+# Install dependencies based on the preferred package manager
+COPY package.json bun.lock ./
+RUN bun install 
+RUN bun install --frozen-lockfile
 
 # Build the app
+FROM deps AS builder
+WORKDIR /app
+COPY . .
+
 RUN bun run build
 
-# Production image
-FROM oven/bun:1.1.10 AS release
 
+# Production image, copy all the files and run next
+FROM node:18-slim AS runner
 WORKDIR /app
 
-# Copy built files and deps from base image
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/package.json ./package.json
-COPY --from=base /app/.next ./.next
-COPY --from=base /app/public ./public
+# ARG CONFIG_FILE
+# COPY $CONFIG_FILE /app/.env
+ENV NODE_ENV production
+# Uncomment the following line in case you want to disable telemetry during runtime.
+# ENV NEXT_TELEMETRY_DISABLED 1
 
-# Set env
-ENV NODE_ENV=production
+# COPY --from=builder /app/.next/standalone ./
+# COPY --from=builder /app/public ./public
+# COPY --from=builder /app/.next/static ./.next/static
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/.next ./.next
+
 EXPOSE 3001
 
-# Start the app
-CMD ["bun", "start"]
+ENV PORT 3001
+
+CMD ["node", "server.js"]
