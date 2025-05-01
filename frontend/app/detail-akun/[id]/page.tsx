@@ -146,7 +146,7 @@ export default function Page() {
         if (response.data.success) {
           const data = response.data.data;
           const fotoUrl = data.foto
-            ? `http://127.0.0.1:8000/storage/${data.foto}`
+            ? `${process.env.NEXT_PUBLIC_STORAGE_URL}/${data.foto}`
             : undefined;
           setProfileData({
             user: {

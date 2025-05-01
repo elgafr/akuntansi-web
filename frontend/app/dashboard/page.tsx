@@ -311,7 +311,7 @@ useEffect(() => {
           setProfileData({
             ...profileData,
             foto: profileData.foto
-              ? `http://127.0.0.1:8000/storage/${profileData.foto}`
+              ? `${process.env.NEXT_PUBLIC_STORAGE_URL}/${profileData.foto}`
               : undefined,
           });
         }
