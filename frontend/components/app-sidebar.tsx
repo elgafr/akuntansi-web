@@ -20,15 +20,16 @@ import {
 const data = {
   navMain: [
     {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: LayoutDashboard,
+      
+    },
+    {
       title: "Perusahaan",
       url: "/perusahaan",
       icon: SquareTerminal,
       isActive: true,
-    },
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: LayoutDashboard,
     },
     {
       title: "Jurnal",
