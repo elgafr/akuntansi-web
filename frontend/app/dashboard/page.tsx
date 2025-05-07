@@ -116,30 +116,34 @@ export default function Page() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   // const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
-  // const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(["", "", ""]);
+  const [searchTerm, setSearchTerm] = useState<string[]>(["", "", ""]);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([
+    "",
+    "",
+    "",
+  ]);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-useEffect(() => {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("selectedAccounts");
-    try {
-      if (saved) {
-        setSelectedAccounts(JSON.parse(saved));
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selectedAccounts");
+      try {
+        if (saved) {
+          setSelectedAccounts(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error("Error parsing selectedAccounts:", e);
       }
-    } catch (e) {
-      console.error("Error parsing selectedAccounts:", e);
     }
-  }
-}, []);
+  }, []);
 
-useEffect(() => {
-  localStorage.setItem("selectedAccounts", JSON.stringify(selectedAccounts));
-}, [selectedAccounts]);
+  useEffect(() => {
+    localStorage.setItem("selectedAccounts", JSON.stringify(selectedAccounts));
+  }, [selectedAccounts]);
 
   // Perubahan pada fungsi calculateRunningSaldo
   const calculateRunningSaldo = (
@@ -339,18 +343,6 @@ useEffect(() => {
     fetchInitialData();
   }, []);
 
-  // useEffect(() => {
-  //   if (!searchTerm.trim()) {
-  //     setFilteredCompanies([]);
-  //     return;
-  //   }
-
-  //   const results = companyList.filter((company) =>
-  //     company.nama.toLowerCase().includes(searchTerm.toLowerCase())
-  //   );
-  //   setFilteredCompanies(results);
-  // }, [searchTerm, companyList]);
-
   const handleCompanySelect = async (company: Company) => {
     try {
       if (selectedCompany) {
@@ -372,7 +364,6 @@ useEffect(() => {
 
       setSelectedCompany(company);
       form.setValue("companyName", company.nama);
-      // setFilteredCompanies([]);
     } catch (error) {
       console.error("Gagal memilih perusahaan:", error);
       alert("Gagal memilih perusahaan");
@@ -508,7 +499,7 @@ useEffect(() => {
               <CardContent className="flex items-center justify-center gap-4 h-full w-full">
                 <Avatar className="w-20 h-20 ring-white flex-shrink-0 self-center">
                   <AvatarImage
-                    src={profileData?.foto || "/default-avatar.png"}
+                    src={profileData?.foto || "https://github.com/shadcn.png"}
                   />
                 </Avatar>
                 <div className="text-md w-full">
@@ -548,33 +539,63 @@ useEffect(() => {
                       newAccounts[index] = value;
                       setSelectedAccounts(newAccounts);
                     }}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        const newTerms = [...searchTerm];
+                        newTerms[index] = "";
+                        setSearchTerm(newTerms);
+                      }
+                    }}
                   >
                     <SelectTrigger className="w-[450px] h-[40px] rounded-xl">
                       <SelectValue placeholder={`Pilih Akun ${index + 1}`} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="none">-- Pilih Akun --</SelectItem>
-                        {accounts
-                          .filter(
-                            (account) =>
-                              !selectedAccounts.some(
-                                (acc, i) =>
-                                  i !== index &&
-                                  acc === account.kode &&
-                                  acc !== "none"
-                              )
-                          )
-                          .map((account: Account) => (
-                            <SelectItem
-                              key={account.kode}
-                              value={account.kode}
-                              disabled={selectedAccounts.includes(account.kode)}
-                            >
-                              {account.kode} - {account.nama}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
+                      <div className="p-1">
+                        {/* Tambah input untuk pencarian */}
+                        <Input
+                          placeholder="Cari akun..."
+                          value={searchTerm[index]}
+                          onChange={(e) => {
+                            const newTerms = [...searchTerm];
+                            newTerms[index] = e.target.value;
+                            setSearchTerm(newTerms);
+                            e.stopPropagation();
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="mb-2"
+                        />
+                        <SelectGroup>
+                          <SelectItem value="none">-- Pilih Akun --</SelectItem>
+                          {accounts
+                            .filter((account) => {
+                              const search = searchTerm[index].toLowerCase();
+                              return (
+                                (account.kode
+                                  .toString()
+                                  .toLowerCase()
+                                  .includes(search) || // Convert ke string
+                                  account.nama
+                                    .toLowerCase()
+                                    .includes(search)) &&
+                                !selectedAccounts.some(
+                                  (acc, i) =>
+                                    i !== index &&
+                                    acc === account.kode.toString() && // Convert ke string
+                                    acc !== "none"
+                                )
+                              );
+                            })
+                            .map((account: Account) => (
+                              <SelectItem
+                                key={account.kode}
+                                value={account.kode.toString()} // Pastikan value string
+                              >
+                                {account.kode} - {account.nama}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
