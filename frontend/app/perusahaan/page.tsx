@@ -22,6 +22,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import axios from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -48,7 +59,6 @@ interface ProfileData {
   foto?: string;
 }
 
-
 export default function Page() {
   const [companyList, setCompanyList] = useState<Company[]>([]);
   const [filteredCompanyList, setFilteredCompanyList] = useState<Company[]>([]);
@@ -67,7 +77,9 @@ export default function Page() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const response = await axios.get( `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`);
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`
+        );
         if (response.data.success) {
           const data = response.data.data;
           const fotoUrl = data.foto
@@ -95,7 +107,9 @@ export default function Page() {
   useEffect(() => {
     const fetchKrsId = async () => {
       try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/krs`);
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/krs`
+        );
         if (response.data.success && response.data.data.length > 0) {
           setKrsId(response.data.data[0].id);
         }
@@ -111,7 +125,9 @@ export default function Page() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`);
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`
+        );
         if (response.data.success) {
           const companies = response.data.data.map((item: any) => ({
             id: item.id,
@@ -134,10 +150,11 @@ export default function Page() {
     fetchCompanies();
   }, []);
 
-
   const refreshCompanyList = async () => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`);
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/perusahaan`
+      );
       if (response.data.success) {
         const companies = response.data.data.map((item: any) => ({
           id: item.id,
@@ -224,9 +241,9 @@ export default function Page() {
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">
-                  {loadingProfile
-                        ? "Loading..."
-                        : profileData?.user?.name || "Nama tidak tersedia"}
+                    {loadingProfile
+                      ? "Loading..."
+                      : profileData?.user?.name || "Nama tidak tersedia"}
                   </div>
                   <div className="text-xs text-gray-800">Student</div>
                 </div>
@@ -274,21 +291,47 @@ export default function Page() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid w-full items-center gap-4">
-                    <div className="flex flex-col space-y-1.5">
-                      <Button
-                        className="rounded-xl bg-transparent border border-destructive text-destructive hover:bg-destructive hover:text-white"
-                        onClick={() => handleDeleteCompany(company.id)}
-                      >
-                        Hapus Perusahaan
-                      </Button>
-                    </div>
-                    <div className="flex flex-col space-y-1.5">
+                  <div className="flex flex-col space-y-1.5">
                       <Button
                         className="rounded-xl"
                         onClick={() => handleSelectPerusahaan(company.id)}
                       >
-                        Detail dan Akun
+                        Detail Akun Perusahaan
                       </Button>
+                    </div>
+                    <div className="flex flex-col space-y-1.5">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            className="rounded-xl bg-transparent border
+                      border-destructive text-destructive hover:bg-destructive
+                      hover:text-white"
+                            variant="outline"
+                          >
+                            Hapus Perusahaan
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Are you absolutely sure?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will
+                              permanently delete your account and remove your
+                              data from our servers.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteCompany(company.id)}
+                            >
+                              Continue
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </CardContent>

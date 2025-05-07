@@ -8,11 +8,18 @@ import { Card, CardTitle, CardHeader, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
 } from "@/components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import EditProfile from "@/components/ui/custom/form-modal/edit-profile/edit-profile";
 import axios from "@/lib/axios";
 import Krs from "@/components/ui/custom/form-modal/krs/krs";
@@ -38,6 +45,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [error, setError] = useState("");
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -52,11 +60,14 @@ export default function Page() {
 
     const fetchProfile = async () => {
       try {
-        const response = await axios.get( `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         const currentUser = response.data.data.user;
         const userProfile = currentUser ? response.data.data : null;
@@ -210,12 +221,47 @@ export default function Page() {
           </Breadcrumb>
 
           <div className="flex items-center gap-4">
-            <Avatar>
-              <AvatarImage
-                src={profileData.foto || "https://github.com/shadcn.png"}
-                alt="Profile"
-              />
-            </Avatar>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="rounded-full p-0 hover:bg-transparent focus:ring-0 focus:ring-offset-0"
+                >
+                  <Avatar>
+                    <AvatarImage
+                      src={profileData.foto || "https://github.com/shadcn.png"}
+                      alt="Profile"
+                    />
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="cursor-pointer">
+                    My Account
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                 onSelect={async () => {
+                  try {
+                    // Gunakan Axios untuk request logout
+                    await axios.post('/mahasiswa/logout'); 
+                
+                    // Hapus token dari localStorage
+                    localStorage.removeItem("token");
+                    
+                    // Redirect ke halaman login
+                    window.location.href = "/login";
+                  } catch (error) {
+                    console.error("Logout error:", error);
+                  }
+                }}
+                  className="cursor-pointer text-red-600 focus:bg-red-50"
+                >
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div>
               <p className="font-medium">{profileData.user?.name}</p>
               <p className="text-xs text-gray-600">Student</p>

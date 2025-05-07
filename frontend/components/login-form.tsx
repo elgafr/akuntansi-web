@@ -51,7 +51,7 @@ export function LoginForm({
         axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
         // Redirect ke halaman perusahaan
-        router.push("/perusahaan");
+        router.push("/dashboard");
       }
     } catch (error: any) {
       console.error("Login error:", error);
