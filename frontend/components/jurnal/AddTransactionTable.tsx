@@ -1066,10 +1066,22 @@ export function AddTransactionTable({
   }, []); // Fetch sekali saat komponen dimount
 
   // Fungsi untuk membungkus teks setiap n karakter
-  function wrapTextEveryNChars(text: string, n: number): string {
+  function wrapTextByWord(text: string, n: number): string {
     if (!text) return '';
-    const regex = new RegExp(`.{1,${n}}`, 'g');
-    return text.match(regex)?.join('\n') ?? text;
+    const words = text.split(' ');
+    let lines: string[] = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      if ((currentLine + (currentLine ? ' ' : '') + word).length > n) {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine += (currentLine ? ' ' : '') + word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines.join('\n');
   }
 
   // Update renderTableRow to use yellow highlighting
@@ -1111,28 +1123,32 @@ export function AddTransactionTable({
       <TableRow 
         key={`tr-${transaction.id || index}-${Date.now()}`}
         data-description={transaction.description}
-        className={rowBgClass}
+        className={`${rowBgClass} py-1`}
       >
-        <TableCell>{isFirstInGroup ? formatDate(transaction.date) : ''}</TableCell>
-        <TableCell>{isFirstInGroup ? transaction.documentType : ''}</TableCell>
-        <TableCell>
-          <div
-            className="whitespace-pre-line break-words max-h-[120px] overflow-auto"
-            style={{ minHeight: 48, lineHeight: '1.5', wordBreak: 'break-word' }}
-            title={transaction.description}
-          >
-            {wrapTextEveryNChars(transaction.description, 30)}
-          </div>
+        <TableCell className="py-1">{isFirstInGroup ? formatDate(transaction.date) : ''}</TableCell>
+        <TableCell className="py-1">{isFirstInGroup ? transaction.documentType : ''}</TableCell>
+        <TableCell className="py-1 text-left align-middle">
+          {isFirstInGroup ? (
+            <div
+              className="whitespace-pre-line break-words max-h-[120px] overflow-auto"
+              style={{ minHeight: 0, lineHeight: '1.3', wordBreak: 'break-word', display: 'inline-block' }}
+              title={transaction.description}
+            >
+              {wrapTextByWord(transaction.description, 30)}
+            </div>
+          ) : (
+            ''
+          )}
         </TableCell>
-        <TableCell>{displayKodeAkun}</TableCell>
-        <TableCell>{displayNamaAkun}</TableCell>
-        <TableCell className="text-right">
-          {transaction.debit ? `Rp ${transaction.debit.toLocaleString()}` : '-'}
+        <TableCell className="py-1">{displayKodeAkun}</TableCell>
+        <TableCell className="py-1">{displayNamaAkun}</TableCell>
+        <TableCell className="text-right py-1">
+          {transaction.debit && transaction.debit > 0 ? `Rp ${transaction.debit.toLocaleString()}` : '0'}
         </TableCell>
-        <TableCell className="text-right">
-          {transaction.kredit ? `Rp ${transaction.kredit.toLocaleString()}` : '-'}
+        <TableCell className="text-right py-1">
+          {transaction.kredit && transaction.kredit > 0 ? `Rp ${transaction.kredit.toLocaleString()}` : '0'}
         </TableCell>
-        <TableCell>
+        <TableCell className="py-1">
           {isFirstInGroup && (
             <div className="flex justify-end gap-2">
               <Button
@@ -1207,7 +1223,7 @@ export function AddTransactionTable({
 
   // Render the UI shell immediately, even when data is loading
   return (
-    <div className="space-y-4 bg-gray-50 p-6 rounded-xl relative">
+    <div className="space-y-4 p-6 rounded-xl relative">
       {/* Header Section with Totals */}
       <div className="flex gap-4 mb-6">
         {/* Debit & Kredit Container */}
@@ -1244,12 +1260,12 @@ export function AddTransactionTable({
         {/* Unbalanced Card */}
         <Card className="bg-red-400 p-4 rounded-xl w-1/3">
           <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl h-full">
-            <div className="text-sm text-white/90">Unbalanced</div>
+            <div className="text-sm text-white/90">Tidak Seimbang</div>
             <div className="text-lg font-medium text-white">
               {isLoading ? (
                 <span className="inline-block h-6 w-32 bg-white/20 animate-pulse rounded"></span>
               ) : (
-                `Difference: Rp ${Math.abs(getTotalDebit() - getTotalKredit()).toLocaleString()}`
+                `Selisih: Rp ${Math.abs(getTotalDebit() - getTotalKredit()).toLocaleString()}`
               )}
             </div>
           </div>
@@ -1260,7 +1276,7 @@ export function AddTransactionTable({
       <div className="flex justify-between items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Input
-            placeholder="Search transactions..."
+            placeholder="Cari transaksi..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-[300px] rounded-lg border-gray-200"
@@ -1276,7 +1292,7 @@ export function AddTransactionTable({
             disabled={isLoading}
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            Ekspor CSV
           </Button>
           <Button
             onClick={() => setIsJurnalFormOpen(true)}
@@ -1313,14 +1329,14 @@ export function AddTransactionTable({
               // Render skeleton loading rows
               Array(5).fill(0).map((_, index) => (
                 <TableRow key={`skeleton-${index}`}>
-                  <TableCell><div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div></TableCell>
-                  <TableCell><div className="h-4 w-16 bg-gray-200 animate-pulse rounded"></div></TableCell>
-                  <TableCell><div className="h-4 w-36 bg-gray-200 animate-pulse rounded"></div></TableCell>
-                  <TableCell><div className="h-4 w-12 bg-gray-200 animate-pulse rounded"></div></TableCell>
-                  <TableCell><div className="h-4 w-28 bg-gray-200 animate-pulse rounded"></div></TableCell>
-                  <TableCell className="text-right"><div className="h-4 w-16 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
-                  <TableCell className="text-right"><div className="h-4 w-16 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
-                  <TableCell className="text-right"><div className="h-4 w-12 bg-gray-200 animate-pulse rounded ml-auto"></div></TableCell>
+                  <TableCell><div className="h-4 w-20 bg-neutral-100 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-16 bg-neutral-100 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-36 bg-neutral-100 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 bg-neutral-100 animate-pulse rounded"></div></TableCell>
+                  <TableCell><div className="h-4 w-28 bg-neutral-100 animate-pulse rounded"></div></TableCell>
+                  <TableCell className="text-right"><div className="h-4 w-16 bg-neutral-100 animate-pulse rounded ml-auto"></div></TableCell>
+                  <TableCell className="text-right"><div className="h-4 w-16 bg-neutral-100 animate-pulse rounded ml-auto"></div></TableCell>
+                  <TableCell className="text-right"><div className="h-4 w-12 bg-neutral-100 animate-pulse rounded ml-auto"></div></TableCell>
                 </TableRow>
               ))
             ) : hasAttemptedInitialLoad && filteredTransactions.length === 0 ? (

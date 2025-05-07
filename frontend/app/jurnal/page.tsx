@@ -115,7 +115,7 @@ function JurnalContent() {
 // Loading fallback component for suspense
 function JurnalContentLoading() {
   return (
-    <div className="space-y-4 bg-gray-50 p-6 rounded-xl relative">
+    <div className="space-y-4 p-2 rounded-xl relative">
       <div className="flex gap-4 mb-6">
         {/* Skeleton for cards */}
         <div className="flex flex-1 flex-grow">
@@ -196,7 +196,7 @@ export default function JurnalPage() {
                     Jurnal Umum
                   </h1>
                   <h2 className="text-sm ml-6">
-                    Let&apos;s check your Journal today
+                    Cek jurnal harianmu di sini
                   </h2>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -206,23 +206,23 @@ export default function JurnalPage() {
                 <Avatar>
                   <AvatarImage
                     src={profileData?.foto || "https://github.com/shadcn.png"}
-                    alt="Profile Picture"
+                    alt="Foto Profil"
                   />
                 </Avatar>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">
                     {loadingProfile
-                      ? "Loading..."
+                      ? "Memuat..."
                       : profileData?.user?.name || "Nama tidak tersedia"}
                   </div>
-                  <div className="text-xs text-gray-800">Student</div>
+                  <div className="text-xs text-gray-800">Mahasiswa</div>
                 </div>
               </div>
             </div>
           </div>
         </header>
 
-        <section className="p-6">
+        <section className="p-2">
           {/* Properly wrap JurnalContent with Suspense to fix the error */}
           <Suspense fallback={<JurnalContentLoading />}>
             <JurnalContent />

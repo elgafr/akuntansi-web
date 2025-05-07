@@ -714,7 +714,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
           }
         }}
       >
-        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto rounded-xl">
           <DialogHeader>
             <DialogTitle>
               {editingTransactions.length > 0 ? 'Edit Transaksi' : 'Tambah Transaksi'}
@@ -983,14 +983,35 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                         Edit Kejadian
                       </Button>
                     ) : (
-                      <Button 
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleUpdateEvent}
-                        className="bg-[#E11D48] hover:bg-[#F43F5E] hover:text-white text-white rounded-lg"
-                      >
-                        Update Kejadian
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (tempTransactions.length > 0) {
+                              setFormData({
+                                ...formData,
+                                date: tempTransactions[0].date,
+                                documentType: tempTransactions[0].documentType,
+                                description: tempTransactions[0].description,
+                              });
+                            }
+                            setIsEditingEvent(false);
+                          }}
+                          className="border-gray-300 text-gray-700"
+                        >
+                          Batal
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleUpdateEvent}
+                          className="bg-[#E11D48] hover:bg-[#F43F5E] hover:text-white text-white rounded-lg"
+                        >
+                          Update Kejadian
+                        </Button>
+                      
+                      </div>
                     )}
                   </div>
                   <div className="grid grid-cols-3 gap-6">
