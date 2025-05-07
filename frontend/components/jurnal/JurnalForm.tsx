@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePostJurnal, useUpdateJurnal } from "@/hooks/useJurnal";
+import { Textarea } from "@/components/ui/textarea";
 
 interface JurnalFormProps {
   isOpen: boolean;
@@ -140,6 +141,38 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
   // Gunakan hooks mutation
   const { mutate: postJurnal, isPending: isPosting } = usePostJurnal();
   const { mutate: updateJurnal, isPending: isUpdating } = useUpdateJurnal();
+
+  // Tambahkan state untuk search
+  const [searchAkun, setSearchAkun] = useState("");
+
+  // Tambahkan fungsi untuk filter akun
+  const filteredAkun = useMemo(() => {
+    const searchLower = searchAkun.toLowerCase().trim();
+    
+    if (!searchLower) {
+      return {
+        akun: akunList || [],
+        subAkun: subAkunList || []
+      };
+    }
+
+    // Normalize search terms by replacing multiple spaces and dashes with single space
+    const normalizedSearch = searchLower.replace(/[-\s]+/g, ' ').trim();
+    const searchTerms = normalizedSearch.split(' ').filter(term => term.length > 0);
+
+    return {
+      akun: akunList.filter((akun) => {
+        const akunText = `${akun.kode} - ${akun.nama}`.toLowerCase();
+        const normalizedAkunText = akunText.replace(/[-\s]+/g, ' ').trim();
+        return searchTerms.every(term => normalizedAkunText.includes(term));
+      }),
+      subAkun: subAkunList.filter((subAkun) => {
+        const subAkunText = `${subAkun.kode} - ${subAkun.nama}`.toLowerCase();
+        const normalizedSubAkunText = subAkunText.replace(/[-\s]+/g, ' ').trim();
+        return searchTerms.every(term => normalizedSubAkunText.includes(term));
+      })
+    };
+  }, [akunList, subAkunList, searchAkun]);
 
   useEffect(() => {
     const fetchActivePerusahaan = async () => {
@@ -717,21 +750,29 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                 
                 <div className="grid gap-2">
                   <label>Bukti</label>
-                  <Input
+                  <Textarea
                     value={formData.documentType}
                     onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
                     disabled={tempTransactions.length > 0}
                     required
+                    maxLength={200}
+                    rows={2}
+                    className="resize-y"
+                    placeholder="Masukkan bukti (maks 200 karakter)"
                   />
                 </div>
 
                 <div className="grid gap-2">
                   <label>Keterangan</label>
-                  <Input
+                  <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     disabled={tempTransactions.length > 0}
                     required
+                    maxLength={200}
+                    className="resize-y break-all"
+                    placeholder="Masukkan keterangan (maks 200 karakter)"
+                    rows={2}
                   />
                 </div>
 
@@ -766,29 +807,104 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                     <SelectTrigger>
                       <SelectValue placeholder={isLoadingAkun ? "Loading..." : "Pilih Kode Akun"} />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Akun</SelectLabel>
-                        {akunList.map((akun) => (
-                          <SelectItem 
-                            key={`main-${akun.id}`}
-                            value={akun.kode.toString()}
-                          >
-                            {`${akun.kode} - ${akun.nama}`}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Sub Akun</SelectLabel>
-                        {subAkunList.map((subAkun) => (
-                          <SelectItem 
-                            key={`sub-${subAkun.id}`}
-                            value={subAkun.kode.toString()}
-                          >
-                            {`${subAkun.kode} - ${subAkun.nama}`}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
+                    <SelectContent 
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                      className="min-w-[300px]"
+                    >
+                      <div className="p-2 sticky top-0 bg-white z-10 border-b">
+                  <Input
+                          placeholder="Cari akun..."
+                          value={searchAkun}
+                          onChange={(e) => setSearchAkun(e.target.value)}
+                          className="h-8"
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter') {
+                              e.stopPropagation();
+                              return;
+                            }
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          autoComplete="off"
+                          onBlur={(e) => {
+                            e.target.focus();
+                          }}
+                        />
+                      </div>
+                      
+                      <div 
+                        className="overflow-y-auto max-h-[300px]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        {filteredAkun.akun.length === 0 && filteredAkun.subAkun.length === 0 ? (
+                          <div className="p-2 text-sm text-gray-500 text-center">
+                            Tidak ada akun yang cocok
+                          </div>
+                        ) : (
+                          <>
+                            {filteredAkun.akun.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Akun</SelectLabel>
+                                {filteredAkun.akun
+                                  .sort((a, b) => a.kode - b.kode)
+                                  .map((akun) => (
+                                    <SelectItem 
+                                      key={`main-${akun.id}`}
+                                      value={akun.kode.toString()}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        const selectedAkun = akunList.find(a => a.kode.toString() === akun.kode.toString());
+                                        if (selectedAkun) {
+                                          setFormData({
+                                            ...formData,
+                                            kodeAkun: selectedAkun.kode.toString(),
+                                            namaAkun: selectedAkun.nama,
+                                            akun_id: selectedAkun.id,
+                                            sub_akun_id: null
+                                          });
+                                        }
+                                      }}
+                                      className="cursor-pointer hover:bg-gray-100"
+                                    >
+                                      {`${akun.kode} - ${akun.nama}`}
+                                    </SelectItem>
+                                  ))}
+                              </SelectGroup>
+                            )}
+                            
+                            {filteredAkun.subAkun.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Sub Akun</SelectLabel>
+                                {filteredAkun.subAkun
+                                  .sort((a, b) => a.kode - b.kode)
+                                  .map((subAkun) => (
+                                    <SelectItem 
+                                      key={`sub-${subAkun.id}`}
+                                      value={subAkun.kode.toString()}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setFormData({
+                                          ...formData,
+                                          kodeAkun: subAkun.kode.toString(),
+                                          namaAkun: subAkun.nama,
+                                          akun_id: subAkun.akun.id,
+                                          sub_akun_id: subAkun.id
+                                        });
+                                      }}
+                                      className="cursor-pointer hover:bg-gray-100"
+                                    >
+                                      {`${subAkun.kode} - ${subAkun.nama}`}
+                                    </SelectItem>
+                                  ))}
+                              </SelectGroup>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -894,10 +1010,14 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                     <div>
                       <p className="text-sm font-medium text-gray-600">Bukti</p>
                       {isEditingEvent ? (
-                        <Input
+                        <Textarea
                           value={formData.documentType}
                           onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
-                          className="mt-1"
+                          className="mt-1 resize-y"
+                          maxLength={200}
+                          rows={2}
+                      
+                          placeholder="Masukkan bukti (maks 200 karakter)"
                         />
                       ) : (
                         <p className="text-base font-medium mt-1">{tempTransactions[0].documentType}</p>
@@ -906,13 +1026,23 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                     <div>
                       <p className="text-sm font-medium text-gray-600">Keterangan</p>
                       {isEditingEvent ? (
-                        <Input
+                        <Textarea
                           value={formData.description}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                          className="mt-1"
+                          className="mt-1 resize-y break-all"
+                          maxLength={200}
+                          
+                          placeholder="Masukkan keterangan (maks 200 karakter)"
+                          rows={2}
                         />
                       ) : (
-                        <p className="text-base font-medium mt-1">{tempTransactions[0].description}</p>
+                        <div
+                          className="break-all max-h-[120px] overflow-auto leading-snug"
+                          style={{ minHeight: 48 }}
+                          title={tempTransactions[0].description}
+                        >
+                          {tempTransactions[0].description}
+                        </div>
                       )}
                     </div>
                   </div>

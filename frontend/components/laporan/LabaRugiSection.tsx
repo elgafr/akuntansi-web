@@ -308,9 +308,9 @@ export function LabaRugiSection() {
   const totalStyles = "font-bold"; // Used only for section names and specific totals
   const underlineStyles = "border-t border-black mt-1"; // Single underline before final total
 
-  // Calculate tax (10% as per backend logic)
+  // Calculate tax 
   const labaBersihSebelumPajak = labaRugiData["Laba/Rugi Luar Biasa"]["Laba Bersih Sebelum Pajak"].nilai;
-  const pajakPenghasilan = labaBersihSebelumPajak * 0.1; // 10% tax rate as per backend
+  const pajakPenghasilan = labaBersihSebelumPajak * 0.25; // 25% tax rate 
   const labaBersihSetelahPajak = labaBersihSebelumPajak - pajakPenghasilan;
 
   return (
@@ -858,7 +858,7 @@ export function LabaRugiSection() {
               {/* Pajak Penghasilan (10%) */}
               <div className={itemStyles}>
                 <div className={`${nameColumnStyles} ${indentedTextStyles}`}>
-                  <span className="text-gray-700">Pajak Penghasilan (10%)</span>
+                  <span className="text-gray-700">Pajak Penghasilan (25%)</span>
                 </div>
                 <div className={calcColumnStyles}></div>
                 <div className={sumColumnStyles}></div>

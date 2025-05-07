@@ -948,28 +948,16 @@ export function BukuBesarTable() {
                     <TableCell>{displayNama}</TableCell>
                   <TableCell>{entry.keterangan}</TableCell>
                   <TableCell className="text-right">
-                    {entry.debit ? `Rp ${entry.debit.toLocaleString()}` : '-'}
+                    {entry.debit ? `Rp ${entry.debit.toLocaleString()}` : '0'}
                   </TableCell>
                 <TableCell className="text-right">
-                    {entry.kredit ? `Rp ${entry.kredit.toLocaleString()}` : '-'}
+                    {entry.kredit ? `Rp ${entry.kredit.toLocaleString()}` : '0'}
                 </TableCell>
                 <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          entry.saldo === 0 
-                            ? 'bg-gray-100 text-gray-600' 
-                            : entry.isDebitNormal
-                              ? 'bg-amber-100 text-amber-600'
-                              : 'bg-purple-100 text-purple-600'
-                        }`}>
-                          {entry.saldo === 0 
-                            ? 'Balance' 
-                            : entry.isDebitNormal ? 'D' : 'K'}
-                        </span>
-                        <span className={entry.saldo < 0 ? 'text-red-600' : ''}>
-                          {entry.saldo < 0 ? '-' : ''}Rp {Math.abs(entry.saldo).toLocaleString()}
-                        </span>
-                      </div>
+                      <span className={entry.saldo < 0 ? 'text-red-600' : ''}>
+                        {entry.saldo < 0 ? '-' : ''}
+                        Rp {Math.abs(entry.saldo).toLocaleString() || '0'}
+                      </span>
                   </TableCell>
                 </TableRow>
                 );
@@ -986,28 +974,16 @@ export function BukuBesarTable() {
             <tr>
               <td colSpan={4} className="px-4 py-2 text-right">Total:</td>
               <td className="px-4 py-2 text-right">
-                Rp {totals.debit.toLocaleString()}
+                {totals.debit ? `Rp ${totals.debit.toLocaleString()}` : '0'}
               </td>
               <td className="px-4 py-2 text-right">
-                Rp {totals.kredit.toLocaleString()}
+                {totals.kredit ? `Rp ${totals.kredit.toLocaleString()}` : '0'}
               </td>
               <td className="px-4 py-2 text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                    totals.saldo === 0 
-                      ? 'bg-gray-100 text-gray-600' 
-                      : isDebitNormal
-                        ? 'bg-amber-100 text-amber-600'
-                        : 'bg-purple-100 text-purple-600'
-                  }`}>
-                    {totals.saldo === 0 
-                      ? 'Balance' 
-                      : isDebitNormal ? 'D' : 'K'}
-                  </span>
-                  <span className={totals.saldo < 0 ? 'text-red-600' : ''}>
-                    {totals.saldo < 0 ? '-' : ''}Rp {Math.abs(totals.saldo).toLocaleString()}
-                  </span>
-                </div>
+                <span className={totals.saldo < 0 ? 'text-red-600' : ''}>
+                  {totals.saldo < 0 ? '-' : ''}
+                  Rp {Math.abs(totals.saldo).toLocaleString() || '0'}
+                </span>
               </td>
             </tr>
           </tfoot>
