@@ -197,10 +197,10 @@ export function NeracaLajurTable({ type }: { type: 'before' | 'after' }) {
                     <TableCell>{item.akun.kode}</TableCell>
                     <TableCell>{namaAkun}</TableCell>
                     <TableCell className="text-right">
-                      {item.debit > 0 ? `Rp ${item.debit.toLocaleString()}` : '-'}
+                      {item.debit > 0 ? `Rp ${item.debit.toLocaleString()}` : '0'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {kreditValue > 0 ? `Rp ${kreditValue.toLocaleString()}` : '-'}
+                      {kreditValue > 0 ? `Rp ${kreditValue.toLocaleString()}` : '0'}
                     </TableCell>
                   </TableRow>
                 );

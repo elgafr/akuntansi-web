@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -204,6 +204,7 @@ export function AddTransactionTable({
   const { toast } = useToast();
   const [highlightedEvents, setHighlightedEvents] = useState<Set<string>>(new Set());
   const [uiShellRendered, setUiShellRendered] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Template for new empty transaction
   const emptyTransaction: Transaction = {
@@ -1064,6 +1065,13 @@ export function AddTransactionTable({
     fetchSubAkun();
   }, []); // Fetch sekali saat komponen dimount
 
+  // Fungsi untuk membungkus teks setiap n karakter
+  function wrapTextEveryNChars(text: string, n: number): string {
+    if (!text) return '';
+    const regex = new RegExp(`.{1,${n}}`, 'g');
+    return text.match(regex)?.join('\n') ?? text;
+  }
+
   // Update renderTableRow to use yellow highlighting
   const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
     const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
@@ -1107,7 +1115,15 @@ export function AddTransactionTable({
       >
         <TableCell>{isFirstInGroup ? formatDate(transaction.date) : ''}</TableCell>
         <TableCell>{isFirstInGroup ? transaction.documentType : ''}</TableCell>
-        <TableCell>{isFirstInGroup ? transaction.description : ''}</TableCell>
+        <TableCell>
+          <div
+            className="whitespace-pre-line break-words max-h-[120px] overflow-auto"
+            style={{ minHeight: 48, lineHeight: '1.5', wordBreak: 'break-word' }}
+            title={transaction.description}
+          >
+            {wrapTextEveryNChars(transaction.description, 30)}
+          </div>
+        </TableCell>
         <TableCell>{displayKodeAkun}</TableCell>
         <TableCell>{displayNamaAkun}</TableCell>
         <TableCell className="text-right">
@@ -1151,6 +1167,43 @@ export function AddTransactionTable({
   useEffect(() => {
     setUiShellRendered(true);
   }, []);
+
+  // Update fungsi scrollToHighlightedRow
+  const scrollToHighlightedRow = useCallback(() => {
+    if (!tableContainerRef.current || highlightedEvents.size === 0) {
+      console.log('No container ref or no highlighted events');
+      return;
+    }
+
+    // Dapatkan description terakhir yang di-highlight
+    const lastHighlightedDescription = Array.from(highlightedEvents).pop();
+    console.log('Last highlighted description:', lastHighlightedDescription);
+
+    // Cari baris dengan description yang sesuai
+    const highlightedRow = tableContainerRef.current.querySelector(
+      `tr[data-description="${lastHighlightedDescription}"]`
+    ) as HTMLElement;
+
+    if (highlightedRow) {
+      console.log('Found highlighted row, scrolling to it');
+      // Scroll ke baris tersebut dengan smooth animation
+      highlightedRow.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    } else {
+      console.log('No matching row found for description:', lastHighlightedDescription);
+    }
+  }, [highlightedEvents]);
+
+  // Update useEffect untuk memanggil scrollToHighlightedRow dengan delay yang lebih lama
+  useEffect(() => {
+    if (highlightedEvents.size > 0) {
+      // Tunggu lebih lama untuk memastikan DOM sudah di-render sepenuhnya
+      const timer = setTimeout(scrollToHighlightedRow, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedEvents, scrollToHighlightedRow]);
 
   // Render the UI shell immediately, even when data is loading
   return (
@@ -1238,7 +1291,10 @@ export function AddTransactionTable({
       </div>
 
       {/* Table - Always render the table structure, but show skeletons when loading */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div 
+        ref={tableContainerRef}
+        className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+      >
         <Table className="relative">
           <TableHeader>
             <TableRow>
