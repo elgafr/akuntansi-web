@@ -45,58 +45,61 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [error, setError] = useState("");
-  const token = localStorage.getItem('token');
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
-    console.log(userData.id);
-
-    // 1. Cek token tanpa redirect langsung
-    if (!token) {
-      window.location.href = "/login";
-      return;
-    }
-
-    const fetchProfile = async () => {
-      try {
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const currentUser = response.data.data.user;
-        const userProfile = currentUser ? response.data.data : null;
-
-        if (userProfile) {
-          setProfileData({
-            ...userProfile,
-            user: {
-              ...currentUser,
-            },
-            foto: userProfile.foto
-              ? `${process.env.NEXT_PUBLIC_STORAGE_URL}/${userProfile.foto}`
-              : undefined,
-          });
-          console.log("Profile Data:", userProfile);
-        }
-      } catch (error: any) {
-        if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          window.location.href = "/login";
-        } else {
-          setError("Gagal memuat profil: " + error.message);
-        }
-      } finally {
-        setLoading(false);
+    if (typeof window !== "undefined") {
+      const storedToken = localStorage.getItem("token");
+      setToken(storedToken);
+      
+      if (!storedToken) {
+        window.location.href = "/login";
+        return;
       }
-    };
 
-    fetchProfile();
+      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+      console.log(userData.id);
+
+      const fetchProfile = async () => {
+        try {
+          const response = await axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/mahasiswa/profile`,
+            {
+              headers: {
+                Authorization: `Bearer ${storedToken}`,
+              },
+            }
+          );
+
+          const currentUser = response.data.data.user;
+          const userProfile = currentUser ? response.data.data : null;
+
+          if (userProfile) {
+            setProfileData({
+              ...userProfile,
+              user: {
+                ...currentUser,
+              },
+              foto: userProfile.foto
+                ? `${process.env.NEXT_PUBLIC_STORAGE_URL}/${userProfile.foto}`
+                : undefined,
+            });
+            console.log("Profile Data:", userProfile);
+          }
+        } catch (error: any) {
+          if (error.response?.status === 401) {
+            localStorage.removeItem("token");
+            window.location.href = "/login";
+          } else {
+            setError("Gagal memuat profil: " + error.message);
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchProfile();
+    }
   }, []);
 
   const saveProfileData = async (formData: FormData) => {
