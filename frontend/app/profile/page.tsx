@@ -244,13 +244,8 @@ export default function Page() {
                 <DropdownMenuItem
                  onSelect={async () => {
                   try {
-                    // Gunakan Axios untuk request logout
                     await axios.post('/mahasiswa/logout'); 
-                
-                    // Hapus token dari localStorage
                     localStorage.removeItem("token");
-                    
-                    // Redirect ke halaman login
                     window.location.href = "/login";
                   } catch (error) {
                     console.error("Logout error:", error);

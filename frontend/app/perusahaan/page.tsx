@@ -7,13 +7,19 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
 } from "@/components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { PlusCircle } from "lucide-react";
 import { FaBuilding } from "react-icons/fa";
-// import Link from "next/link";
+import Link from "next/link";
 import FormModal from "@/components/ui/custom/form-modal/add-company/add-company";
 import {
   Card,
@@ -233,12 +239,44 @@ export default function Page() {
             </Breadcrumb>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage
-                    src={profileData?.foto || "https://github.com/shadcn.png"}
-                    alt="Profile Picture"
-                  />
-                </Avatar>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="rounded-full p-0 hover:bg-transparent focus:ring-0 focus:ring-offset-0"
+                    >
+                      <Avatar>
+                        <AvatarImage
+                          src={
+                            profileData?.foto || "https://github.com/shadcn.png"
+                          }
+                          alt="Profile"
+                        />
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="cursor-pointer">
+                        My Account
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={async () => {
+                        try {
+                          await axios.post("/mahasiswa/logout");
+                          localStorage.removeItem("token");
+                          window.location.href = "/login";
+                        } catch (error) {
+                          console.error("Logout error:", error);
+                        }
+                      }}
+                      className="cursor-pointer text-red-600 focus:bg-red-50"
+                    >
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <div className="text-left mr-12">
                   <div className="text-sm font-medium">
                     {loadingProfile
@@ -291,7 +329,7 @@ export default function Page() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid w-full items-center gap-4">
-                  <div className="flex flex-col space-y-1.5">
+                    <div className="flex flex-col space-y-1.5">
                       <Button
                         className="rounded-xl"
                         onClick={() => handleSelectPerusahaan(company.id)}
@@ -311,18 +349,20 @@ export default function Page() {
                             Hapus Perusahaan
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="rounded-xl">
                           <AlertDialogHeader>
                             <AlertDialogTitle>
-                              Apakah anda yakin ingin menghapus data Perusahaan ini?
+                              Apakah anda yakin ingin menghapus data Perusahaan{" "}
+                              {company.nama}?
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                               Data yang telah dihapus tidak dapat dikembalikan.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
                             <AlertDialogAction
+                              className="rounded-xl"
                               onClick={() => handleDeleteCompany(company.id)}
                             >
                               Continue
