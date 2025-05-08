@@ -969,20 +969,18 @@ export function AddTransactionTable({
     return parsedDate;
   };
 
-  // Perbaiki formatDate untuk menampilkan dengan konsisten di UI
+  // Perbaiki formatDate untuk konsistensi SSR/Client
   const formatDate = (dateString: string): string => {
     if (!dateString) return '';
-    
     try {
       const date = parseDate(dateString);
-    return date.toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-      });
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0'); // getMonth() dimulai dari 0
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     } catch (error) {
       console.error("Error formatting date:", error, dateString);
-      return dateString; // Kembalikan string asli jika gagal
+      return dateString;
     }
   };
 
@@ -1084,7 +1082,7 @@ export function AddTransactionTable({
     return lines.join('\n');
   }
 
-  // Update renderTableRow to use yellow highlighting
+  // Update renderTableRow to use stable key
   const renderTableRow = (transaction: Transaction, index: number, array: Transaction[]) => {
     const isFirstInGroup = index === 0 || transaction.description !== array[index - 1].description;
     const isPartOfGroup = index > 0 && transaction.description === array[index - 1].description;
@@ -1121,7 +1119,7 @@ export function AddTransactionTable({
 
     return (
       <TableRow 
-        key={`tr-${transaction.id || index}-${Date.now()}`}
+        key={`tr-${transaction.id || index}`}
         data-description={transaction.description}
         className={`${rowBgClass} py-1`}
       >

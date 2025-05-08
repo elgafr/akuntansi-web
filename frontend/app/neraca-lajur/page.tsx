@@ -117,9 +117,9 @@ export default function NeracaLajurPage() {
                   <h1 className="text-2xl font-bold ml-6 text-black">
                     Neraca Lajur
                   </h1>
-                  <h2 className="text-sm ml-6">
+                  {/* <h2 className="text-sm ml-6">
                     Let&apos;s check your Neraca Lajur today
-                  </h2>
+                  </h2> */}
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

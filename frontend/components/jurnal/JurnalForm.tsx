@@ -758,7 +758,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                     maxLength={200}
                     rows={2}
                     className="resize-y"
-                    placeholder="Masukkan bukti (maks 200 karakter)"
+                    placeholder="Masukkan bukti"
                   />
                 </div>
 
@@ -771,7 +771,7 @@ export function JurnalForm({ isOpen, onClose, onSubmit, editingTransactions = []
                     required
                     maxLength={200}
                     className="resize-y break-all"
-                    placeholder="Masukkan keterangan (maks 200 karakter)"
+                    placeholder="Masukkan keterangan"
                     rows={2}
                   />
                 </div>

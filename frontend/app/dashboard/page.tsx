@@ -390,9 +390,9 @@ export default function Page() {
                 <h1 className="text-2xl font-bold ml-6 text-black">
                   Dashboard
                 </h1>
-                <h2 className="text-sm ml-6">
+                {/* <h2 className="text-sm ml-6">
                   Let&apos;s check your Dashboard today
-                </h2>
+                </h2> */}
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

@@ -195,9 +195,9 @@ export default function JurnalPage() {
                   <h1 className="text-2xl font-bold ml-6 text-black">
                     Jurnal Umum
                   </h1>
-                  <h2 className="text-sm ml-6">
+                  {/* <h2 className="text-sm ml-6">
                     Cek jurnal harianmu di sini
-                  </h2>
+                  </h2> */}
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

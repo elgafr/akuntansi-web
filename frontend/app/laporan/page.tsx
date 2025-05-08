@@ -64,9 +64,9 @@ export default function LaporanPage() {
                   <h1 className="text-2xl font-bold ml-6 text-black">
                     Laporan Keuangan
                   </h1>
-                  <h2 className="text-sm ml-6">
+                  {/* <h2 className="text-sm ml-6">
                     Let&apos;s check your Financial Reports
-                  </h2>
+                  </h2> */}
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
