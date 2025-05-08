@@ -218,7 +218,7 @@ export default function Page() {
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
                 <h1 className="text-2xl font-bold text-black">Profile</h1>
-                <h2 className="text-sm">Let's check your Profile today</h2>
+                {/* <h2 className="text-sm">Let's check your Profile today</h2> */}
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

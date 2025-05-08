@@ -221,9 +221,25 @@ export function LabaRugiSection() {
 
   // Helper function to format account values
   const formatAccountValue = (name: string, value: number, isTotal: boolean = false, isSubtotal: boolean = false) => {
-    // If the value is negative or the account is a deduction, display in parentheses without minus sign
+    // Pengecualian: baris Laba Rugi atau Rugi Sebelum Pajak, tampilkan tanpa tanda kurung walau negatif
+    if (
+      name === "Laba Rugi" ||
+      name === "Rugi Sebelum Pajak" ||
+      name === "Laba Bersih Sebelum Pajak"
+    ) {
+      return (
+        <div className="flex items-center gap-2 justify-end">
+          <span>Rp</span>
+          <span className={`tabular-nums w-36 text-right ${isTotal || isSubtotal ? 'font-bold' : ''}`}>
+            {Math.abs(value).toLocaleString('id-ID')}
+          </span>
+        </div>
+      );
+    }
+
+    // Baris lain: tetap pakai tanda kurung jika negatif/deduction
     const isNegativeOrDeduction = value < 0 || isDeductionAccount(name);
-    const displayValue = Math.abs(value); // Remove the minus sign by using absolute value
+    const displayValue = Math.abs(value);
     const formattedNumber = displayValue.toLocaleString('id-ID');
 
     if (isNegativeOrDeduction) {
@@ -310,8 +326,12 @@ export function LabaRugiSection() {
 
   // Calculate tax 
   const labaBersihSebelumPajak = labaRugiData["Laba/Rugi Luar Biasa"]["Laba Bersih Sebelum Pajak"].nilai;
-  const pajakPenghasilan = labaBersihSebelumPajak * 0.25; // 25% tax rate 
-  const labaBersihSetelahPajak = labaBersihSebelumPajak - pajakPenghasilan;
+  // const labaBersihSebelumPajak = -5000000; // Contoh nilai negatif untuk testing
+  const labaBersihSetelahPajak = labaRugiData["Laba/Rugi Luar Biasa"]["Laba Bersih Setelah Pajak"]?.nilai ?? 0;
+  const pajakPenghasilan = labaBersihSebelumPajak - labaBersihSetelahPajak;
+
+  // Cek apakah rugi
+  const isRugiSebelumPajak = labaBersihSebelumPajak < 0;
 
   return (
     <div className="space-y-6">
@@ -843,47 +863,55 @@ export function LabaRugiSection() {
                 <div className={`${finalSumColumnStyles} ${underlineStyles}`}></div>
               </div>
 
-              {/* Laba Bersih Sebelum Pajak */}
+              {/* Laba Bersih Sebelum Pajak atau Rugi Sebelum Pajak */}
               <div className={`${itemStyles} ${totalStyles}`}>
                 <div className={`${nameColumnStyles} ${indentedTextStyles}`}>
-                  <span className="text-gray-800">Laba Bersih Sebelum Pajak</span>
+                  <span className="text-gray-800">
+                    {isRugiSebelumPajak ? "Laba Rugi" : "Laba Bersih Sebelum Pajak"}
+                  </span>
                 </div>
                 <div className={calcColumnStyles}></div>
                 <div className={sumColumnStyles}></div>
                 <div className={finalSumColumnStyles}>
-                  {formatAccountValue('Laba Bersih Sebelum Pajak', labaRugiData["Laba/Rugi Luar Biasa"]["Laba Bersih Sebelum Pajak"].nilai, true)}
+                  {formatAccountValue(
+                    isRugiSebelumPajak ? "Rugi Sebelum Pajak" : "Laba Bersih Sebelum Pajak",
+                    labaBersihSebelumPajak,
+                    true
+                  )}
                 </div>
               </div>
 
-              {/* Pajak Penghasilan (10%) */}
-              <div className={itemStyles}>
-                <div className={`${nameColumnStyles} ${indentedTextStyles}`}>
-                  <span className="text-gray-700">Pajak Penghasilan (25%)</span>
-                </div>
-                <div className={calcColumnStyles}></div>
-                <div className={sumColumnStyles}></div>
-                <div className={finalSumColumnStyles}>
-                  {formatAccountValue('Pajak Penghasilan', pajakPenghasilan)}
-                </div>
-              </div>
-              <div className={itemStyles}>
-                <div className={nameColumnStyles}></div>
-                <div className={calcColumnStyles}></div>
-                <div className={sumColumnStyles}></div>
-                <div className={`${finalSumColumnStyles} ${underlineStyles}`}></div>
-              </div>
-
-              {/* Laba Bersih Setelah Pajak */}
-              <div className={`${itemStyles} ${totalStyles}`}>
-                <div className={`${nameColumnStyles} ${indentedTextStyles}`}>
-                  <span className="text-gray-800">Laba Bersih Setelah Pajak</span>
-                </div>
-                <div className={calcColumnStyles}></div>
-                <div className={sumColumnStyles}></div>
-                <div className={finalSumColumnStyles}>
-                  {formatAccountValue('Laba Bersih Setelah Pajak', labaBersihSetelahPajak, true)}
-                </div>
-              </div>
+              {/* Pajak Penghasilan (25%) dan Laba Bersih Setelah Pajak hanya jika Laba Bersih Sebelum Pajak >= 0 */}
+              {!isRugiSebelumPajak && (
+                <>
+                  <div className={itemStyles}>
+                    <div className={`${nameColumnStyles} ${indentedTextStyles}`}>
+                      <span className="text-gray-700">Pajak Penghasilan (25%)</span>
+                    </div>
+                    <div className={calcColumnStyles}></div>
+                    <div className={sumColumnStyles}></div>
+                    <div className={finalSumColumnStyles}>
+                      {formatAccountValue('Pajak Penghasilan', pajakPenghasilan)}
+                    </div>
+                  </div>
+                  <div className={itemStyles}>
+                    <div className={nameColumnStyles}></div>
+                    <div className={calcColumnStyles}></div>
+                    <div className={sumColumnStyles}></div>
+                    <div className={`${finalSumColumnStyles} ${underlineStyles}`}></div>
+                  </div>
+                  <div className={`${itemStyles} ${totalStyles}`}>
+                    <div className={`${nameColumnStyles} ${indentedTextStyles}`}>
+                      <span className="text-gray-800">Laba Bersih Setelah Pajak</span>
+                    </div>
+                    <div className={calcColumnStyles}></div>
+                    <div className={sumColumnStyles}></div>
+                    <div className={finalSumColumnStyles}>
+                      {formatAccountValue('Laba Bersih Setelah Pajak', labaBersihSetelahPajak, true)}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

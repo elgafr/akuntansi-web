@@ -973,13 +973,13 @@ export function BukuBesarTable() {
           <tfoot className="bg-gray-50 font-medium">
             <tr>
               <td colSpan={4} className="px-4 py-2 text-right">Total:</td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-2 py-2 text-right">
                 {totals.debit ? `Rp ${totals.debit.toLocaleString()}` : '0'}
               </td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-2 py-2 text-right">
                 {totals.kredit ? `Rp ${totals.kredit.toLocaleString()}` : '0'}
               </td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-2 py-2 text-right">
                 <span className={totals.saldo < 0 ? 'text-red-600' : ''}>
                   {totals.saldo < 0 ? '-' : ''}
                   Rp {Math.abs(totals.saldo).toLocaleString() || '0'}

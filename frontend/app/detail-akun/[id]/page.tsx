@@ -401,9 +401,9 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <h1 className="text-2xl font-bold ml-8">Perusahaan</h1>
-                  <h2 className="text-sm ml-8">
+                  {/* <h2 className="text-sm ml-8">
                     Let's check your Company today
-                  </h2>
+                  </h2> */}
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

@@ -161,6 +161,40 @@ const fetchPosisiKeuangan = async (): Promise<PosisiKeuanganResponse> => {
   }
 };
 
+// Helper functions
+const formatCurrency = (amount: number) => {
+  return `Rp ${amount.toLocaleString('id-ID')}`;
+};
+
+function formatPosisiKeuanganValue(item: any, group: "aset" | "kewajiban" | "ekuitas") {
+  const namaAkun = item.akun?.nama || "";
+  const saldoNormal = item.akun?.saldo_normal;
+  const total = item.total || 0;
+
+  if (namaAkun.toLowerCase().includes("cadangan kerugian piutang")) {
+    return <span className="tabular-nums">({formatCurrency(Math.abs(total))})</span>;
+  }
+
+  if (group === "aset") {
+    if (saldoNormal === "debit" && total > 0) {
+      return <span className="tabular-nums">({formatCurrency(Math.abs(total))})</span>;
+    }
+    return <span className="tabular-nums">{formatCurrency(total)}</span>;
+  }
+
+  if (group === "kewajiban" || group === "ekuitas") {
+    if (saldoNormal === "debit" && total < 0) {
+      return <span className="tabular-nums">({formatCurrency(Math.abs(total))})</span>;
+    }
+    if (saldoNormal === "kredit" && total > 0) {
+      return <span className="tabular-nums">({formatCurrency(Math.abs(total))})</span>;
+    }
+    return <span className="tabular-nums">{formatCurrency(total)}</span>;
+  }
+
+  return <span className="tabular-nums">{formatCurrency(total)}</span>;
+}
+
 export function PosisiKeuanganSection() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -180,11 +214,6 @@ export function PosisiKeuanganSection() {
     refetchOnWindowFocus: true,
   });
   
-  // Helper functions
-  const formatCurrency = (amount: number) => {
-    return `Rp ${amount.toLocaleString('id-ID')}`;
-  };
-
   const handleExportPDF = async () => {
     const element = document.getElementById('posisi-keuangan-section');
     if (!element) return;
@@ -325,12 +354,12 @@ export function PosisiKeuanganSection() {
                     >
                       {item.akun?.nama || 'Unnamed Account'}
                     </span>
-                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
+                    {formatPosisiKeuanganValue(item, "aset")}
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Aset Lancar</span>
-                  <span className="tabular-nums">{formatCurrency(data.aset_lancar?.total_keseluruhan || 0)}</span>
+                  {formatCurrency(data.aset_lancar?.total_keseluruhan || 0)}
                 </div>
               </div>
             </div>
@@ -347,12 +376,12 @@ export function PosisiKeuanganSection() {
                     >
                       {item.akun?.nama || 'Unnamed Account'}
                     </span>
-                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
+                    {formatPosisiKeuanganValue(item, "aset")}
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Aset Tetap</span>
-                  <span className="tabular-nums">{formatCurrency(data.aset_tetap?.total_keseluruhan || 0)}</span>
+                  {formatCurrency(data.aset_tetap?.total_keseluruhan || 0)}
                 </div>
               </div>
             </div>
@@ -360,7 +389,7 @@ export function PosisiKeuanganSection() {
             {/* Total Aset */}
             <div className="flex justify-between py-3 font-bold border-t border-black mt-4">
               <span>TOTAL ASET</span>
-              <span className="tabular-nums">{formatCurrency(data.total_aset || 0)}</span>
+              {formatCurrency(data.total_aset || 0)}
             </div>
           </div>
 
@@ -380,12 +409,12 @@ export function PosisiKeuanganSection() {
                     >
                       {item.akun?.nama || 'Unnamed Account'}
                     </span>
-                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
+                    {formatPosisiKeuanganValue(item, "kewajiban")}
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Kewajiban</span>
-                  <span className="tabular-nums">{formatCurrency(data.kewajiban?.total_keseluruhan || 0)}</span>
+                  {formatCurrency(data.kewajiban?.total_keseluruhan || 0)}
                 </div>
               </div>
             </div>
@@ -402,12 +431,12 @@ export function PosisiKeuanganSection() {
                     >
                       {item.akun?.nama || 'Unnamed Account'}
                     </span>
-                    <span className="tabular-nums">{formatCurrency(item.total || 0)}</span>
+                    {formatPosisiKeuanganValue(item, "ekuitas")}
                   </div>
                 ))}
                 <div className="flex justify-between py-2 font-semibold border-t mt-2">
                   <span>Total Ekuitas</span>
-                  <span className="tabular-nums">{formatCurrency(data.ekuitas?.total_keseluruhan || 0)}</span>
+                  {formatCurrency(data.ekuitas?.total_keseluruhan || 0)}
                 </div>
               </div>
             </div>
@@ -415,7 +444,7 @@ export function PosisiKeuanganSection() {
             {/* Total Kewajiban dan Ekuitas */}
             <div className="flex justify-between py-3 font-bold border-t border-black mt-4">
               <span>TOTAL KEWAJIBAN DAN EKUITAS</span>
-              <span className="tabular-nums">{formatCurrency(data.total_kewajiban_ekuitas || 0)}</span>
+              {formatCurrency(data.total_kewajiban_ekuitas || 0)}
             </div>
           </div>
         </div>
